@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>DTF Halftone</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap">
+<style>
+/* Layout: an app frame. Header bar, the print shown on the shirt colour (left, as big as possible), settings rail (right); stacks on phones. */
+:root{
+  --bg:#f3f3f2; --panel:#ffffff; --soft:#f6f6f5; --ink:#111111; --muted:#6b6b6b; --line:#e6e6e6; --line-strong:#cfcfcf;
+  --accent:#d10074; --accent-ink:#ffffff; --on:#111111; --on-ink:#ffffff;
+  --good:#1b7a3a; --good-bg:#e8f4ec; --warn:#8f5400; --warn-bg:#fbf1e1; --bad:#b3261e; --bad-bg:#fbebea;
+  --toast:#111111; --toast-ink:#ffffff;
+  --font:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --r:4px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f0f0f; --panel:#181818; --soft:#202020; --ink:#f1f1f1; --muted:#a6a6a6; --line:#2c2c2c; --line-strong:#3d3d3d;
+  --accent:#e0168a; --accent-ink:#ffffff; --on:#f1f1f1; --on-ink:#111111;
+  --good:#6fd08f; --good-bg:#16291d; --warn:#f0b25c; --warn-bg:#2d2312; --bad:#ff8a80; --bad-bg:#331a18;
+  --toast:#f1f1f1; --toast-ink:#111111; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f0f0f; --panel:#181818; --soft:#202020; --ink:#f1f1f1; --muted:#a6a6a6; --line:#2c2c2c; --line-strong:#3d3d3d;
+  --accent:#e0168a; --accent-ink:#ffffff; --on:#f1f1f1; --on-ink:#111111;
+  --good:#6fd08f; --good-bg:#16291d; --warn:#f0b25c; --warn-bg:#2d2312; --bad:#ff8a80; --bad-bg:#331a18;
+  --toast:#f1f1f1; --toast-ink:#111111; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+.app{display:flex;flex-direction:column;height:100%;min-height:600px}
+.bar{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;flex-direction:column;gap:2px}
+.kicker{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.05}
+.file{flex:1 1 220px;min-width:0;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.file b{color:var(--ink);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tag{flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border:1px solid var(--line-strong);border-radius:var(--r);color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 18px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;user-select:none}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.btn[disabled]{opacity:.45;cursor:default;pointer-events:none}
+.btn.small{height:34px;padding:0 12px;font-size:13px}
+
+.work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px}
+.stage{position:relative;min-height:0;overflow:hidden;touch-action:none;background:#111111}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:default}
+.stage.pannable #view{cursor:grab}
+.stage.panning #view{cursor:grabbing}
+.stage.picking #view{cursor:crosshair}
+.overlay{position:absolute;left:max(12px,env(safe-area-inset-left,0px));right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;pointer-events:none}
+.overlay>*{pointer-events:auto}
+.o-top{top:12px}
+.o-bottom{bottom:12px;align-items:flex-end}
+.tray{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.tray-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 4px 0 2px}
+.sw{position:relative;width:26px;height:26px;padding:0;border-radius:3px;border:1px solid rgba(128,128,128,.45);cursor:pointer;flex:none}
+.sw[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:2px}
+.sw.custom{background:conic-gradient(#ff2d55,#ffcc00,#34c759,#0a84ff,#bf5af2,#ff2d55)}
+.sw.custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.readout{font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink);padding:6px 10px}
+.stack{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.legend{gap:4px 14px;padding:6px 10px;font-size:12px;font-weight:500;max-width:560px}
+.legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.legend i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(128,128,128,.6);flex:none}
+.pane-pick{position:absolute;padding:3px}
+.pane-pick select{height:32px;padding:0 8px;border:0;border-radius:3px;background:var(--panel);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer}
+.busy{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none}
+.hint{position:absolute;left:50%;top:76px;transform:translateX(-50%);padding:8px 14px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap}
+.drop{position:absolute;inset:12px;display:grid;place-items:center;border:2px dashed var(--accent);border-radius:var(--r);background:color-mix(in srgb,var(--panel) 88%,transparent);font-size:18px;font-weight:800;letter-spacing:-.02em;pointer-events:none}
+
+.panel{overflow:auto;background:var(--panel);border-left:1px solid var(--line);padding-bottom:24px}
+.group{display:grid;gap:12px;padding-block:18px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line)}
+h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.looks{display:grid;gap:8px}
+.look{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:12px;border:1.5px solid var(--line);border-radius:var(--r);cursor:pointer}
+.look:hover{border-color:var(--line-strong)}
+.look:has(input:checked){border-color:var(--ink);background:var(--soft)}
+.look input{grid-row:1/3;margin:2px 0 0;accent-color:var(--ink);width:16px;height:16px}
+.look-t{font-weight:700}
+.look-d{font-size:13px;color:var(--muted)}
+.field{display:grid;gap:6px}
+.f-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.f-head label,.f-head span{font-weight:600;font-size:13px}
+.f-head output{font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.f-note{margin:0;font-size:12px;color:var(--muted)}
+input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{height:34px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:13px;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums}
+.chip:hover{border-color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.knock{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.knock .sw{cursor:default;width:22px;height:22px}
+.link{background:none;border:0;padding:0;font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer;color:var(--ink)}
+.inkrow{display:flex;align-items:center;gap:10px;font-size:13px}
+.colorbox{position:relative;width:34px;height:34px;border:1.5px solid var(--line);border-radius:var(--r);overflow:hidden;flex:none}
+.colorbox input{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);border:0;padding:0;cursor:pointer}
+.size{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.num{display:flex;align-items:center;height:42px;border:1.5px solid var(--line);border-radius:var(--r);padding:0 10px;gap:6px}
+.num:focus-within{border-color:var(--ink)}
+.num input{width:64px;border:0;background:transparent;font-weight:700;font-size:16px;font-variant-numeric:tabular-nums;outline:none}
+.num span{color:var(--muted);font-size:13px}
+.size .by{color:var(--muted)}
+.size .h{font-weight:700;font-variant-numeric:tabular-nums}
+.checks{display:grid;gap:12px}
+.check{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start}
+.mark{width:22px;height:22px;border-radius:var(--r);display:grid;place-items:center;font-size:13px;font-weight:800;line-height:1}
+.mark.good{background:var(--good-bg);color:var(--good)}
+.mark.warn{background:var(--warn-bg);color:var(--warn)}
+.mark.bad{background:var(--bad-bg);color:var(--bad)}
+.mark.info{background:var(--soft);color:var(--muted)}
+.check b{display:block;font-size:13px}
+.check span{display:block;font-size:12px;color:var(--muted)}
+details summary{cursor:pointer;font-weight:600;font-size:13px}
+details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:calc(100% - 32px);padding:10px 16px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;z-index:20}
+
+@media (max-width:880px){
+  .app{height:auto}
+  .work{grid-template-columns:1fr}
+  .stage{height:64vh;min-height:380px}
+  .stage.is-split{height:100vh;min-height:640px}
+  .panel{border-left:0;border-top:1px solid var(--line);overflow:visible}
+  .o-top .tray-label{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <span class="kicker">Tshirt Workshop · Staff tool</span>
+      <h1>DTF Halftone</h1>
+    </div>
+    <div class="file" id="fileInfo"><span class="tag">Sample</span><b>Sample art</b></div>
+    <div class="actions">
+      <label class="btn" for="fileIn">Open art</label>
+      <input type="file" id="fileIn" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
+      <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
+    </div>
+  </header>
+
+  <main class="work">
+    <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
+      <canvas id="view"></canvas>
+      <div class="overlay o-top" id="oTop">
+        <div class="tray" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tray-label">Shirt</span></div>
+        <div class="tray" role="group" aria-label="View" id="viewTray" title="Press V to step through the views">
+          <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
+          <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
+          <button class="chip" type="button" data-view="map" aria-pressed="false">Halftone map</button>
+          <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
+        </div>
+        <div class="tray" role="group" aria-label="Zoom" id="zoomTray">
+          <button class="chip" type="button" data-zoom="fit" aria-pressed="true">Fit</button>
+          <button class="chip" type="button" data-zoom="1" aria-pressed="false">1:1</button>
+          <button class="chip" type="button" data-zoom="2" aria-pressed="false">2×</button>
+          <button class="chip" type="button" data-zoom="4" aria-pressed="false">4×</button>
+        </div>
+      </div>
+      <div class="overlay o-bottom" id="oBottom">
+        <div class="stack">
+          <div class="tray legend" id="legend" hidden></div>
+          <div class="tray"><span class="readout" id="sizeRead">–</span></div>
+        </div>
+        <button class="btn small" type="button" id="compareBtn" title="Press and hold to see the art before halftoning">Hold for original</button>
+      </div>
+      <div class="tray pane-pick" id="paneA" hidden><select id="paneASel" aria-label="Left side shows"></select></div>
+      <div class="tray pane-pick" id="paneB" hidden><select id="paneBSel" aria-label="Right side shows"></select></div>
+      <div class="busy" id="busy" hidden>Updating…</div>
+      <div class="hint" id="pickHint" hidden>Click the colour to knock out · Esc to cancel</div>
+      <div class="drop" id="drop" hidden>Drop the art to open it</div>
+    </section>
+
+    <aside class="panel" aria-label="Halftone settings">
+      <section class="group">
+        <h2>Look</h2>
+        <div class="looks" id="looks">
+          <label class="look"><input type="radio" name="look" id="lookEdges" value="edges"><span class="look-t">Fix soft edges</span><span class="look-d">Shadows, glows and fades become solid dots. Solid parts stay solid.</span></label>
+          <label class="look"><input type="radio" name="look" id="lookKnock" value="knock"><span class="look-t">Shirt shows through</span><span class="look-d">Colours close to the shirt drop out. Shading turns into dots.</span></label>
+          <label class="look"><input type="radio" name="look" id="lookFull" value="full"><span class="look-t">Full halftone</span><span class="look-d">The whole design becomes dots for a soft, vintage print.</span></label>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Dots</h2>
+        <div class="field">
+          <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">35 lpi</output></div>
+          <input type="range" id="lpi" min="15" max="65" step="1" value="35">
+          <p class="f-note" id="lpiNote">Dots every 0.73 mm.</p>
+        </div>
+        <div class="field">
+          <div class="f-head"><span>Angle</span></div>
+          <div class="chips" id="angleChips">
+            <button class="chip" type="button" data-angle="0">0°</button>
+            <button class="chip" type="button" data-angle="15">15°</button>
+            <button class="chip" type="button" data-angle="22.5">22.5°</button>
+            <button class="chip" type="button" data-angle="45">45°</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="f-head"><span>Dot shape</span></div>
+          <div class="chips" id="shapeChips">
+            <button class="chip" type="button" data-shape="round">Round</button>
+            <button class="chip" type="button" data-shape="ellipse">Ellipse</button>
+            <button class="chip" type="button" data-shape="square">Square</button>
+            <button class="chip" type="button" data-shape="line">Line</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="group" id="knockGroup">
+        <h2>Knock out</h2>
+        <div class="knock">
+          <span class="sw" id="knockSw" aria-hidden="true"></span>
+          <span id="knockTxt">Measured from the shirt colour.</span>
+          <button class="link" type="button" id="pickBtn">Pick from art</button>
+          <button class="link" type="button" id="knockReset" hidden>Use shirt colour</button>
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="k0">Shirt shows through up to</label><output id="k0Out" for="k0">10%</output></div>
+          <input type="range" id="k0" min="0" max="60" step="1" value="10">
+          <p class="f-note">Colours this close to the shirt disappear.</p>
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="k1">Full ink from</label><output id="k1Out" for="k1">70%</output></div>
+          <input type="range" id="k1" min="20" max="100" step="1" value="70">
+          <p class="f-note">Colours this different from the shirt print solid. Between the two, dots.</p>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Tone</h2>
+        <div class="field">
+          <div class="f-head"><label for="mid">Ink amount</label><output id="midOut" for="mid">0</output></div>
+          <input type="range" id="mid" min="-50" max="50" step="1" value="0">
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="con">Contrast</label><output id="conOut" for="con">0</output></div>
+          <input type="range" id="con" min="-50" max="50" step="1" value="0">
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="drop">Drop dots under</label><output id="dropOut" for="drop">15%</output></div>
+          <input type="range" id="drop" min="0" max="40" step="1" value="15">
+          <p class="f-note" id="dropNote">Smallest dot about 0.32 mm across.</p>
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="solid">Solid above</label><output id="solidOut" for="solid">92%</output></div>
+          <input type="range" id="solid" min="60" max="100" step="1" value="92">
+          <p class="f-note">Dots this big join into solid ink.</p>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Ink colour</h2>
+        <div class="chips" id="inkChips">
+          <button class="chip" type="button" data-ink="art">Artwork colours</button>
+          <button class="chip" type="button" data-ink="one">One colour</button>
+        </div>
+        <div class="inkrow" id="inkRow" hidden>
+          <span class="colorbox"><input type="color" id="inkPick" value="#ffffff" aria-label="Ink colour"></span>
+          <span id="inkTxt">Every dot prints in this colour.</span>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Print size</h2>
+        <div class="size">
+          <div class="num"><input type="number" id="wcm" min="1" max="50" step="0.1" value="25" aria-label="Print width in centimetres"><span>cm wide</span></div>
+          <span class="by">×</span>
+          <span><span class="h" id="hcm">25.0</span> <span class="by">cm high</span></span>
+        </div>
+        <div class="chips" id="sizeChips">
+          <button class="chip" type="button" data-w="9">Chest 9 cm</button>
+          <button class="chip" type="button" data-w="28">Front 28 cm</button>
+          <button class="chip" type="button" data-w="33">Back 33 cm</button>
+          <button class="chip" type="button" data-w="max">Largest</button>
+        </div>
+        <p class="f-note" id="sizeNote">Saved at 300 dpi. Largest print is 40 × 50 cm either way round.</p>
+      </section>
+
+      <section class="group">
+        <h2>Film check</h2>
+        <div class="checks" id="checks"></div>
+      </section>
+
+      <section class="group">
+        <details>
+          <summary>DTF halftone tips</summary>
+          <ul>
+            <li>25–35 lpi suits most tees. Go to 45 or more for small or detailed prints.</li>
+            <li>22.5° is the usual angle for single-colour halftones. It hides the rows of dots best.</li>
+            <li>On dark tees, “Shirt shows through” lets the shirt be your darkest colour, so the print is lighter and breathes.</li>
+            <li>Keep the smallest dots around 0.3 mm or more so they hold in the wash.</li>
+            <li>Press V to step through On shirt, White base, Halftone map and Split. Hold for original in the base and map views shows where the art was see-through.</li>
+            <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
+            <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
+            <li>Nothing is uploaded. The art stays on this computer.</li>
+          </ul>
+        </details>
+      </section>
+    </aside>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- The halftone engine. Runs in a Web Worker (built from this function's text), or on the page if workers are blocked. ---------- */
+function engine(){
+  const N = 128;            // threshold tile resolution per screen cell
+  const tiles = {};
+  let S = null;             // source pixels at output size {w,h,d}
+
+  // Fill order inside one screen cell; a, b = distance from the cell centre along the screen axes (0 centre, 1 edge). Smaller fills first.
+  function key(shape, a, b){
+    switch(shape){
+      case 'ellipse': return a*a*0.45 + b*b;
+      case 'square':  return Math.max(a, b);
+      case 'line':    return b;
+      default:        return a + b <= 1 ? a*a + b*b : 4 - ((1-a)*(1-a) + (1-b)*(1-b)); // Euclidean: round dots that meet at 50%, then round holes
+    }
+  }
+  // Rank every sample in the cell so a coverage value c fills exactly c of the cell's area, whatever the shape.
+  function tile(shape){
+    if (tiles[shape]) return tiles[shape];
+    const n = N*N, keys = new Float64Array(n), order = new Array(n);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){
+      const a = Math.abs((i + 0.5)/N*2 - 1), b = Math.abs((j + 0.5)/N*2 - 1), k = j*N + i;
+      keys[k] = key(shape, a, b) + 1e-4*(a*a + b*b); order[k] = k;
+    }
+    order.sort((p, q) => keys[p] - keys[q]);
+    const t = new Float32Array(n);
+    for (let r = 0; r < n; r++) t[order[r]] = (r + 0.5)/n;
+    return (tiles[shape] = t);
+  }
+  function setSrc(w, h, buf){
+    const d = new Uint8ClampedArray(buf);
+    S = {w, h, d};
+    let vis = 0, soft = 0;
+    for (let i = 3; i < d.length; i += 4){ const a = d[i]; if (a){ vis++; if (a < 255) soft++; } }
+    return {vis, soft, total: w*h};
+  }
+  function run(p){
+    const {w, h, d} = S, out = new Uint8ClampedArray(w*h*4), t = tile(p.shape);
+    const cls = new Uint8Array(w*h); // what happened to each pixel: 0 clear, 1 removed, 2 gap between dots, 3 dot, 4 solid
+    const lut = new Float32Array(1025);
+    for (let i = 0; i <= 1024; i++){
+      let c = i/1024;
+      if (p.gamma !== 1) c = Math.pow(c, p.gamma);
+      c = (c - 0.5)*p.contrast + 0.5;
+      c = c < 0 ? 0 : c > 1 ? 1 : c;
+      if (c >= p.solid) c = 1; else if (c < p.drop) c = 0;
+      lut[i] = c;
+    }
+    lut[0] = 0;
+    const cell = p.dpi/p.lpi, th = p.angle*Math.PI/180, cs = Math.cos(th)/cell, sn = Math.sin(th)/cell;
+    const tone = p.tone, lum = p.metric === 'lum', k0 = p.k0, ks = Math.max(0.001, p.k1 - p.k0);
+    const kr = p.knock[0], kg = p.knock[1], kb = p.knock[2], kl = (0.299*kr + 0.587*kg + 0.114*kb);
+    // 100% = as different from the knock-out colour as a colour can be (white on a black shirt, black on a white one)
+    const far = lum ? Math.max(kl, 255 - kl) : Math.max(kr, 255 - kr, kg, 255 - kg, kb, 255 - kb);
+    const one = p.one, ir = p.ink[0], ig = p.ink[1], ib = p.ink[2];
+    let on = 0;
+    for (let y = 0; y < h; y++){
+      let fx = 0.5*cs + (y + 0.5)*sn, fy = -0.5*sn + (y + 0.5)*cs, i = y*w*4;
+      for (let x = 0; x < w; x++, i += 4, fx += cs, fy -= sn){
+        const a = d[i+3];
+        if (a === 0) continue;
+        let c = a/255;
+        if (tone){
+          const r = d[i], g = d[i+1], b = d[i+2];
+          let m;
+          if (lum){ m = 0.299*r + 0.587*g + 0.114*b - kl; if (m < 0) m = -m; }
+          else { m = r > kr ? r - kr : kr - r; const dg = g > kg ? g - kg : kg - g; if (dg > m) m = dg; const db = b > kb ? b - kb : kb - b; if (db > m) m = db; }
+          const q = (m/far - k0)/ks;
+          if (q <= 0){ cls[i >> 2] = 1; continue; }
+          if (q < 1) c *= q;
+        }
+        c = lut[(c*1024) | 0];
+        if (c <= 0){ cls[i >> 2] = 1; continue; }
+        if (c < 1){
+          const u = fx - Math.floor(fx), v = fy - Math.floor(fy);
+          if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]){ cls[i >> 2] = 2; continue; }
+          cls[i >> 2] = 3;
+        } else cls[i >> 2] = 4;
+        if (one){ out[i] = ir; out[i+1] = ig; out[i+2] = ib; }
+        else { out[i] = d[i]; out[i+1] = d[i+1]; out[i+2] = d[i+2]; }
+        out[i+3] = 255; on++;
+      }
+    }
+    return {w, h, buf: out.buffer, cls: cls.buffer, on};
+  }
+  function handle(m){
+    if (m.type === 'src') return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
+    const r = run(m.p);
+    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls}, transfer: [r.buf, r.cls]};
+  }
+  return {handle};
+}
+
+const WORKER_SRC = `const E=(${engine.toString()})();onmessage=e=>{const m=e.data;try{const r=E.handle(m);postMessage(r.msg,r.transfer||[])}catch(err){postMessage({type:'err',id:m.id,v:m.v,msg:String(err&&err.message||err)})}};`;
+
+/* ---------- Page ---------- */
+const DPI = 300;
+const MAX_SHORT = 40, MAX_LONG = 50; // largest print, cm, either way round
+const SHIRTS = [['Black','#111111'],['White','#ffffff'],['Navy','#1d2742'],['Charcoal','#3d3d40'],['Grey marle','#a8a8a8'],['Red','#c21a26'],['Royal','#2552a8'],['Bottle green','#1f4a33'],['Natural','#eee3cc']];
+const LOOKS = {
+  edges: {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 90},
+  knock: {k0: 10, k1: 70,  mid: 0, con: 0, drop: 15, solid: 92},
+  full:  {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 96}
+};
+const $ = id => document.getElementById(id);
+const st = {look: 'knock', lpi: 35, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
+            ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt'};
+const KEEP = ['look','lpi','angle','shape','k0','k1','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB'];
+try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
+function remember(){ try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
+
+const stage = $('stage'), view = $('view'), vctx = view.getContext('2d');
+const srcCanvas = document.createElement('canvas'), srcCtx = srcCanvas.getContext('2d', {willReadFrequently: true});
+const outCanvas = document.createElement('canvas'), outCtx = outCanvas.getContext('2d');
+const masks = {base: {canvas: document.createElement('canvas'), mips: null, key: -1}, map: {canvas: document.createElement('canvas'), mips: null, key: -1}};
+const origCanvas = document.createElement('canvas'), origCtx = origCanvas.getContext('2d');
+let lastCls = null, paintN = 0, origFor = 0, origMips = null;
+let art = null, srcV = 0, srcStats = null, srcMips = null, outMips = null, outReady = false, lastOn = 0;
+let runId = 0, running = false, pending = false, compare = false, picking = false;
+const idleWaiters = [];
+
+/* worker, or the same engine on the page */
+let bus = null, gotReply = false;
+function localBus(){ const E = engine(); return {post: m => setTimeout(() => { try { onMsg(E.handle(m).msg); } catch(err){ onMsg({type: 'err', id: m.id, v: m.v, msg: String(err && err.message || err)}); } }, 0)}; }
+function makeBus(){
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], {type: 'text/javascript'})));
+    w.onmessage = e => { gotReply = true; onMsg(e.data); };
+    w.onerror = e => { e.preventDefault && e.preventDefault(); if (!gotReply){ bus = localBus(); running = false; if (art) buildSrc(); } };
+    return {post: (m, t) => w.postMessage(m, t || [])};
+  } catch(e){ return localBus(); }
+}
+bus = makeBus();
+
+function onMsg(m){
+  if (m.type === 'src'){ if (m.v === srcV){ srcStats = m.stats; } return; }
+  if (m.type === 'err'){ running = false; pending = false; $('busy').hidden = true; toast('That didn’t work: ' + m.msg); flushIdle(); return; }
+  running = false;
+  if (m.v === srcV) paint(m);
+  if (pending){ pending = false; schedule(); } else { $('busy').hidden = true; flushIdle(); }
+}
+function flushIdle(){ while (idleWaiters.length) idleWaiters.shift()(); }
+function idle(){ return (running || pending) ? new Promise(r => idleWaiters.push(r)) : Promise.resolve(); }
+
+function hexRgb(h){ const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rgbHex(r, g, b){ return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join(''); }
+function params(){
+  return {lpi: st.lpi, angle: st.angle, shape: st.shape, dpi: DPI,
+          tone: st.look !== 'edges', metric: st.look === 'full' ? 'lum' : 'max',
+          k0: st.k0/100, k1: st.k1/100, knock: hexRgb(st.knock || st.shirt),
+          gamma: Math.pow(2, -st.mid/50), contrast: Math.pow(2, st.con/50),
+          drop: st.drop/100, solid: st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex)};
+}
+function schedule(){
+  if (!srcV) return;
+  if (running){ pending = true; return; }
+  running = true;
+  $('busy').hidden = false;
+  bus.post({type: 'run', id: ++runId, v: srcV, p: params()});
+}
+
+/* ---------- sizes ---------- */
+function maxWidthCm(){ if (!art) return MAX_SHORT; const a = art.h/art.w; return art.w >= art.h ? Math.min(MAX_LONG, MAX_SHORT/a) : Math.min(MAX_SHORT, MAX_LONG/a); }
+function outW(){ return Math.max(1, Math.round(st.widthCm/2.54*DPI)); }
+function outH(){ return Math.max(1, Math.round(outW()*art.h/art.w)); }
+function setWidth(cm, quiet){
+  const max = Math.floor(maxWidthCm()*10)/10;
+  let w = Math.round(Math.max(1, Math.min(cm || 1, max))*10)/10;
+  if (!quiet && cm > max + 0.05) toast(`Largest print is 40 × 50 cm, so it’s set to ${max.toFixed(1)} cm wide.`);
+  st.widthCm = w;
+  $('wcm').value = w.toFixed(1);
+  $('hcm').textContent = (w*art.h/art.w).toFixed(1);
+  $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px, saved at 300 dpi. Largest print is 40 × 50 cm either way round.`;
+  $('sizeRead').textContent = `${w.toFixed(1)} × ${(w*art.h/art.w).toFixed(1)} cm · ${outW()} × ${outH()} px`;
+}
+
+/* Draw big images down in halves first so the result stays clean in every browser. */
+function drawScaled(ctx, img, sw, sh, W, H){
+  let src = img, cw = sw, ch = sh;
+  while (cw/2 >= W && ch/2 >= H){
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(cw/2)); c.height = Math.max(1, Math.round(ch/2));
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(src, 0, 0, c.width, c.height); src = c; cw = c.width; ch = c.height;
+  }
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(src, 0, 0, W, H);
+}
+function buildMips(cv){
+  const levels = [cv]; let c = cv;
+  while (c.width > 600 || c.height > 600){
+    const n = document.createElement('canvas'); n.width = Math.max(1, c.width >> 1); n.height = Math.max(1, c.height >> 1);
+    const x = n.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(c, 0, 0, n.width, n.height); levels.push(n); c = n;
+  }
+  return levels;
+}
+/* White base and halftone map views, drawn from what the engine did to each pixel. */
+const abgr = h => { const [r, g, b] = hexRgb(h); return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0; };
+const VIEWS = {
+  base: {pal: ['#000000', '#000000', '#000000', '#ffffff', '#ffffff'],
+         legend: [['#ffffff', 'Ink on a white base'], ['#000000', 'Clear film']]},
+  map:  {pal: ['#000000', '#5a5a5a', '#ff2e93', '#ff2e93', '#f2f2f2'], // dots and the gaps between them share one pink, so the halftoned area reads as one patch
+         legend: [['#f2f2f2', 'Solid ink'], ['#ff2e93', 'Turned into dots'], ['#5a5a5a', 'Removed']]}
+};
+const ORIG_LEGEND = [['#ffffff', 'Original: solid'], ['#808080', 'Original: see-through, prints as haze'], ['#000000', 'Clear film']];
+const PANES = [['orig', 'Original on shirt'], ['origbase', 'Original alpha'], ['shirt', 'Halftone on shirt'], ['base', 'White base'], ['map', 'Halftone map']];
+function buildMask(kind){
+  const m = masks[kind];
+  if (!lastCls || m.key === paintN) return;
+  const W = outCanvas.width, H = outCanvas.height, pal = VIEWS[kind].pal.map(abgr), c = m.canvas, x = c.getContext('2d');
+  c.width = W; c.height = H;
+  const im = x.createImageData(W, H), u = new Uint32Array(im.data.buffer);
+  for (let j = 0; j < u.length; j++) u[j] = pal[lastCls[j]];
+  x.putImageData(im, 0, 0); m.mips = buildMips(c); m.key = paintN;
+}
+// what is on screen now: one view, or the two sides of Split (Hold for original swaps in the original)
+function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB] : [compare ? (st.view === 'shirt' ? 'orig' : 'origbase') : st.view]; }
+function prepareViews(){
+  const ks = st.view === 'split' ? [st.paneA, st.paneB] : [st.view];
+  for (const k of ks) if (masks[k]) buildMask(k);
+  if (ks.some(isMask)) buildOrigMask();
+}
+function levelsFor(kind){
+  if (kind === 'orig') return srcMips;
+  if (kind === 'origbase') return origMips;
+  if (kind === 'shirt') return outMips || srcMips;
+  return masks[kind].mips || outMips;
+}
+const isMask = kind => kind !== 'shirt' && kind !== 'orig';
+const paneBg = kind => isMask(kind) ? '#1a1a1a' : st.shirt;
+function buildOrigMask(){
+  if (origFor === srcV || !srcCanvas.width) return;
+  const W = srcCanvas.width, H = srcCanvas.height, d = srcCtx.getImageData(0, 0, W, H).data;
+  origCanvas.width = W; origCanvas.height = H;
+  const im = origCtx.createImageData(W, H), u = new Uint32Array(im.data.buffer);
+  for (let j = 0, i = 3; j < u.length; j++, i += 4){ const a = d[i]; u[j] = ((255 << 24) | (a << 16) | (a << 8) | a) >>> 0; }
+  origCtx.putImageData(im, 0, 0); origMips = buildMips(origCanvas); origFor = srcV;
+}
+
+let srcTimer = 0;
+function buildSrcSoon(){ clearTimeout(srcTimer); srcTimer = setTimeout(buildSrc, 250); }
+function buildSrc(){
+  if (!art) return;
+  const W = outW(), H = outH();
+  srcCanvas.width = W; srcCanvas.height = H;
+  drawScaled(srcCtx, art.el, art.w, art.h, W, H);
+  const data = srcCtx.getImageData(0, 0, W, H);
+  srcV++; srcStats = null;
+  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer}, [data.data.buffer]);
+  srcMips = buildMips(srcCanvas);
+  prepareViews();
+  st.cx = W/2; st.cy = H/2;
+  if (running) pending = true; else schedule();
+}
+
+function paint(m){
+  outCanvas.width = m.w; outCanvas.height = m.h;
+  outCtx.putImageData(new ImageData(new Uint8ClampedArray(m.buf), m.w, m.h), 0, 0);
+  outMips = buildMips(outCanvas);
+  lastCls = new Uint8Array(m.cls); paintN++;
+  prepareViews();
+  outReady = true; lastOn = m.on;
+  $('saveBtn').disabled = false;
+  render(); updateChecks();
+}
+
+/* ---------- the view: the print on the shirt colour, fit or zoomed ---------- */
+let geo = null, geos = [];
+function render(){
+  const r = stage.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const cw = Math.max(1, Math.round(r.width*dpr)), ch = Math.max(1, Math.round(r.height*dpr));
+  if (view.width !== cw || view.height !== ch){ view.width = cw; view.height = ch; }
+  const topH = $('oTop').offsetHeight + 12, botH = $('oBottom').offsetHeight + 12;
+  let panes;
+  if (st.view !== 'split'){
+    panes = [{kind: kindsShown()[0], x: 0, y: 0, w: r.width, h: r.height, top: topH + 12, bottom: botH + 12}];
+  } else {
+    const across = r.width >= r.height*1.1, pa = $('paneA'), pb = $('paneB'), pickH = pa.offsetHeight + 8;
+    if (across){ // side by side
+      const hw = Math.round(r.width/2);
+      panes = [{kind: st.paneA, x: 0, y: 0, w: hw, h: r.height, top: topH + pickH + 8, bottom: botH + 12},
+               {kind: st.paneB, x: hw, y: 0, w: r.width - hw, h: r.height, top: topH + pickH + 8, bottom: botH + 12}];
+      place(pa, 12, topH); place(pb, hw + 12, topH);
+    } else { // stacked, for tall screens
+      const hh = Math.round(r.height/2);
+      panes = [{kind: st.paneA, x: 0, y: 0, w: r.width, h: hh, top: topH + pickH + 8, bottom: 12},
+               {kind: st.paneB, x: 0, y: hh, w: r.width, h: r.height - hh, top: pickH + 20, bottom: botH + 12}];
+      place(pa, 12, topH); place(pb, 12, hh + 12);
+    }
+    pa.firstElementChild.setAttribute('aria-label', across ? 'Left side shows' : 'Top shows');
+    pb.firstElementChild.setAttribute('aria-label', across ? 'Right side shows' : 'Bottom shows');
+  }
+  stage.style.background = paneBg(panes[0].kind);
+  geos = panes.map(p => drawPane(p, dpr));
+  geo = geos[0];
+  if (panes.length > 1){
+    const p = panes[1];
+    vctx.fillStyle = '#808080'; // mid grey reads on white and black shirts alike
+    if (p.x > 0) vctx.fillRect(Math.round(p.x*dpr) - dpr, 0, 2*dpr, ch); else vctx.fillRect(0, Math.round(p.y*dpr) - dpr, cw, 2*dpr);
+  }
+}
+function place(el, x, y){ el.style.left = x + 'px'; el.style.top = y + 'px'; }
+function drawPane(p, dpr){
+  const X = Math.round(p.x*dpr), Y = Math.round(p.y*dpr), W = Math.round(p.w*dpr), H = Math.round(p.h*dpr);
+  const g = {x: p.x, y: p.y, w: p.w, h: p.h, dpr, k: 1, dx: X, dy: Y, OW: 0, OH: 0};
+  vctx.save(); vctx.beginPath(); vctx.rect(X, Y, W, H); vctx.clip();
+  vctx.fillStyle = paneBg(p.kind); vctx.fillRect(X, Y, W, H);
+  const levels = levelsFor(p.kind);
+  if (levels){
+    const OW = levels[0].width, OH = levels[0].height, side = st.view === 'split' ? 12 : 24;
+    if (st.zoom === 'fit'){
+      const bw = Math.max(40, p.w - side*2), bh = Math.max(40, p.h - p.top - p.bottom), s = Math.min(bw/OW, bh/OH);
+      g.k = s*dpr; g.dx = X + (side + (bw - OW*s)/2)*dpr; g.dy = Y + (p.top + (bh - OH*s)/2)*dpr;
+    } else { // both sides share one centre, so they zoom and pan together
+      g.k = +st.zoom;
+      st.cx = Math.max(0, Math.min(OW, st.cx)); st.cy = Math.max(0, Math.min(OH, st.cy));
+      g.dx = X + W/2 - st.cx*g.k; g.dy = Y + H/2 - st.cy*g.k;
+    }
+    g.OW = OW; g.OH = OH;
+    const k = g.k, L = k < 1 ? Math.min(levels.length - 1, Math.max(0, Math.floor(Math.log2(1/k)))) : 0, lv = levels[L];
+    vctx.imageSmoothingEnabled = k < 1; vctx.imageSmoothingQuality = 'high';
+    vctx.drawImage(lv, 0, 0, lv.width, lv.height, g.dx, g.dy, OW*k, OH*k);
+    if (isMask(p.kind)){ // outline the print box so clear film reads against the background
+      const lw = Math.max(1, Math.round(dpr));
+      vctx.strokeStyle = '#5c5c5c'; vctx.lineWidth = lw; vctx.strokeRect(g.dx - lw/2, g.dy - lw/2, OW*k + lw, OH*k + lw);
+    }
+  }
+  vctx.restore();
+  return g;
+}
+function geoAt(x, y){ return geos.find(g => x >= g.x && x < g.x + g.w && y >= g.y && y < g.y + g.h) || geo; }
+new ResizeObserver(() => render()).observe(stage);
+
+function setZoom(z, atX, atY){
+  if (z !== 'fit' && geo){
+    if (atX != null){ const g = geoAt(atX, atY); st.cx = (atX*g.dpr - g.dx)/g.k; st.cy = (atY*g.dpr - g.dy)/g.k; }
+    else if (st.zoom === 'fit'){ st.cx = geo.OW/2; st.cy = geo.OH/2; }
+  }
+  st.zoom = z;
+  for (const b of $('zoomTray').querySelectorAll('[data-zoom]')) b.setAttribute('aria-pressed', String(b.dataset.zoom === String(z)));
+  stage.classList.toggle('pannable', z !== 'fit');
+  render();
+}
+$('zoomTray').addEventListener('click', e => { const b = e.target.closest('[data-zoom]'); if (b) setZoom(b.dataset.zoom === 'fit' ? 'fit' : +b.dataset.zoom); });
+
+const VIEW_ORDER = ['shirt', 'base', 'map', 'split'];
+function setView(v){
+  st.view = v;
+  for (const b of $('viewTray').querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === v));
+  const split = v === 'split';
+  $('paneA').hidden = $('paneB').hidden = !split;
+  $('compareBtn').hidden = split;
+  stage.classList.toggle('is-split', split);
+  compare = false;
+  prepareViews(); syncLegend(); render();
+}
+function syncLegend(){
+  const items = [], seen = new Set();
+  for (const k of kindsShown()){
+    const list = k === 'origbase' ? ORIG_LEGEND : VIEWS[k] ? VIEWS[k].legend : [];
+    for (const it of list) if (!seen.has(it[1])){ seen.add(it[1]); items.push(it); }
+  }
+  const lg = $('legend');
+  lg.hidden = !items.length;
+  lg.innerHTML = items.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join('');
+}
+for (const id of ['paneA', 'paneB']){
+  const sel = $(id + 'Sel');
+  sel.innerHTML = PANES.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+  sel.value = st[id];
+  sel.addEventListener('change', () => { st[id] = sel.value; remember(); prepareViews(); syncLegend(); render(); });
+}
+$('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
+window.addEventListener('keydown', e => {
+  const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
+  if ((e.key === 'v' || e.key === 'V') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)
+    setView(VIEW_ORDER[(VIEW_ORDER.indexOf(st.view) + 1) % VIEW_ORDER.length]);
+});
+
+let drag = null;
+view.addEventListener('pointerdown', e => {
+  if (picking){ pickAt(e); return; }
+  if (st.zoom === 'fit') return;
+  drag = {x: e.clientX, y: e.clientY, cx: st.cx, cy: st.cy};
+  view.setPointerCapture(e.pointerId); stage.classList.add('panning');
+});
+view.addEventListener('pointermove', e => {
+  if (!drag || !geo) return;
+  st.cx = drag.cx - (e.clientX - drag.x)*geo.dpr/geo.k; st.cy = drag.cy - (e.clientY - drag.y)*geo.dpr/geo.k; render();
+});
+const endDrag = () => { drag = null; stage.classList.remove('panning'); };
+view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag);
+view.addEventListener('wheel', e => {
+  if (st.zoom === 'fit' || !geo) return;
+  e.preventDefault(); st.cx += e.deltaX*geo.dpr/geo.k; st.cy += e.deltaY*geo.dpr/geo.k; render();
+}, {passive: false});
+view.addEventListener('dblclick', e => {
+  if (picking) return;
+  const r = view.getBoundingClientRect();
+  if (st.zoom === 'fit') setZoom(1, e.clientX - r.left, e.clientY - r.top); else setZoom('fit');
+});
+
+const cmp = $('compareBtn');
+const cmpOn = () => { if (!compare){ compare = true; syncLegend(); render(); } }, cmpOff = () => { if (compare){ compare = false; syncLegend(); render(); } };
+cmp.addEventListener('pointerdown', e => { e.preventDefault(); cmpOn(); });
+cmp.addEventListener('pointerup', cmpOff); cmp.addEventListener('pointerleave', cmpOff); cmp.addEventListener('pointercancel', cmpOff);
+cmp.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); cmpOn(); } });
+cmp.addEventListener('keyup', cmpOff); cmp.addEventListener('blur', cmpOff);
+
+/* ---------- knock-out colour picker ---------- */
+function startPick(){ picking = true; stage.classList.add('picking'); $('pickHint').hidden = false; }
+function endPick(){ picking = false; stage.classList.remove('picking'); $('pickHint').hidden = true; }
+function pickAt(e){
+  const r = view.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, g = geoAt(px, py);
+  const x = Math.floor((px*g.dpr - g.dx)/g.k), y = Math.floor((py*g.dpr - g.dy)/g.k);
+  if (x < 0 || y < 0 || x >= srcCanvas.width || y >= srcCanvas.height){ toast('Click on the art to pick a colour.'); return; }
+  const p = srcCtx.getImageData(x, y, 1, 1).data;
+  if (p[3] < 8){ toast('That spot is clear. Click on a colour in the art.'); return; }
+  endPick();
+  st.knock = rgbHex(p[0], p[1], p[2]);
+  syncKnock(); schedule();
+}
+$('pickBtn').addEventListener('click', () => picking ? endPick() : startPick());
+$('knockReset').addEventListener('click', () => { st.knock = null; syncKnock(); schedule(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && picking) endPick(); });
+function syncKnock(){
+  $('knockSw').style.background = st.knock || st.shirt;
+  $('knockTxt').textContent = st.knock ? `Measured from ${st.knock.toUpperCase()}, picked from the art.` : 'Measured from the shirt colour.';
+  $('knockReset').hidden = !st.knock;
+}
+
+/* ---------- controls ---------- */
+const shirtTray = $('shirtTray');
+for (const [name, hex] of SHIRTS){
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'sw'; b.style.background = hex; b.dataset.hex = hex; b.title = name; b.setAttribute('aria-label', name);
+  shirtTray.appendChild(b);
+}
+const custom = document.createElement('label');
+custom.className = 'sw custom'; custom.title = 'Another colour';
+custom.innerHTML = '<input type="color" id="shirtPick" aria-label="Another shirt colour">';
+shirtTray.appendChild(custom);
+function syncShirt(){
+  let matched = false;
+  for (const b of shirtTray.querySelectorAll('button.sw')){ const on = b.dataset.hex.toLowerCase() === st.shirt.toLowerCase(); matched = matched || on; b.setAttribute('aria-pressed', String(on)); }
+  custom.setAttribute('aria-pressed', String(!matched));
+  if (!matched) custom.style.background = st.shirt; else custom.style.background = '';
+  $('shirtPick').value = st.shirt;
+  syncKnock();
+}
+shirtTray.addEventListener('click', e => { const b = e.target.closest('button.sw'); if (!b) return; st.shirt = b.dataset.hex; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
+$('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
+
+const SLIDERS = [['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
+                 ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`]];
+function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } }
+for (const [id, fmt] of SLIDERS){
+  $(id).addEventListener('input', e => {
+    let v = +e.target.value;
+    if (id === 'k0' && v >= st.k1){ st.k1 = Math.min(100, v + 5); }
+    if (id === 'k1' && v <= st.k0){ st.k0 = Math.max(0, v - 5); }
+    st[id] = v; syncSliders(); updateNotes(); remember(); schedule();
+  });
+}
+function syncChips(boxId, attr, val){ for (const b of $(boxId).querySelectorAll(`[data-${attr}]`)) b.setAttribute('aria-pressed', String(b.dataset[attr] === String(val))); }
+$('angleChips').addEventListener('click', e => { const b = e.target.closest('[data-angle]'); if (!b) return; st.angle = +b.dataset.angle; syncChips('angleChips', 'angle', st.angle); remember(); schedule(); });
+$('shapeChips').addEventListener('click', e => { const b = e.target.closest('[data-shape]'); if (!b) return; st.shape = b.dataset.shape; syncChips('shapeChips', 'shape', st.shape); remember(); schedule(); });
+$('inkChips').addEventListener('click', e => { const b = e.target.closest('[data-ink]'); if (!b) return; st.ink = b.dataset.ink; syncInk(); remember(); schedule(); });
+$('inkPick').addEventListener('input', e => { st.inkHex = e.target.value; remember(); schedule(); });
+function syncInk(){ syncChips('inkChips', 'ink', st.ink); $('inkRow').hidden = st.ink !== 'one'; $('inkPick').value = st.inkHex; }
+$('looks').addEventListener('change', e => {
+  if (e.target.name !== 'look') return;
+  st.look = e.target.value; Object.assign(st, LOOKS[st.look]);
+  syncLook(); syncSliders(); updateNotes(); remember(); schedule();
+});
+function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look === 'edges'; }
+
+let wTimer = 0;
+$('wcm').addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0)) return; clearTimeout(wTimer); wTimer = setTimeout(() => { setWidth(v); buildSrcSoon(); updateChecks(); }, 450); });
+$('wcm').addEventListener('change', e => { clearTimeout(wTimer); setWidth(parseFloat(e.target.value)); buildSrcSoon(); updateChecks(); });
+$('sizeChips').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b || !art) return; setWidth(b.dataset.w === 'max' ? maxWidthCm() : +b.dataset.w, b.dataset.w === 'max'); buildSrcSoon(); updateChecks(); });
+
+/* ---------- notes and the film check ---------- */
+function updateNotes(){
+  const cellMm = 25.4/st.lpi;
+  $('lpiNote').textContent = `Dots every ${cellMm.toFixed(2)} mm. Lower numbers give bigger dots.`;
+  $('dropNote').textContent = `Smallest dot about ${minDotMm().toFixed(2)} mm across.`;
+}
+function minDotMm(){ const cellMm = 25.4/st.lpi; return st.drop > 0 ? cellMm*Math.sqrt(4*(st.drop/100)/Math.PI) : 25.4/DPI; }
+function updateChecks(){
+  if (!art) return;
+  const rows = [];
+  const s = srcStats;
+  const softPct = s && s.vis ? Math.round(s.soft/s.vis*100) : null;
+  rows.push(['good', '✓', 'No see-through pixels',
+    (softPct != null && softPct >= 1 ? `The art had ${softPct}% see-through pixels (glows, shadows, fades, soft edges). ` : '') + 'Every pixel is now solid ink or clear film, so the film has no haze.']);
+  const md = minDotMm();
+  rows.push(md >= 0.3 ? ['good', '✓', `Smallest dot about ${md.toFixed(2)} mm`, 'A good size for DTF film.']
+                       : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
+  const dpi = Math.round(art.w/(st.widthCm/2.54));
+  rows.push(dpi >= 240 ? ['good', '✓', `Art is ${dpi} dpi at this size`, 'Sharp.']
+          : dpi >= 150 ? ['warn', '!', `Art is ${dpi} dpi at this size`, 'Dots print crisp, but fine lines may look soft.']
+                       : ['bad', '!', `Art is only ${dpi} dpi at this size`, `Dots print crisp, but detail will look soft. Sharp up to ${(art.w/240*2.54).toFixed(1)} cm wide, or ask for a bigger file.`]);
+  if (s && outReady && s.total){
+    const before = s.vis/s.total*100, after = lastOn/s.total*100, cut = s.vis ? Math.round((1 - lastOn/s.vis)*100) : 0;
+    rows.push(cut > 0 ? ['info', '↘', `Ink area down ${cut}%`, `Ink covered ${before.toFixed(0)}% of the print box, now ${after.toFixed(0)}%. Less ink feels softer and breathes.`]
+                      : ['info', '→', 'Ink area about the same', `Ink covers ${after.toFixed(0)}% of the print box.`]);
+  }
+  $('checks').innerHTML = rows.map(([c, m, t, d]) => `<div class="check"><span class="mark ${c}" aria-hidden="true">${m}</span><div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join('');
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
+
+/* ---------- opening art ---------- */
+function setArt(el, w, h, name, isSample, dpi){
+  art = {el, w, h, name, isSample};
+  outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
+  const fi = $('fileInfo');
+  fi.innerHTML = (isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(name)}</b><span>${w.toLocaleString()} × ${h.toLocaleString()} px</span>`;
+  st.knock = null; syncKnock();
+  setWidth(isSample ? 25 : w/(dpi || DPI)*2.54, true);
+  setZoom('fit');
+  buildSrc(); render(); updateChecks();
+}
+async function readPngDpi(file){
+  try {
+    const b = new Uint8Array(await file.slice(0, 65536).arrayBuffer()), v = new DataView(b.buffer);
+    let p = 8;
+    while (p + 12 <= b.length){
+      const len = v.getUint32(p), type = String.fromCharCode(b[p+4], b[p+5], b[p+6], b[p+7]);
+      if (type === 'pHYs' && b[p+16] === 1){ const d = Math.round(v.getUint32(p+8)*0.0254); return d >= 50 && d <= 2400 ? d : null; }
+      if (type === 'IDAT') return null;
+      p += 12 + len;
+    }
+  } catch(e){}
+  return null;
+}
+async function openFile(f){
+  if (!f) return;
+  if (!/^image\//.test(f.type) && !/\.(png|jpe?g|webp|gif|svg)$/i.test(f.name || '')){
+    toast('Open a PNG, JPG, WebP or SVG. Save PDFs and Photoshop files as PNG first.'); return;
+  }
+  const im = new Image(); im.decoding = 'async'; im.src = URL.createObjectURL(f);
+  try { await im.decode(); } catch(e){ toast('That file wouldn’t open. Try saving it as a PNG.'); return; }
+  if (!im.naturalWidth || !im.naturalHeight){ toast('That file has no size set. Save it as a PNG and try again.'); return; }
+  const dpi = /png/i.test(f.type) || /\.png$/i.test(f.name || '') ? await readPngDpi(f) : null;
+  endPick();
+  setArt(im, im.naturalWidth, im.naturalHeight, f.name || 'Pasted art', false, dpi);
+}
+$('fileIn').addEventListener('change', e => { openFile(e.target.files[0]); e.target.value = ''; });
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')){ dragDepth++; $('drop').hidden = false; } });
+window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('drop').hidden = true; });
+window.addEventListener('dragover', e => { e.preventDefault(); });
+window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const f = e.dataTransfer?.files?.[0]; if (f) openFile(f); });
+window.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) openFile(it.getAsFile()); });
+
+/* ---------- saving: transparent PNG at 300 dpi, settings written into the file ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b){ let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function chunk(type, data){
+  const out = new Uint8Array(12 + data.length), v = new DataView(out.buffer);
+  v.setUint32(0, data.length); for (let i = 0; i < 4; i++) out[4+i] = type.charCodeAt(i);
+  out.set(data, 8); v.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+  return out;
+}
+function ascii(s){ const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0x7f; return b; }
+async function withDpi(blob, dpi, texts){
+  const src = new Uint8Array(await blob.arrayBuffer()), dv = new DataView(src.buffer);
+  const ppm = Math.round(dpi/0.0254), phys = new Uint8Array(9), pv = new DataView(phys.buffer);
+  pv.setUint32(0, ppm); pv.setUint32(4, ppm); phys[8] = 1;
+  const parts = [src.subarray(0, 8)];
+  let p = 8;
+  while (p + 12 <= src.length){
+    const len = dv.getUint32(p), type = String.fromCharCode(src[p+4], src[p+5], src[p+6], src[p+7]), end = p + 12 + len;
+    if (type !== 'pHYs') parts.push(src.subarray(p, end));
+    if (type === 'IHDR'){ parts.push(chunk('pHYs', phys)); for (const [k, v] of texts) parts.push(chunk('tEXt', ascii(k + '\0' + v))); }
+    p = end;
+  }
+  return new Blob(parts, {type: 'image/png'});
+}
+function fileName(){
+  const base = art.isSample ? 'sample-art' : (art.name || 'art').replace(/\.[a-z0-9]+$/i, '').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'art';
+  return `${base}-halftone-${st.lpi}lpi.png`;
+}
+function settingsText(){
+  const look = {edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
+  return `${look}; ${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%` +
+         (st.look !== 'edges' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ${st.k0}-${st.k1}%` : '') +
+         (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
+         `; ${st.widthCm.toFixed(1)} x ${(st.widthCm*art.h/art.w).toFixed(1)} cm at 300 dpi`;
+}
+let saving = false;
+$('saveBtn').addEventListener('click', async () => {
+  if (saving || !art) return;
+  saving = true; $('saveBtn').disabled = true;
+  try {
+    await idle();
+    $('busy').textContent = 'Preparing the PNG…'; $('busy').hidden = false;
+    await new Promise(r => setTimeout(r, 30));
+    const raw = await new Promise((res, rej) => outCanvas.toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
+    const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop DTF Halftone'], ['Comment', settingsText()]]);
+    $('busy').hidden = true;
+    await saveFile(png, fileName());
+  } catch(err){
+    $('busy').hidden = true; toast(err && err.message ? err.message : 'Saving didn’t work.');
+  } finally {
+    $('busy').textContent = 'Updating…'; saving = false; $('saveBtn').disabled = !outReady;
+  }
+});
+async function downloadsCap(){
+  if (!window.claude || typeof window.claude.use !== 'function') return null;
+  try { return await Promise.race([window.claude.use('downloads'), new Promise(r => setTimeout(() => r(null), 10000))]); } catch(e){ return null; }
+}
+async function saveFile(blob, name){
+  const dl = await downloadsCap();
+  if (dl){
+    try { await dl.save({filename: name, data: blob}); toast(`Saved ${name}`); }
+    catch(e){
+      const code = e && e.code;
+      if (code === 'declined') toast('Not saved.');
+      else if (code === 'rate_limited') toast('A save is already waiting for an answer.');
+      else toast('Saving isn’t available here. Open this tool in a browser tab to save.');
+    }
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+  toast(`Saved ${name}`);
+}
+
+let toastTimer = 0;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3600); }
+
+/* ---------- sample art: glow, gradient sun, waves and a soft shadow, so every look has something to show ---------- */
+async function sampleArt(){
+  try { await Promise.race([document.fonts.load('800 200px Inter'), new Promise(r => setTimeout(r, 1500))]); } catch(e){}
+  const S = 2400, c = document.createElement('canvas'); c.width = S; c.height = S;
+  const x = c.getContext('2d'), cx = 1200, cy = 980, R = 640;
+  let g = x.createRadialGradient(cx, cy, R*0.85, cx, cy, R*1.6);
+  g.addColorStop(0, 'rgba(255,64,150,0.8)'); g.addColorStop(1, 'rgba(255,64,150,0)');
+  x.fillStyle = g; x.beginPath(); x.arc(cx, cy, R*1.6, 0, Math.PI*2); x.fill();
+  const sun = document.createElement('canvas'); sun.width = S; sun.height = S;
+  const s = sun.getContext('2d');
+  g = s.createLinearGradient(0, cy - R, 0, cy + R);
+  g.addColorStop(0, '#ffe14d'); g.addColorStop(0.42, '#ff8a3d'); g.addColorStop(0.72, '#ff2e88'); g.addColorStop(1, '#6a2bd9');
+  s.fillStyle = g; s.beginPath(); s.arc(cx, cy, R, 0, Math.PI*2); s.fill();
+  s.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 7; i++){ const y = cy + 90 + i*82 + i*i*3, h = 10 + i*8; s.fillRect(0, y, S, h); }
+  x.drawImage(sun, 0, 0);
+  for (let w = 0; w < 3; w++){
+    const y0 = 1690 + w*70;
+    g = x.createLinearGradient(260, 0, 2140, 0);
+    g.addColorStop(0, 'rgba(0,200,200,0)'); g.addColorStop(0.5, `rgba(0,214,201,${0.95 - w*0.28})`); g.addColorStop(1, 'rgba(0,200,200,0)');
+    x.strokeStyle = g; x.lineWidth = 34 - w*6; x.lineCap = 'round'; x.beginPath();
+    for (let px = 260; px <= 2140; px += 10){ const py = y0 + Math.sin((px + w*90)/95)*22; px === 260 ? x.moveTo(px, py) : x.lineTo(px, py); }
+    x.stroke();
+  }
+  x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+  try { x.letterSpacing = '-6px'; } catch(e){}
+  x.font = '800 260px Inter, "Arial Black", Arial, sans-serif';
+  x.shadowColor = 'rgba(0,0,0,0.65)'; x.shadowBlur = 46; x.shadowOffsetY = 22;
+  x.fillStyle = '#ffffff'; x.fillText('WOLLONGONG', cx, 2180, 2200);
+  return c;
+}
+
+/* ---------- start ---------- */
+syncShirt(); syncLook(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape); syncInk(); updateNotes();
+sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); });
+})();
+</script>
+</body>
+</html>
