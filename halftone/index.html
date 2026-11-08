@@ -78,6 +78,21 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .legend i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(128,128,128,.6);flex:none}
 .pane-pick{position:absolute;padding:3px}
 .pane-pick select{height:32px;padding:0 8px;border:0;border-radius:3px;background:var(--panel);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer}
+.rules{display:grid;gap:10px}
+.rules:empty{display:none}
+.rule{display:grid;gap:12px;padding:12px;border:1.5px solid var(--line);border-radius:var(--r)}
+.rule.on{border-color:var(--ink)}
+.rule-head{display:flex;align-items:center;gap:8px}
+.rule-n{font-size:12px;font-weight:800;color:var(--muted);min-width:12px}
+.rule-head select{flex:1;min-width:0;height:34px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer}
+.icon{flex:none;width:34px;height:34px;display:grid;place-items:center;padding:0;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);cursor:pointer;font-size:13px;line-height:1}
+.icon:hover,.rule-head select:hover{border-color:var(--ink)}
+.samples{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sample{position:relative;width:30px;height:30px;padding:0;border-radius:3px;border:1px solid rgba(128,128,128,.5);cursor:pointer}
+.sample::after{content:"×";position:absolute;inset:0;display:grid;place-items:center;border-radius:2px;background:rgba(0,0,0,.55);color:#ffffff;font-size:15px;font-weight:700;opacity:0}
+.sample:hover::after,.sample:focus-visible::after{opacity:1}
+.check-row{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;width:max-content}
+.check-row input{width:16px;height:16px;margin:0;accent-color:var(--ink)}
 .busy{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none}
 .hint{position:absolute;left:50%;top:76px;transform:translateX(-50%);padding:8px 14px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap}
 .drop{position:absolute;inset:12px;display:grid;place-items:center;border:2px dashed var(--accent);border-radius:var(--r);background:color-mix(in srgb,var(--panel) 88%,transparent);font-size:18px;font-weight:800;letter-spacing:-.02em;pointer-events:none}
@@ -164,6 +179,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
           <button class="chip" type="button" data-view="map" aria-pressed="false">Halftone map</button>
+          <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
         </div>
         <div class="tray" role="group" aria-label="Zoom" id="zoomTray">
@@ -191,6 +207,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <section class="group">
         <h2>Look</h2>
         <div class="looks" id="looks">
+          <label class="look"><input type="radio" name="look" id="lookShadows" value="shadows"><span class="look-t">Remove shadows</span><span class="look-d">Quick clean-up for dark shirts. Shadows drop out and the rest prints solid, with no dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookEdges" value="edges"><span class="look-t">Fix soft edges</span><span class="look-d">Shadows, glows and fades become solid dots. Solid parts stay solid.</span></label>
           <label class="look"><input type="radio" name="look" id="lookKnock" value="knock"><span class="look-t">Shirt shows through</span><span class="look-d">Colours close to the shirt drop out. Shading turns into dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookFull" value="full"><span class="look-t">Full halftone</span><span class="look-d">The whole design becomes dots for a soft, vintage print.</span></label>
@@ -198,13 +215,22 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       </section>
 
       <section class="group">
-        <h2>Dots</h2>
-        <div class="field">
+        <h2>Finish</h2>
+        <div class="chips" id="finishChips" role="group" aria-label="Finish">
+          <button class="chip" type="button" data-finish="dots">Halftone dots</button>
+          <button class="chip" type="button" data-finish="cut">Clean cut, no dots</button>
+        </div>
+        <div class="field" id="cutField" hidden>
+          <div class="f-head"><label for="cut">Threshold</label><output id="cutOut" for="cut">50%</output></div>
+          <input type="range" id="cut" min="5" max="95" step="1" value="50">
+          <p class="f-note">Pixels less solid than this are removed. Everything left prints fully solid, so the film has no see-through areas.</p>
+        </div>
+        <div class="field dotf">
           <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">35 lpi</output></div>
           <input type="range" id="lpi" min="15" max="65" step="1" value="35">
           <p class="f-note" id="lpiNote">Dots every 0.73 mm.</p>
         </div>
-        <div class="field">
+        <div class="field dotf">
           <div class="f-head"><span>Angle</span></div>
           <div class="chips" id="angleChips">
             <button class="chip" type="button" data-angle="0">0°</button>
@@ -213,7 +239,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <button class="chip" type="button" data-angle="45">45°</button>
           </div>
         </div>
-        <div class="field">
+        <div class="field dotf">
           <div class="f-head"><span>Dot shape</span></div>
           <div class="chips" id="shapeChips">
             <button class="chip" type="button" data-shape="round">Round</button>
@@ -244,6 +270,13 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
+      <section class="group" id="rangeGroup">
+        <h2>Colour range</h2>
+        <p class="f-note">Like Photoshop’s Select › Colour Range. Select shadows, midtones, highlights or colours picked from the art, then choose what happens to them. Show displays the selection: white is selected.</p>
+        <div class="rules" id="rules"></div>
+        <button class="btn small" type="button" id="addRule">Add a colour range</button>
+      </section>
+
       <section class="group">
         <h2>Tone</h2>
         <div class="field">
@@ -254,12 +287,12 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <div class="f-head"><label for="con">Contrast</label><output id="conOut" for="con">0</output></div>
           <input type="range" id="con" min="-50" max="50" step="1" value="0">
         </div>
-        <div class="field">
+        <div class="field dotf">
           <div class="f-head"><label for="drop">Drop dots under</label><output id="dropOut" for="drop">15%</output></div>
           <input type="range" id="drop" min="0" max="40" step="1" value="15">
           <p class="f-note" id="dropNote">Smallest dot about 0.32 mm across.</p>
         </div>
-        <div class="field">
+        <div class="field dotf">
           <div class="f-head"><label for="solid">Solid above</label><output id="solidOut" for="solid">92%</output></div>
           <input type="range" id="solid" min="60" max="100" step="1" value="92">
           <p class="f-note">Dots this big join into solid ink.</p>
@@ -310,6 +343,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Press V to step through On shirt, White base, Halftone map and Split. Hold for original in the base and map views shows where the art was see-through.</li>
             <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
+            <li>For a quick black-shirt clean-up with no halftone, use Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
         </details>
@@ -358,6 +392,24 @@ function engine(){
     for (let i = 3; i < d.length; i += 4){ const a = d[i]; if (a){ vis++; if (a < 255) soft++; } }
     return {vis, soft, total: w*h};
   }
+  // How much a colour belongs to a colour range (like Photoshop's Select > Color Range): 1 selected, 0 not, in between at the fuzzy edge.
+  function selectWeight(R, r, g, b, L){
+    let s;
+    if (R.type === 'sample'){
+      let best = 1e12;
+      for (const c of R.samples){
+        const rm = (r + c[0])/2, dr = r - c[0], dg = g - c[1], db = b - c[2];
+        const dd = (2 + rm/256)*dr*dr + 4*dg*dg + (2 + (255 - rm)/256)*db*db; // "redmean" colour distance, 0 to 765
+        if (dd < best) best = dd;
+      }
+      s = R.samples.length ? 1 - Math.sqrt(best)/765/R.reach : 0;
+    } else {
+      const off = R.type === 'shadows' ? L - R.band : R.type === 'highlights' ? (1 - R.band) - L : Math.abs(L - 0.5) - R.band;
+      s = off <= 0 ? 1 : 1 - off/R.soft;
+    }
+    s = s < 0 ? 0 : s > 1 ? 1 : s;
+    return R.invert ? 1 - s : s;
+  }
   function run(p){
     const {w, h, d} = S, out = new Uint8ClampedArray(w*h*4), t = tile(p.shape);
     const cls = new Uint8Array(w*h); // what happened to each pixel: 0 clear, 1 removed, 2 gap between dots, 3 dot, 4 solid
@@ -377,6 +429,10 @@ function engine(){
     // 100% = as different from the knock-out colour as a colour can be (white on a black shirt, black on a white one)
     const far = lum ? Math.max(kl, 255 - kl) : Math.max(kr, 255 - kr, kg, 255 - kg, kb, 255 - kb);
     const one = p.one, ir = p.ink[0], ig = p.ink[1], ib = p.ink[2];
+    const cut = p.cut || 0; // clean cut: no screen, pixels at least this solid print solid, the rest is removed
+    // colour ranges, applied in order to each pixel's ink amount; sel keeps one range's selection for the Selection view
+    const rules = p.rules || [], nr = rules.length, selOut = p.selOut;
+    const sel = selOut >= 0 && selOut < nr ? new Uint8Array(w*h) : null;
     let on = 0;
     for (let y = 0; y < h; y++){
       let fx = 0.5*cs + (y + 0.5)*sn, fy = -0.5*sn + (y + 0.5)*cs, i = y*w*4;
@@ -384,18 +440,30 @@ function engine(){
         const a = d[i+3];
         if (a === 0) continue;
         let c = a/255;
+        const r = d[i], g = d[i+1], b = d[i+2];
         if (tone){
-          const r = d[i], g = d[i+1], b = d[i+2];
           let m;
           if (lum){ m = 0.299*r + 0.587*g + 0.114*b - kl; if (m < 0) m = -m; }
           else { m = r > kr ? r - kr : kr - r; const dg = g > kg ? g - kg : kg - g; if (dg > m) m = dg; const db = b > kb ? b - kb : kb - b; if (db > m) m = db; }
           const q = (m/far - k0)/ks;
-          if (q <= 0){ cls[i >> 2] = 1; continue; }
-          if (q < 1) c *= q;
+          if (q <= 0){ if (!nr){ cls[i >> 2] = 1; continue; } c = 0; }
+          else if (q < 1) c *= q;
+        }
+        if (nr){
+          const L = (0.299*r + 0.587*g + 0.114*b)/255;
+          for (let k = 0; k < nr; k++){
+            const R = rules[k], s = selectWeight(R, r, g, b, L);
+            if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0;
+            if (s <= 0) continue;
+            if (R.action === 'remove') c *= 1 - s;
+            else if (R.action === 'fade') c *= 1 - s*(1 - R.keep);
+            else c += ((a >= 128 ? 1 : 0) - c)*s; // keep solid: full ink wherever the art is at least half opaque
+          }
+          if (c <= 0){ cls[i >> 2] = 1; continue; }
         }
         c = lut[(c*1024) | 0];
-        if (c <= 0){ cls[i >> 2] = 1; continue; }
-        if (c < 1){
+        if (c <= 0 || c < cut){ cls[i >> 2] = 1; continue; }
+        if (c < 1 && !cut){
           const u = fx - Math.floor(fx), v = fy - Math.floor(fy);
           if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]){ cls[i >> 2] = 2; continue; }
           cls[i >> 2] = 3;
@@ -405,12 +473,13 @@ function engine(){
         out[i+3] = 255; on++;
       }
     }
-    return {w, h, buf: out.buffer, cls: cls.buffer, on};
+    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on};
   }
   function handle(m){
     if (m.type === 'src') return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
     const r = run(m.p);
-    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls}, transfer: [r.buf, r.cls]};
+    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel},
+            transfer: r.sel ? [r.buf, r.cls, r.sel] : [r.buf, r.cls]};
   }
   return {handle};
 }
@@ -422,14 +491,15 @@ const DPI = 300;
 const MAX_SHORT = 40, MAX_LONG = 50; // largest print, cm, either way round
 const SHIRTS = [['Black','#111111'],['White','#ffffff'],['Navy','#1d2742'],['Charcoal','#3d3d40'],['Grey marle','#a8a8a8'],['Red','#c21a26'],['Royal','#2552a8'],['Bottle green','#1f4a33'],['Natural','#eee3cc']];
 const LOOKS = {
+  shadows: {k0: 0, k1: 100, mid: 0, con: 0, drop: 15, solid: 92},
   edges: {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 90},
   knock: {k0: 10, k1: 70,  mid: 0, con: 0, drop: 15, solid: 92},
   full:  {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 96}
 };
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 35, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
-            ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt'};
-const KEEP = ['look','lpi','angle','shape','k0','k1','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB'];
+            ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50};
+const KEEP = ['look','lpi','angle','shape','k0','k1','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 function remember(){ try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
@@ -439,6 +509,9 @@ const outCanvas = document.createElement('canvas'), outCtx = outCanvas.getContex
 const masks = {base: {canvas: document.createElement('canvas'), mips: null, key: -1}, map: {canvas: document.createElement('canvas'), mips: null, key: -1}};
 const origCanvas = document.createElement('canvas'), origCtx = origCanvas.getContext('2d');
 let lastCls = null, paintN = 0, origFor = 0, origMips = null;
+// colour ranges; not saved between visits, because sampled colours belong to one piece of art
+let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt';
+const selCanvas = document.createElement('canvas');
 let art = null, srcV = 0, srcStats = null, srcMips = null, outMips = null, outReady = false, lastOn = 0;
 let runId = 0, running = false, pending = false, compare = false, picking = false;
 const idleWaiters = [];
@@ -470,10 +543,11 @@ function hexRgb(h){ const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255,
 function rgbHex(r, g, b){ return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join(''); }
 function params(){
   return {lpi: st.lpi, angle: st.angle, shape: st.shape, dpi: DPI,
-          tone: st.look !== 'edges', metric: st.look === 'full' ? 'lum' : 'max',
+          tone: st.look === 'knock' || st.look === 'full', metric: st.look === 'full' ? 'lum' : 'max',
           k0: st.k0/100, k1: st.k1/100, knock: hexRgb(st.knock || st.shirt),
           gamma: Math.pow(2, -st.mid/50), contrast: Math.pow(2, st.con/50),
-          drop: st.drop/100, solid: st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex)};
+          drop: st.drop/100, solid: st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
+          cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1};
 }
 function schedule(){
   if (!srcV) return;
@@ -528,7 +602,8 @@ const VIEWS = {
          legend: [['#f2f2f2', 'Solid ink'], ['#ff2e93', 'Turned into dots'], ['#5a5a5a', 'Removed']]}
 };
 const ORIG_LEGEND = [['#ffffff', 'Original: solid'], ['#808080', 'Original: see-through, prints as haze'], ['#000000', 'Clear film']];
-const PANES = [['orig', 'Original on shirt'], ['origbase', 'Original alpha'], ['shirt', 'Halftone on shirt'], ['base', 'White base'], ['map', 'Halftone map']];
+const PANES = [['orig', 'Original on shirt'], ['origbase', 'Original alpha'], ['shirt', 'Halftone on shirt'], ['base', 'White base'], ['map', 'Halftone map'], ['sel', 'Selection']];
+const selLegend = () => [['#ffffff', `Selected by colour range ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
 function buildMask(kind){
   const m = masks[kind];
   if (!lastCls || m.key === paintN) return;
@@ -538,17 +613,26 @@ function buildMask(kind){
   for (let j = 0; j < u.length; j++) u[j] = pal[lastCls[j]];
   x.putImageData(im, 0, 0); m.mips = buildMips(c); m.key = paintN;
 }
+function buildSelMask(){ // the active colour range's selection in grey, like Photoshop's grayscale preview
+  if (!lastSel || !lastCls || selKey === paintN) return;
+  const W = outCanvas.width, H = outCanvas.height, x = selCanvas.getContext('2d'), empty = abgr('#262626');
+  selCanvas.width = W; selCanvas.height = H;
+  const im = x.createImageData(W, H), u = new Uint32Array(im.data.buffer);
+  for (let j = 0; j < u.length; j++){ if (!lastCls[j]) u[j] = empty; else { const v = lastSel[j]; u[j] = ((255 << 24) | (v << 16) | (v << 8) | v) >>> 0; } }
+  x.putImageData(im, 0, 0); selMips = buildMips(selCanvas); selKey = paintN;
+}
 // what is on screen now: one view, or the two sides of Split (Hold for original swaps in the original)
 function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB] : [compare ? (st.view === 'shirt' ? 'orig' : 'origbase') : st.view]; }
 function prepareViews(){
   const ks = st.view === 'split' ? [st.paneA, st.paneB] : [st.view];
-  for (const k of ks) if (masks[k]) buildMask(k);
+  for (const k of ks){ if (masks[k]) buildMask(k); else if (k === 'sel') buildSelMask(); }
   if (ks.some(isMask)) buildOrigMask();
 }
 function levelsFor(kind){
   if (kind === 'orig') return srcMips;
   if (kind === 'origbase') return origMips;
   if (kind === 'shirt') return outMips || srcMips;
+  if (kind === 'sel') return rules.length ? selMips : null;
   return masks[kind].mips || outMips;
 }
 const isMask = kind => kind !== 'shirt' && kind !== 'orig';
@@ -582,7 +666,7 @@ function paint(m){
   outCanvas.width = m.w; outCanvas.height = m.h;
   outCtx.putImageData(new ImageData(new Uint8ClampedArray(m.buf), m.w, m.h), 0, 0);
   outMips = buildMips(outCanvas);
-  lastCls = new Uint8Array(m.cls); paintN++;
+  lastCls = new Uint8Array(m.cls); lastSel = m.sel ? new Uint8Array(m.sel) : null; paintN++;
   prepareViews();
   outReady = true; lastOn = m.on;
   $('saveBtn').disabled = false;
@@ -668,7 +752,7 @@ function setZoom(z, atX, atY){
 }
 $('zoomTray').addEventListener('click', e => { const b = e.target.closest('[data-zoom]'); if (b) setZoom(b.dataset.zoom === 'fit' ? 'fit' : +b.dataset.zoom); });
 
-const VIEW_ORDER = ['shirt', 'base', 'map', 'split'];
+const viewOrder = () => rules.length ? ['shirt', 'base', 'map', 'sel', 'split'] : ['shirt', 'base', 'map', 'split'];
 function setView(v){
   st.view = v;
   for (const b of $('viewTray').querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === v));
@@ -676,30 +760,38 @@ function setView(v){
   $('paneA').hidden = $('paneB').hidden = !split;
   $('compareBtn').hidden = split;
   stage.classList.toggle('is-split', split);
+  if (v !== 'sel') viewBeforeSel = v;
+  syncShowChips();
   compare = false;
   prepareViews(); syncLegend(); render();
 }
 function syncLegend(){
   const items = [], seen = new Set();
   for (const k of kindsShown()){
-    const list = k === 'origbase' ? ORIG_LEGEND : VIEWS[k] ? VIEWS[k].legend : [];
+    const list = k === 'origbase' ? ORIG_LEGEND : k === 'sel' ? selLegend() : VIEWS[k] ? VIEWS[k].legend : [];
     for (const it of list) if (!seen.has(it[1])){ seen.add(it[1]); items.push(it); }
   }
   const lg = $('legend');
   lg.hidden = !items.length;
   lg.innerHTML = items.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join('');
 }
+function syncPaneOptions(){
+  for (const id of ['paneA', 'paneB']){
+    const sel = $(id + 'Sel'), list = PANES.filter(([v]) => v !== 'sel' || rules.length);
+    if (!list.some(([v]) => v === st[id])) st[id] = 'shirt';
+    sel.innerHTML = list.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+    sel.value = st[id];
+  }
+}
 for (const id of ['paneA', 'paneB']){
   const sel = $(id + 'Sel');
-  sel.innerHTML = PANES.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
-  sel.value = st[id];
   sel.addEventListener('change', () => { st[id] = sel.value; remember(); prepareViews(); syncLegend(); render(); });
 }
 $('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
 window.addEventListener('keydown', e => {
   const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
   if ((e.key === 'v' || e.key === 'V') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)
-    setView(VIEW_ORDER[(VIEW_ORDER.indexOf(st.view) + 1) % VIEW_ORDER.length]);
+    { const o = viewOrder(); setView(o[(o.indexOf(st.view) + 1) % o.length]); }
 });
 
 let drag = null;
@@ -733,19 +825,30 @@ cmp.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter'){ 
 cmp.addEventListener('keyup', cmpOff); cmp.addEventListener('blur', cmpOff);
 
 /* ---------- knock-out colour picker ---------- */
-function startPick(){ picking = true; stage.classList.add('picking'); $('pickHint').hidden = false; }
-function endPick(){ picking = false; stage.classList.remove('picking'); $('pickHint').hidden = true; }
+function startPick(target){ // target: 'knock', or the number of the colour range being sampled
+  pickFor = target; picking = true; stage.classList.add('picking');
+  $('pickHint').textContent = target === 'knock' ? 'Click the colour to knock out · Esc to cancel' : 'Click a colour in the art to add it to the selection · Esc to cancel';
+  $('pickHint').hidden = false; syncPickChips();
+}
+function endPick(){ picking = false; pickFor = null; stage.classList.remove('picking'); $('pickHint').hidden = true; syncPickChips(); }
 function pickAt(e){
   const r = view.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, g = geoAt(px, py);
   const x = Math.floor((px*g.dpr - g.dx)/g.k), y = Math.floor((py*g.dpr - g.dy)/g.k);
   if (x < 0 || y < 0 || x >= srcCanvas.width || y >= srcCanvas.height){ toast('Click on the art to pick a colour.'); return; }
   const p = srcCtx.getImageData(x, y, 1, 1).data;
   if (p[3] < 8){ toast('That spot is clear. Click on a colour in the art.'); return; }
+  const target = pickFor, hex = rgbHex(p[0], p[1], p[2]);
   endPick();
-  st.knock = rgbHex(p[0], p[1], p[2]);
-  syncKnock(); schedule();
+  if (target === 'knock'){ st.knock = hex; syncKnock(); }
+  else if (rules[target]){
+    const R = rules[target];
+    if (!R.samples.includes(hex)) R.samples.push(hex);
+    if (R.samples.length > 8) R.samples.shift();
+    activeRule = target; renderRules();
+  }
+  schedule();
 }
-$('pickBtn').addEventListener('click', () => picking ? endPick() : startPick());
+$('pickBtn').addEventListener('click', () => picking ? endPick() : startPick('knock'));
 $('knockReset').addEventListener('click', () => { st.knock = null; syncKnock(); schedule(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && picking) endPick(); });
 function syncKnock(){
@@ -777,7 +880,7 @@ shirtTray.addEventListener('click', e => { const b = e.target.closest('button.sw
 $('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
 
 const SLIDERS = [['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
-                 ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`]];
+                 ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`]];
 function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } }
 for (const [id, fmt] of SLIDERS){
   $(id).addEventListener('input', e => {
@@ -796,9 +899,127 @@ function syncInk(){ syncChips('inkChips', 'ink', st.ink); $('inkRow').hidden = s
 $('looks').addEventListener('change', e => {
   if (e.target.name !== 'look') return;
   st.look = e.target.value; Object.assign(st, LOOKS[st.look]);
-  syncLook(); syncSliders(); updateNotes(); remember(); schedule();
+  st.finish = st.look === 'shadows' ? 'cut' : 'dots';
+  if (st.look === 'shadows') ensureShadowRule();
+  syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
-function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look === 'edges'; }
+function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look !== 'knock' && st.look !== 'full'; }
+$('finishChips').addEventListener('click', e => { const b = e.target.closest('[data-finish]'); if (!b) return; st.finish = b.dataset.finish; syncFinish(); remember(); schedule(); });
+function syncFinish(){
+  syncChips('finishChips', 'finish', st.finish);
+  const cut = st.finish === 'cut';
+  for (const el of document.querySelectorAll('.dotf')) el.hidden = cut;
+  $('cutField').hidden = !cut;
+  updateChecks();
+}
+
+/* ---------- colour range: like Photoshop's Select > Color Range, as cards applied top to bottom ---------- */
+const RULE_TYPES = [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights'], ['sample', 'Sampled colours']];
+const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['solid', 'Keep solid']];
+const RULE_DEFAULTS = [['shadows', 'remove'], ['highlights', 'solid'], ['midtones', 'fade'], ['sample', 'remove']];
+const MAX_RULES = 4;
+function newRule(type, action){ return {type, action, samples: [], range: 50, fuzz: 20, keep: 50, invert: false}; }
+function ensureShadowRule(){
+  let i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert);
+  if (i < 0){ rules.unshift(newRule('shadows', 'remove')); i = 0; }
+  activeRule = i; syncRules();
+}
+function ruleParams(R){
+  const fz = R.fuzz/100, rg = R.range/100;
+  return {type: R.type, samples: R.samples.map(hexRgb), invert: R.invert, action: R.action, keep: R.keep/100,
+          reach: Math.max(0.01, fz*0.6), band: R.type === 'midtones' ? rg*0.25 : rg*0.5, soft: Math.max(0.01, fz*0.5)};
+}
+function ruleNote(R){ // what a range picks, in brightness from 0% (black) to 100% (white)
+  if (R.type === 'sample') return R.samples.length ? 'The picked colours, plus colours this close to them.' : 'Pick colours in the art to select them.';
+  const q = ruleParams(R), pc = v => Math.round(Math.max(0, Math.min(1, v))*100) + '%', inv = R.invert ? ' Inverted: everything else is selected.' : '';
+  if (R.type === 'shadows') return `Selects 0–${pc(q.band)} brightness, fading out by ${pc(q.band + q.soft)}.${inv}`;
+  if (R.type === 'highlights') return `Selects ${pc(1 - q.band)}–100% brightness, fading out by ${pc(1 - q.band - q.soft)}.${inv}`;
+  return `Selects ${pc(0.5 - q.band)}–${pc(0.5 + q.band)} brightness, fading out by ${pc(0.5 - q.band - q.soft)} and ${pc(0.5 + q.band + q.soft)}.${inv}`;
+}
+function ruleSlider(i, k, label, v){
+  return `<div class="field"><div class="f-head"><label for="r${i}${k}">${label}</label><output id="r${i}${k}Out" for="r${i}${k}">${v}%</output></div>` +
+         `<input type="range" id="r${i}${k}" data-k="${k}" min="0" max="100" step="1" value="${v}"></div>`;
+}
+function renderRules(){
+  $('rules').innerHTML = rules.map((R, i) => `<div class="rule${i === activeRule ? ' on' : ''}" data-i="${i}">
+      <div class="rule-head">
+        <span class="rule-n">${i + 1}</span>
+        <select data-k="type" aria-label="Colour range ${i + 1} selects">${RULE_TYPES.map(([v, t]) => `<option value="${v}"${v === R.type ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        <button class="chip" type="button" data-act="show" aria-pressed="false" title="Show this selection in black and white">Show</button>
+        <button class="icon" type="button" data-act="del" title="Delete" aria-label="Delete colour range ${i + 1}">✕</button>
+      </div>
+      ${R.type !== 'sample' ? ruleSlider(i, 'range', 'Range', R.range) :
+        `<div class="samples">${R.samples.map((h, j) => `<button class="sample" type="button" data-act="unsample" data-j="${j}" style="background:${h}" title="${h.toUpperCase()}: click to remove" aria-label="Remove ${h.toUpperCase()}"></button>`).join('')}` +
+        `<button class="chip" type="button" data-act="pick" aria-pressed="false">${R.samples.length ? 'Add a colour' : 'Pick a colour'}</button></div>`}
+      ${ruleSlider(i, 'fuzz', 'Fuzziness', R.fuzz)}
+      <p class="f-note" data-note>${ruleNote(R)}</p>
+      <label class="check-row"><input type="checkbox" data-k="invert"${R.invert ? ' checked' : ''}> Invert</label>
+      <div class="chips" role="group" aria-label="What happens to the selection">${RULE_ACTIONS.map(([v, t]) => `<button class="chip" type="button" data-act="action" data-v="${v}" aria-pressed="${v === R.action}">${t}</button>`).join('')}</div>
+      ${R.action === 'fade' ? ruleSlider(i, 'keep', 'Ink kept', R.keep) : ''}
+    </div>`).join('');
+  $('addRule').hidden = rules.length >= MAX_RULES;
+  $('addRule').textContent = rules.length ? 'Add another colour range' : 'Add a colour range';
+  syncShowChips(); syncPickChips();
+}
+function syncRules(){
+  renderRules();
+  $('viewTray').querySelector('[data-view="sel"]').hidden = !rules.length;
+  syncPaneOptions();
+  if (!rules.length && st.view === 'sel') setView(viewBeforeSel);
+  else { prepareViews(); syncLegend(); render(); }
+}
+function syncShowChips(){ for (const b of $('rules').querySelectorAll('[data-act="show"]')) b.setAttribute('aria-pressed', String(st.view === 'sel' && +b.closest('.rule').dataset.i === activeRule)); }
+function syncPickChips(){ for (const b of $('rules').querySelectorAll('[data-act="pick"]')) b.setAttribute('aria-pressed', String(pickFor === +b.closest('.rule').dataset.i)); }
+function setActive(i){
+  if (activeRule === i) return;
+  activeRule = i;
+  for (const c of $('rules').querySelectorAll('.rule')) c.classList.toggle('on', +c.dataset.i === i);
+  syncShowChips(); syncLegend(); schedule();
+}
+$('addRule').addEventListener('click', () => {
+  if (rules.length >= MAX_RULES) return;
+  const used = new Set(rules.map(R => R.type)), d = RULE_DEFAULTS.find(([t]) => !used.has(t)) || RULE_DEFAULTS[0];
+  rules.push(newRule(d[0], d[1])); activeRule = rules.length - 1;
+  syncRules(); schedule();
+  if (d[0] === 'sample') startPick(activeRule);
+});
+const rulesBox = $('rules');
+rulesBox.addEventListener('input', e => {
+  const k = e.target.dataset.k, card = e.target.closest('.rule');
+  if (!card || !k || e.target.type !== 'range') return;
+  const i = +card.dataset.i, R = rules[i];
+  R[k] = +e.target.value; $(`r${i}${k}Out`).textContent = `${R[k]}%`;
+  card.querySelector('[data-note]').textContent = ruleNote(R);
+  setActive(i); schedule();
+});
+rulesBox.addEventListener('change', e => {
+  const k = e.target.dataset.k, card = e.target.closest('.rule');
+  if (!card || !k || e.target.type === 'range') return;
+  const i = +card.dataset.i, R = rules[i];
+  activeRule = i;
+  if (k === 'type'){ R.type = e.target.value; renderRules(); if (R.type === 'sample' && !R.samples.length) startPick(i); }
+  else if (k === 'invert'){ R.invert = e.target.checked; renderRules(); }
+  syncLegend(); schedule();
+});
+rulesBox.addEventListener('click', e => {
+  const card = e.target.closest('.rule'); if (!card) return;
+  const b = e.target.closest('[data-act]'), i = +card.dataset.i, R = rules[i];
+  if (!b){ setActive(i); return; }
+  const act = b.dataset.act;
+  if (act === 'del'){
+    if (pickFor === i) endPick();
+    rules.splice(i, 1); activeRule = Math.max(0, Math.min(activeRule, rules.length - 1));
+    syncRules(); schedule(); return;
+  }
+  if (act === 'show'){
+    if (st.view === 'sel' && activeRule === i){ setView(viewBeforeSel); return; }
+    activeRule = i; renderRules(); setView('sel'); schedule(); return;
+  }
+  setActive(i);
+  if (act === 'pick'){ if (pickFor === i) endPick(); else startPick(i); }
+  else if (act === 'unsample'){ R.samples.splice(+b.dataset.j, 1); renderRules(); schedule(); }
+  else if (act === 'action'){ R.action = b.dataset.v; renderRules(); schedule(); }
+});
 
 let wTimer = 0;
 $('wcm').addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0)) return; clearTimeout(wTimer); wTimer = setTimeout(() => { setWidth(v); buildSrcSoon(); updateChecks(); }, 450); });
@@ -820,7 +1041,8 @@ function updateChecks(){
   rows.push(['good', '✓', 'No see-through pixels',
     (softPct != null && softPct >= 1 ? `The art had ${softPct}% see-through pixels (glows, shadows, fades, soft edges). ` : '') + 'Every pixel is now solid ink or clear film, so the film has no haze.']);
   const md = minDotMm();
-  rows.push(md >= 0.3 ? ['good', '✓', `Smallest dot about ${md.toFixed(2)} mm`, 'A good size for DTF film.']
+  if (st.finish === 'cut') rows.push(['good', '✓', 'Clean cut, no dots', `Pixels at least ${st.cut}% solid print fully solid. The rest is removed.`]);
+  else rows.push(md >= 0.3 ? ['good', '✓', `Smallest dot about ${md.toFixed(2)} mm`, 'A good size for DTF film.']
                        : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
   const dpi = Math.round(art.w/(st.widthCm/2.54));
   rows.push(dpi >= 240 ? ['good', '✓', `Art is ${dpi} dpi at this size`, 'Sharp.']
@@ -908,9 +1130,12 @@ function fileName(){
   return `${base}-halftone-${st.lpi}lpi.png`;
 }
 function settingsText(){
-  const look = {edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
-  return `${look}; ${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%` +
-         (st.look !== 'edges' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ${st.k0}-${st.k1}%` : '') +
+  const look = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
+  const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
+  const ruleText = (R, i) => `range ${i + 1}: ${R.type === 'sample' ? 'colours ' + R.samples.join(' ').toUpperCase() : R.type + ' ' + R.range + '%'}` +
+    ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}`;
+  return `${look}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
+         (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ${st.k0}-${st.k1}%` : '') +
          (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
          `; ${st.widthCm.toFixed(1)} x ${(st.widthCm*art.h/art.w).toFixed(1)} cm at 300 dpi`;
 }
@@ -991,6 +1216,8 @@ async function sampleArt(){
 
 /* ---------- start ---------- */
 syncShirt(); syncLook(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape); syncInk(); updateNotes();
+if (st.look === 'shadows') ensureShadowRule(); else syncRules();
+syncFinish();
 sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); });
 })();
 </script>
