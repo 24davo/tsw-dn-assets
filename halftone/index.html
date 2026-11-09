@@ -1531,7 +1531,7 @@ async function sampleArt(){
 
 /* ---------- start ---------- */
 /* ---------- presets: one shared list for every workshop computer (a Google Sheet web app), plus this computer's own ---------- */
-const SYNC_ADDRESS = ''; // the "DTF Halftone Presets" web app address; empty keeps presets in this browser only
+const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
 const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt'];
