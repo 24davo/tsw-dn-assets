@@ -53,6 +53,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .stage-col{display:flex;flex-direction:column;min-width:0;min-height:0}
 .stage-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 16px;padding-block:6px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:12px;background:var(--panel);border-bottom:1px solid var(--line)}
 .stage-bar .tray{border:0;padding:0;background:none}
+.bar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .stage{flex:1;position:relative;min-height:0;overflow:hidden;touch-action:none;background:#111111}
 #view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:default}
 .stage.pannable #view{cursor:grab}
@@ -273,7 +274,10 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
         </div>
-        <div class="tray" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tray-label">Shirt</span></div>
+        <div class="bar-right">
+          <button class="chip" type="button" id="edgeBtn" aria-pressed="true" data-tip="Show the edge of the print area on the shirt views (E key).">Print edge</button>
+          <div class="tray" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tray-label">Shirt</span></div>
+        </div>
       </div>
     <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
       <canvas id="view"></canvas>
@@ -733,6 +737,8 @@ let lastCls = null, paintN = 0, origFor = 0, origMips = null;
 let steps = [], stepPos = -1, stepTimer = 0, stepLabel = null, restoring = false, unsaved = false;
 let cropping = null; // while drawing a crop: {prev, F, rect: [x0, y0, x1, y1] in file pixels, drag, geo}
 let folds = [];      // the panel's sections, filled once their titles become fold buttons
+let showEdge = true; // the dashed print-area edge on the shirt views
+try { showEdge = localStorage.getItem('tsw-dtf-edge') !== 'off'; } catch(e){}
 // colour ranges; not saved between visits, because sampled colours belong to one piece of art
 let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt', viewBeforeClear = 'shirt';
 const selCanvas = document.createElement('canvas');
@@ -978,6 +984,11 @@ function drawPane(p, dpr){
     if (isMask(p.kind)){ // outline the print box so clear film reads against the background
       const lw = Math.max(1, Math.round(dpr));
       vctx.strokeStyle = '#5c5c5c'; vctx.lineWidth = lw; vctx.strokeRect(g.dx - lw/2, g.dy - lw/2, OW*k + lw, OH*k + lw);
+    } else if (showEdge){ // on the shirt the art box is invisible, so a dashed edge shows where the print area ends
+      const [sr, sg, sb] = hexRgb(st.shirt), light = (0.299*sr + 0.587*sg + 0.114*sb)/255 > 0.55, lw = Math.max(1, Math.round(dpr));
+      vctx.save(); vctx.setLineDash([6*dpr, 4*dpr]); vctx.lineWidth = lw;
+      vctx.strokeStyle = light ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
+      vctx.strokeRect(g.dx - lw/2, g.dy - lw/2, OW*k + lw, OH*k + lw); vctx.restore();
     }
   }
   vctx.restore();
@@ -1127,10 +1138,14 @@ for (const id of ['paneA', 'paneB']){
 }
 document.addEventListener('pointerdown', e => { if (paneOpen && !e.target.closest('.pane-pick')) closePaneMenu(); });
 $('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
+function setEdge(on){ showEdge = on; $('edgeBtn').setAttribute('aria-pressed', String(on)); try { localStorage.setItem('tsw-dtf-edge', on ? 'on' : 'off'); } catch(e){} render(); }
+$('edgeBtn').addEventListener('click', () => setEdge(!showEdge));
+$('edgeBtn').setAttribute('aria-pressed', String(showEdge));
 window.addEventListener('keydown', e => {
   const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
   if ((e.key === 'v' || e.key === 'V') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)
     { const o = viewOrder(); setView(o[(o.indexOf(st.view) + 1) % o.length]); }
+  else if ((e.key === 'e' || e.key === 'E') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) setEdge(!showEdge);
   else if ((e.key === 't' || e.key === 'T') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey){
     if (st.view === 'split'){ if (!e.repeat) cmpOn(); } // in Split, hold T to see both sides on the checks
     else setView(st.view === 'clear' ? viewBeforeClear : 'clear'); // flick to and from the transparent view
