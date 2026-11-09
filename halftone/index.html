@@ -112,6 +112,16 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .lv-grad{height:10px;border:1px solid var(--line);border-radius:2px;background:linear-gradient(90deg,#000000,#ffffff)}
 .o-right{display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 #zoomRange{width:130px;margin:0 4px;accent-color:var(--ink)}
+.cal{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.55)}
+.cal-box{display:grid;gap:14px;width:min(960px,100%);max-height:100%;overflow:auto;padding:24px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.cal-title{margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em;text-transform:none;color:var(--ink)}
+.cal-text{margin:0;font-size:13px;color:var(--muted);max-width:70ch}
+.cal-stage{display:grid;gap:6px;justify-items:start;overflow-x:auto;padding:4px 0}
+.cal-card{flex:none;display:grid;place-items:center;border:2px solid var(--ink);background:var(--soft);font-size:13px;font-weight:700;color:var(--muted)}
+.cal-ruler{height:16px;margin-top:10px;border-bottom:2px solid var(--ink);border-right:2px solid var(--ink);background-image:linear-gradient(90deg,var(--ink) 2px,transparent 2px),linear-gradient(90deg,var(--ink) 1px,transparent 1px);background-repeat:repeat-x;background-position:left bottom}
+.cal-ends{display:flex;justify-content:space-between;width:100%;max-width:var(--rw,100%);font-size:12px;font-weight:600;color:var(--muted)}
+#calRange{width:100%;accent-color:var(--ink)}
+.cal-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 #zoomOut{min-width:44px;padding-right:4px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
 .busy{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none}
 .hint{position:absolute;left:50%;top:76px;transform:translateX(-50%);padding:8px 14px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap}
@@ -149,7 +159,7 @@ input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .num input{width:64px;border:0;background:transparent;font-weight:700;font-size:16px;font-variant-numeric:tabular-nums;outline:none}
 .num span{color:var(--muted);font-size:13px}
 .size .by{color:var(--muted)}
-.size .h{font-weight:700;font-variant-numeric:tabular-nums}
+.num input[id="hcm"]{width:64px}
 .checks{display:grid;gap:12px}
 .check{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start}
 .mark{width:22px;height:22px;border-radius:var(--r);display:grid;place-items:center;font-size:13px;font-weight:800;line-height:1}
@@ -211,6 +221,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <div class="o-right">
           <div class="tray" role="group" aria-label="Zoom" id="zoomTray" title="Pinch, or Ctrl/Cmd + scroll, to zoom at the pointer. Keys: + − 0">
             <button class="chip" type="button" data-zoom="fit" aria-pressed="true">Fit</button>
+            <button class="chip" type="button" data-zoom="life" aria-pressed="false" title="The print at its real size on this screen. Set up once with a bank card.">Life size</button>
             <button class="chip" type="button" data-zoom="1" aria-pressed="false">1:1</button>
             <button class="chip" type="button" data-zoom="2" aria-pressed="false">2×</button>
             <button class="chip" type="button" data-zoom="4" aria-pressed="false">4×</button>
@@ -236,6 +247,24 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <label class="look"><input type="radio" name="look" id="lookKnock" value="knock"><span class="look-t">Shirt shows through</span><span class="look-d">Colours close to the shirt drop out. Shading turns into dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookFull" value="full"><span class="look-t">Full halftone</span><span class="look-d">The whole design becomes dots for a soft, vintage print.</span></label>
         </div>
+      </section>
+
+      <section class="group" id="sizeGroup">
+        <h2>Print size</h2>
+        <div class="size">
+          <div class="num"><input type="number" id="wcm" min="0.5" max="50" step="0.1" value="25" aria-label="Print width in centimetres"><span>cm wide</span></div>
+          <span class="by">×</span>
+          <div class="num"><input type="number" id="hcm" min="0.5" max="50" step="0.1" value="25" aria-label="Print height in centimetres"><span>cm high</span></div>
+        </div>
+        <div class="chips" id="sizeChips">
+          <button class="chip" type="button" data-w="9">Chest 9 cm</button>
+          <button class="chip" type="button" data-w="28">Front 28 cm</button>
+          <button class="chip" type="button" data-w="33">Back 33 cm</button>
+          <button class="chip" type="button" data-w="max">Largest</button>
+        </div>
+        <p class="f-note" id="sizeNote">Saved at 300 dpi. Largest print is 40 × 50 cm either way round.</p>
+        <p class="f-note">Type either side and the other follows. The original art is resized to this first, then Levels, colour ranges and dots are worked out at this size, so the dots are true to the print.</p>
+        <p class="f-note" id="lifeNote"></p>
       </section>
 
       <section class="group" id="levelsGroup">
@@ -364,22 +393,6 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       </section>
 
       <section class="group">
-        <h2>Print size</h2>
-        <div class="size">
-          <div class="num"><input type="number" id="wcm" min="1" max="50" step="0.1" value="25" aria-label="Print width in centimetres"><span>cm wide</span></div>
-          <span class="by">×</span>
-          <span><span class="h" id="hcm">25.0</span> <span class="by">cm high</span></span>
-        </div>
-        <div class="chips" id="sizeChips">
-          <button class="chip" type="button" data-w="9">Chest 9 cm</button>
-          <button class="chip" type="button" data-w="28">Front 28 cm</button>
-          <button class="chip" type="button" data-w="33">Back 33 cm</button>
-          <button class="chip" type="button" data-w="max">Largest</button>
-        </div>
-        <p class="f-note" id="sizeNote">Saved at 300 dpi. Largest print is 40 × 50 cm either way round.</p>
-      </section>
-
-      <section class="group">
         <h2>Film check</h2>
         <div class="checks" id="checks"></div>
       </section>
@@ -396,7 +409,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
-            <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys.</li>
+            <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
             <li>For a quick black-shirt clean-up with no halftone, use Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
@@ -404,6 +417,20 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       </section>
     </aside>
   </main>
+</div>
+<div class="cal" id="cal" role="dialog" aria-modal="true" aria-labelledby="calTitle" hidden>
+  <div class="cal-box">
+    <h2 class="cal-title" id="calTitle">Set up life size for this screen</h2>
+    <p class="cal-text">Hold a bank card flat against the screen over the box, and drag the slider until the box is exactly as wide as the card. Bank, ID and loyalty cards are all 85.6 mm wide. Or hold a ruler to the 10 cm line.</p>
+    <div class="cal-stage">
+      <div class="cal-card" id="calCard"><span>85.6 mm</span></div>
+      <div class="cal-ruler" id="calRuler"></div>
+      <div class="cal-ends"><span>0</span><span>10 cm</span></div>
+    </div>
+    <input type="range" id="calRange" min="200" max="900" step="1" value="378" aria-label="Box size">
+    <p class="cal-text">Set it up again on each screen you use, and after changing the display's scaling setting.</p>
+    <div class="cal-actions"><button class="btn" type="button" id="calCancel">Cancel</button><button class="btn primary" type="button" id="calSave">Save and show life size</button></div>
+  </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -627,13 +654,12 @@ function schedule(){
 function maxWidthCm(){ if (!art) return MAX_SHORT; const a = art.h/art.w; return art.w >= art.h ? Math.min(MAX_LONG, MAX_SHORT/a) : Math.min(MAX_SHORT, MAX_LONG/a); }
 function outW(){ return Math.max(1, Math.round(st.widthCm/2.54*DPI)); }
 function outH(){ return Math.max(1, Math.round(outW()*art.h/art.w)); }
-function setWidth(cm, quiet){
-  const max = Math.floor(maxWidthCm()*10)/10;
-  let w = Math.round(Math.max(1, Math.min(cm || 1, max))*10)/10;
-  if (!quiet && cm > max + 0.05) toast(`Largest print is 40 × 50 cm, so it’s set to ${max.toFixed(1)} cm wide.`);
+function setWidth(cm, quiet, typing){
+  const max = maxWidthCm(), w = Math.max(0.5, Math.min(cm || 1, max)), h = w*art.h/art.w;
+  if (!quiet && cm > max + 0.001) toast(`Largest print is 40 × 50 cm, so it’s set to ${w.toFixed(1)} × ${h.toFixed(1)} cm.`);
   st.widthCm = w;
-  $('wcm').value = w.toFixed(1);
-  $('hcm').textContent = (w*art.h/art.w).toFixed(1);
+  if (typing !== $('wcm')) $('wcm').value = w.toFixed(1);
+  if (typing !== $('hcm')) $('hcm').value = h.toFixed(1);
   $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px, saved at 300 dpi. Largest print is 40 × 50 cm either way round.`;
   $('sizeRead').textContent = `${w.toFixed(1)} × ${(w*art.h/art.w).toFixed(1)} cm · ${outW()} × ${outH()} px`;
 }
@@ -831,16 +857,52 @@ function zoomTo(k, ax, ay){
   st.zoom = kk; stage.classList.add('pannable'); render();
 }
 function syncZoomUI(){
-  for (const b of $('zoomTray').querySelectorAll('[data-zoom]')) b.setAttribute('aria-pressed', String(b.dataset.zoom === String(st.zoom)));
-  const [lo, hi] = zoomSpan(), fit = st.zoom === 'fit';
+  const fit = st.zoom === 'fit', life = !fit && lifeDevPxMm && Math.abs(st.zoom/lifeK() - 1) < 0.005;
+  for (const b of $('zoomTray').querySelectorAll('[data-zoom]')) b.setAttribute('aria-pressed', String(b.dataset.zoom === 'life' ? !!life : b.dataset.zoom === String(st.zoom)));
+  const [lo, hi] = zoomSpan();
   $('zoomRange').value = fit ? 0 : Math.max(1, Math.round(clampN(Math.log(st.zoom/lo)/Math.log(hi/lo), 0, 1)*1000));
-  $('zoomOut').textContent = fit ? 'Fit' : `${Math.round(st.zoom*100)}%`;
+  $('zoomOut').textContent = fit ? 'Fit' : life ? 'Life' : `${Math.round(st.zoom*100)}%`;
 }
+
+/* ---------- Life size: the screen's real pixels per mm, measured once against a bank card (85.6 mm wide) ---------- */
+let lifeDevPxMm = null, calPxMm = 96/25.4; // device pixels per mm once set up; while setting up, CSS pixels per mm
+try { const v = parseFloat(localStorage.getItem('tsw-dtf-life')); if (v > 0) lifeDevPxMm = v; } catch(e){}
+const lifeK = () => lifeDevPxMm*25.4/DPI; // screen pixels per file pixel at real size
+function lifeZoom(){ if (!lifeDevPxMm) openCal(); else setZoom(lifeK()); }
+function openCal(){
+  calPxMm = lifeDevPxMm ? lifeDevPxMm/(window.devicePixelRatio || 1) : 96/25.4;
+  $('calRange').value = Math.round(calPxMm*100); drawCal();
+  $('cal').hidden = false; $('calRange').focus();
+}
+function closeCal(){ $('cal').hidden = true; }
+function drawCal(){
+  const m = calPxMm, card = $('calCard'), ruler = $('calRuler');
+  card.style.width = `${85.6*m}px`; card.style.height = `${53.98*m}px`; card.style.borderRadius = `${3.18*m}px`;
+  ruler.style.width = `${100*m}px`; $('calRuler').nextElementSibling.style.setProperty('--rw', `${100*m}px`); ruler.style.backgroundSize = `${10*m}px 16px, ${5*m}px 9px`;
+}
+function syncLifeNote(){
+  $('lifeNote').innerHTML = lifeDevPxMm
+    ? 'Life size zoom is set up for this screen. <button class="link" type="button" data-cal>Check it</button>'
+    : 'Life size zoom needs a one-minute setup with a bank card. <button class="link" type="button" data-cal>Set it up</button>';
+}
+$('lifeNote').addEventListener('click', e => { if (e.target.closest('[data-cal]')) openCal(); });
+$('calRange').addEventListener('input', e => { calPxMm = +e.target.value/100; drawCal(); });
+$('calCancel').addEventListener('click', closeCal);
+$('cal').addEventListener('click', e => { if (e.target === $('cal')) closeCal(); });
+$('calSave').addEventListener('click', () => {
+  lifeDevPxMm = calPxMm*(window.devicePixelRatio || 1); // device pixels survive browser zoom on the same screen
+  try { localStorage.setItem('tsw-dtf-life', String(lifeDevPxMm)); } catch(e){}
+  closeCal(); syncLifeNote(); setZoom(lifeK());
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('cal').hidden) closeCal(); });
 $('zoomRange').addEventListener('input', e => {
   const v = +e.target.value, [lo, hi] = zoomSpan();
   if (v <= 0) setZoom('fit'); else zoomTo(lo*Math.pow(hi/lo, v/1000));
 });
-$('zoomTray').addEventListener('click', e => { const b = e.target.closest('[data-zoom]'); if (b) setZoom(b.dataset.zoom === 'fit' ? 'fit' : +b.dataset.zoom); });
+$('zoomTray').addEventListener('click', e => {
+  const b = e.target.closest('[data-zoom]'); if (!b) return;
+  if (b.dataset.zoom === 'life') lifeZoom(); else setZoom(b.dataset.zoom === 'fit' ? 'fit' : +b.dataset.zoom);
+});
 
 const viewOrder = () => rules.length ? ['shirt', 'base', 'map', 'sel', 'split'] : ['shirt', 'base', 'map', 'split'];
 function setView(v){
@@ -1194,8 +1256,12 @@ new ResizeObserver(() => drawHisto()).observe($('histo'));
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawHisto); } catch(e){}
 
 let wTimer = 0;
-$('wcm').addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0)) return; clearTimeout(wTimer); wTimer = setTimeout(() => { setWidth(v); buildSrcSoon(); updateChecks(); }, 450); });
-$('wcm').addEventListener('change', e => { clearTimeout(wTimer); setWidth(parseFloat(e.target.value)); buildSrcSoon(); updateChecks(); });
+// width or height: type either one, the other follows the art's shape
+const fromBox = (id, v) => id === 'hcm' ? v*art.w/art.h : v;
+for (const id of ['wcm', 'hcm']){
+  $(id).addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0) || !art) return; clearTimeout(wTimer); wTimer = setTimeout(() => { setWidth(fromBox(id, v), false, e.target); buildSrcSoon(); updateChecks(); }, 450); });
+  $(id).addEventListener('change', e => { const v = parseFloat(e.target.value); clearTimeout(wTimer); if (!art) return; setWidth(v > 0 ? fromBox(id, v) : st.widthCm); buildSrcSoon(); updateChecks(); });
+}
 $('sizeChips').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b || !art) return; setWidth(b.dataset.w === 'max' ? maxWidthCm() : +b.dataset.w, b.dataset.w === 'max'); buildSrcSoon(); updateChecks(); });
 
 /* ---------- notes and the film check ---------- */
@@ -1391,7 +1457,7 @@ async function sampleArt(){
 /* ---------- start ---------- */
 syncShirt(); syncLook(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape); syncInk(); updateNotes();
 if (st.look === 'shadows') ensureShadowRule(); else syncRules();
-syncLevels();
+syncLevels(); syncLifeNote();
 syncFinish();
 sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); });
 })();
