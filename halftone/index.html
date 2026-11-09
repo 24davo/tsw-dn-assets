@@ -2118,6 +2118,7 @@ function analyseArt(a){
   a.q.done = true;
   if (art !== a) return;
   syncQuality(); updateChecks();
+  if (a.quiet) return; // reopened after a refresh: it was said the first time
   if (a.q.kind) toast(`This file looks already enlarged ${a.q.scale}×: its real detail is about ${Math.round(a.w/a.q.scale).toLocaleString()} px wide. Details in Print size.`);
   else if (a.jpegQ && a.jpegQ < 60) toast(`This JPEG was saved at low quality (${a.jpegQ} of 100). Details in Print size.`);
 }
@@ -2227,9 +2228,7 @@ $('smoothBtn').addEventListener('change', e => { if (!art) return; art.smooth = 
 function setArt(el, w, h, name, isSample, dpi, kind){
   if (cropping) endCrop(false);
   endBrush(); shownStrokes = [];
-  art = {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}, // w and h follow the crop
-         isVector: !!(kind && kind.vector), jpegQ: kind && kind.jpegQ || null, smooth: false, q: null,
-         id: ++artSeq, strokes: [], strokesN: 0}; // touch-up strokes, in the file's pixels
+  art = makeArt(el, w, h, name, isSample, dpi, kind);
   syncCrop(); clearDoneMarks();
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
   $('nameSuffix').value = ''; // a suffix belongs to one piece of art
@@ -2243,6 +2242,11 @@ function setArt(el, w, h, name, isSample, dpi, kind){
   if (cur) cur.art = art;
   renderTabs();
   const a = art; setTimeout(() => analyseArt(a), 30); // after the first paint
+}
+function makeArt(el, w, h, name, isSample, dpi, kind){
+  return {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}, // w and h follow the crop
+          isVector: !!(kind && kind.vector), jpegQ: kind && kind.jpegQ || null, smooth: false, q: null,
+          id: ++artSeq, strokes: [], strokesN: 0, file: null}; // strokes: touch-ups, in the file's pixels; file: the opened file, kept for a refresh
 }
 function syncFileInfo(){
   $('fileInfo').innerHTML = (art.isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(art.name)}</b>` +
@@ -2285,10 +2289,11 @@ function loadDoc(d){ // puts a tab's design on screen: its art, settings, histor
 }
 function switchTo(d){ if (d === cur) return; stashDoc(); loadDoc(d); }
 function newDoc(){ // a new tab for the art being opened; the sample's tab is reused
-  if (!art || art.isSample){ if (!cur){ cur = {id: ++docSeq}; docs.push(cur); } return; }
+  if (!art || art.isSample){ if (!cur){ cur = {id: ++docSeq, key: newKey()}; docs.push(cur); } return; }
   stashDoc();
-  cur = {id: ++docSeq}; docs.push(cur);
+  cur = {id: ++docSeq, key: newKey()}; docs.push(cur);
 }
+const newKey = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const docFull = () => docs.length >= MAX_DOCS && !(art && art.isSample);
 function closeDoc(d){
   if (docs.length < 2) return;
@@ -2296,12 +2301,14 @@ function closeDoc(d){
     const i = docs.indexOf(d); if (i < 0) return;
     docs.splice(i, 1);
     if (d === cur){ cur = null; loadDoc(docs[Math.min(i, docs.length - 1)]); } else renderTabs();
+    forgetDoc(d);
     d.art = null; d.steps = null; // let the browser free the image
   };
   if (d !== cur && d.unsaved && d.art && !d.art.isSample) switchTo(d); // show it, so the question is about what's on screen
   if (d === cur) guardThen(go, false, true); else go();
 }
 function renderTabs(){
+  persistSoon();
   $('tabsActions').hidden = docs.filter(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample).length < 2;
   $('tabsList').innerHTML = docs.map(d => {
     const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
@@ -2356,6 +2363,82 @@ $('allSaveBtn').addEventListener('click', async () => {
   if (docs.includes(start)) switchTo(start);
   toast(saved === list.length ? `Saved all ${saved} PNGs.` : `Saved ${saved} of ${list.length} PNGs. The rest weren’t saved.`);
 });
+/* Open designs are kept in this browser's own storage (IndexedDB) on this computer, so a refresh or a restart brings them
+   back: the file, crop, print size, settings, touch-ups, name suffix and History. Nothing leaves the computer. Closing a tab
+   forgets it. The sample is never kept. */
+let dbP = null, dbOk = false, persistTimer = 0; // dbOk: this browser's storage opened
+const keptFailed = new Set(); // designs too big for this browser's storage: they won't come back after a refresh
+function openDb(){
+  if (dbP) return dbP;
+  dbP = new Promise(res => {
+    try {
+      const r = indexedDB.open('tsw-dtf-tabs', 1);
+      r.onupgradeneeded = () => { for (const n of ['docs', 'files', 'meta']) if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n); };
+      r.onsuccess = () => { dbOk = true; res(r.result); }; r.onerror = () => res(null); r.onblocked = () => res(null);
+    } catch(e){ res(null); }
+  });
+  return dbP;
+}
+const idbGet = (db, store, key) => new Promise(res => { try { const r = db.transaction(store).objectStore(store).get(key); r.onsuccess = () => res(r.result); r.onerror = () => res(undefined); } catch(e){ res(undefined); } });
+const idbDone = tx => new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => rej(tx.error); });
+function docRecord(d){
+  const live = d === cur, a = live ? art : d.art;
+  return {name: a.name, dpi: a.dpi, jpegQ: a.jpegQ, isVector: a.isVector, fullW: a.fullW, fullH: a.fullH, smooth: !!a.smooth,
+    strokes: a.strokes, strokesN: a.strokesN, snap: live ? snapshot() : d.snap, activeRule: live ? activeRule : d.activeRule,
+    steps: live ? steps : d.steps, stepPos: live ? stepPos : d.stepPos, unsaved: live ? unsaved : d.unsaved,
+    zoom: live ? st.zoom : d.zoom, cx: live ? st.cx : d.cx, cy: live ? st.cy : d.cy, suffix: live ? $('nameSuffix').value : d.suffix,
+    done: live ? [...document.querySelectorAll('.panel > .group.done')].map(g => g.id) : d.done};
+}
+function persistSoon(){ if (restoringDocs) return; clearTimeout(persistTimer); persistTimer = setTimeout(persistNow, 400); }
+async function persistNow(){
+  clearTimeout(persistTimer); persistTimer = 0;
+  const db = await openDb(); if (!db) return;
+  const kept = [];
+  for (const d of docs){
+    const a = d === cur ? art : d.art;
+    if (!a || a.isSample || !a.file || keptFailed.has(d.key)) continue;
+    try {
+      const tx = db.transaction(['docs', 'files'], 'readwrite');
+      tx.objectStore('docs').put(docRecord(d), d.key);
+      if (!d.fileKept) tx.objectStore('files').put(a.file, d.key);
+      await idbDone(tx); d.fileKept = true; kept.push(d.key);
+    } catch(e){ keptFailed.add(d.key); toast(`“${a.name}” is too big to keep for a refresh on this computer. Save it before closing.`); }
+  }
+  try { const tx = db.transaction('meta', 'readwrite'); tx.objectStore('meta').put({keys: kept, current: cur && cur.key}, 'order'); await idbDone(tx); } catch(e){}
+}
+async function forgetDoc(d){
+  const db = await openDb(); if (!db || !d.key) return;
+  try { const tx = db.transaction(['docs', 'files'], 'readwrite'); tx.objectStore('docs').delete(d.key); tx.objectStore('files').delete(d.key); await idbDone(tx); } catch(e){}
+}
+let restoringDocs = false;
+async function restoreDocs(){ // answers how many designs came back
+  const db = await openDb(); if (!db) return 0;
+  const meta = await idbGet(db, 'meta', 'order');
+  if (!meta || !Array.isArray(meta.keys) || !meta.keys.length) return 0;
+  restoringDocs = true;
+  const back = [];
+  try {
+    for (const key of meta.keys){
+      const rec = await idbGet(db, 'docs', key), file = await idbGet(db, 'files', key);
+      if (!rec || !file || !rec.snap) continue;
+      const im = new Image(); im.decoding = 'async'; im.src = URL.createObjectURL(file);
+      try { await im.decode(); } catch(e){ continue; }
+      const a = makeArt(im, rec.fullW, rec.fullH, rec.name, false, rec.dpi, {vector: rec.isVector, jpegQ: rec.jpegQ});
+      Object.assign(a, {file, quiet: true, smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0});
+      if (rec.snap.crop){ a.crop = {...rec.snap.crop}; a.w = a.crop.w; a.h = a.crop.h; }
+      if (a.strokesN) rebuildEdits(a);
+      back.push({id: ++docSeq, key, art: a, fileKept: true, snap: rec.snap, activeRule: rec.activeRule || 0, steps: rec.steps && rec.steps.length ? rec.steps : [{snap: rec.snap, label: `Opened ${rec.name}`, at: Date.now()}],
+                 stepPos: rec.steps && rec.steps.length ? Math.min(rec.stepPos, rec.steps.length - 1) : 0, unsaved: !!rec.unsaved, zoom: rec.zoom || 'fit', cx: rec.cx || 0, cy: rec.cy || 0, suffix: rec.suffix || '', done: rec.done || []});
+    }
+  } finally { restoringDocs = false; }
+  if (!back.length) return 0;
+  docs = back; cur = null;
+  loadDoc(back.find(d => d.key === meta.current) || back[0]);
+  back.forEach((d, i) => setTimeout(() => analyseArt(d.art), 60 + i*40));
+  toast(back.length === 1 ? `“${back[0].art.name}” is back from last time.` : `Your ${back.length} designs are back from last time.`);
+  return back.length;
+}
+window.addEventListener('pagehide', () => { if (persistTimer) persistNow(); });
 function openArt(){ if (docFull()){ toast(`Up to ${MAX_DOCS} designs can be open at once. Close a tab first.`); return; } $('fileIn').click(); }
 async function openFiles(list){ for (const f of list) await openFile(f); }
 async function readPngDpi(file){
@@ -2386,6 +2469,7 @@ async function openFile(f){
   newDoc();
   setArt(im, im.naturalWidth, im.naturalHeight, f.name || 'Pasted art', false, dpi,
          {vector: /svg/i.test(f.type) || /\.svg$/i.test(f.name || ''), jpegQ});
+  art.file = f; persistSoon();
 }
 $('fileIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; openFiles(list); });
 $('openBtn').addEventListener('click', openArt);
@@ -2430,7 +2514,7 @@ function fileName(){
   return `${base}_twedit_${toMm(st.widthCm)}w` + (st.finish === 'cut' ? '' : `_${st.lpi}lpi`) + (extra ? `_${extra}` : '') + '.png';
 }
 function syncFileName(){ if (art) $('nameNote').innerHTML = `Saves as <b>${esc(fileName())}</b>`; }
-$('nameSuffix').addEventListener('input', syncFileName);
+$('nameSuffix').addEventListener('input', () => { syncFileName(); persistSoon(); });
 function settingsText(){
   const look = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
   const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
@@ -2846,7 +2930,12 @@ $('askSaveBtn').addEventListener('click', async () => {
   $('askSaveBtn').textContent = 'Open art'; $('askSaveBtn').dataset.next = '1'; $('askNoSave').hidden = true;
   $('askSave').hidden = false; $('askSaveBtn').focus();
 });
-window.addEventListener('beforeunload', e => { commitStep(); if (hasUnsaved() || docs.some(d => d !== cur && d.unsaved && d.art && !d.art.isSample)){ e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => {
+  commitStep();
+  if (persistTimer) persistNow(); // the last change, kept for next time
+  const lost = d => !dbOk || keptFailed.has(d.key) || !(d === cur ? art : d.art).file; // designs that won't come back
+  if (docs.some(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample && (d === cur ? unsaved : d.unsaved) && lost(d))){ e.preventDefault(); e.returnValue = ''; }
+});
 
 /* ---------- sections start folded; Expand all opens every one ---------- */
 const SECTION_TIPS = {
@@ -3041,8 +3130,8 @@ for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el
 // open in Split when the screen has room for two views side by side
 if (stage.clientWidth >= 960 && stage.clientWidth >= stage.clientHeight*1.1) setView('split');
 syncFinish();
-cur = {id: ++docSeq}; docs = [cur]; renderTabs(); // the first tab holds the sample until art is opened
-sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); });
+cur = {id: ++docSeq, key: newKey()}; docs = [cur]; renderTabs(); // the first tab holds the sample until art is opened
+restoreDocs().catch(() => 0).then(n => { if (!n) sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); }); });
 })();
 </script>
 </body>
