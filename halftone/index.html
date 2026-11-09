@@ -161,8 +161,8 @@ input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .preset-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .chip[disabled]{opacity:.45;cursor:default;pointer-events:none}
 .preset-form{display:grid;gap:10px;padding:12px;border:1.5px solid var(--ink);border-radius:var(--r)}
-.preset-form input[type="text"]{height:38px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:600}
-.preset-form input[type="text"]:focus{border-color:var(--ink);outline:none}
+.preset-form input[type="text"],.preset-form input[type="password"]{height:38px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:600}
+.preset-form input[type="text"]:focus,.preset-form input[type="password"]:focus{border-color:var(--ink);outline:none}
 .preset-confirm{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;font-weight:600}
 .size{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .num{display:flex;align-items:center;height:42px;border:1.5px solid var(--line);border-radius:var(--r);padding:0 10px;gap:6px}
@@ -259,14 +259,22 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <button class="chip" type="button" id="presetNew">Save new</button>
           <button class="chip" type="button" id="presetUpdate" disabled title="Save the current settings over the chosen preset">Update</button>
           <button class="chip" type="button" id="presetDelete" disabled>Delete</button>
+          <button class="chip" type="button" id="presetShare" hidden>Share with all computers</button>
         </div>
         <form class="preset-form" id="presetForm" hidden>
           <input type="text" id="presetName" maxlength="48" placeholder="e.g. Black tee, shadows out" aria-label="Preset name" autocomplete="off">
           <label class="check-row"><input type="checkbox" id="presetSize"> <span id="presetSizeTxt">Include the print size</span></label>
           <div class="preset-actions"><button class="btn small primary" type="submit">Save preset</button><button class="btn small" type="button" id="presetCancel">Cancel</button></div>
         </form>
+        <form class="preset-form" id="codeForm" hidden>
+          <div class="f-head"><label for="teamCode">Team code</label></div>
+          <input type="password" id="teamCode" autocomplete="off" aria-describedby="codeNote">
+          <p class="f-note" id="codeNote">Needed once on each computer to change the shared presets. It’s in the Settings tab of the “DTF Halftone Presets” Google Sheet.</p>
+          <div class="preset-actions"><button class="btn small primary" type="submit">OK</button><button class="btn small" type="button" id="codeCancel">Cancel</button></div>
+        </form>
         <div class="preset-confirm" id="presetConfirm" hidden><span id="presetConfirmTxt"></span><button class="link" type="button" id="presetYes">Delete</button><button class="link" type="button" id="presetNo">Keep it</button></div>
-        <p class="f-note">A preset keeps the look, finish, dots, knock-out, Levels, colour ranges, tone, ink and shirt colour. Open the art first, then choose the preset. Presets live in this browser: <button class="link" type="button" id="presetExport">Export</button> them to a file and <button class="link" type="button" id="presetImport">Import</button> it on the other computers.</p>
+        <p class="f-note" id="syncNote" hidden></p>
+        <p class="f-note" id="presetHelp"></p>
         <input type="file" id="presetFile" accept=".json,application/json" hidden>
       </section>
 
@@ -1522,11 +1530,24 @@ async function sampleArt(){
 }
 
 /* ---------- start ---------- */
-/* ---------- presets: kept in this browser, shared between computers by exporting a file ---------- */
+/* ---------- presets: one shared list for every workshop computer (a Google Sheet web app), plus this computer's own ---------- */
+const SYNC_ADDRESS = ''; // the "DTF Halftone Presets" web app address; empty keeps presets in this browser only
+const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
+const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
 const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt'];
-let presets = [];
-try { const v = JSON.parse(localStorage.getItem('tsw-dtf-presets') || '[]'); if (Array.isArray(v)) presets = v.filter(x => x && x.name && x.s); } catch(e){}
-function savePresets(){ try { localStorage.setItem('tsw-dtf-presets', JSON.stringify(presets)); } catch(e){ toast('This browser could not keep presets. Export them to a file instead.'); } }
+const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
+const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
+const sameName = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+let presets = [].concat(readJSON('tsw-dtf-presets', [])).filter(isPreset);                 // this computer only
+let shared = SYNC_URL ? [].concat(readJSON('tsw-dtf-shared', [])).filter(isPreset) : [];   // the last copy of the shared list
+let sharedAt = SYNC_URL ? readJSON('tsw-dtf-shared-at', null) : null;
+let syncState = SYNC_URL ? 'loading' : 'off', syncBusy = false, teamCode = null, codeAsk = null;
+try { teamCode = localStorage.getItem('tsw-dtf-team'); } catch(e){}
+function savePresets(){ if (!writeJSON('tsw-dtf-presets', presets)) toast('This browser could not keep presets. Export them to a file instead.'); }
+function putLocal(p){ const i = presets.findIndex(x => sameName(x.name, p.name)); if (i >= 0) presets[i] = p; else presets.push(p); savePresets(); return i >= 0; }
+function dropLocal(name){ const i = presets.findIndex(x => sameName(x.name, name)); if (i >= 0){ presets.splice(i, 1); savePresets(); } }
+function useShared(list){ shared = [].concat(list || []).filter(isPreset); sharedAt = Date.now(); writeJSON('tsw-dtf-shared', shared); writeJSON('tsw-dtf-shared-at', sharedAt); }
 function capturePreset(name, withSize){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   s.knock = st.knock; s.knockFrom = knockFrom;
@@ -1538,7 +1559,7 @@ function applyPreset(p){
   for (const k of PRESET_KEYS) if (k in p.s) st[k] = p.s[k];
   st.knock = p.s.knock || null; knockFrom = st.knock ? (p.s.knockFrom || 'hand') : 'shirt';
   Object.assign(lv, LV0, p.levels || {});
-  rules = (p.rules || []).slice(0, MAX_RULES).map(R => ({...newRule(R.type || 'shadows', R.action || 'remove'), ...R, samples: [...(R.samples || [])]}));
+  rules = [].concat(p.rules || []).slice(0, MAX_RULES).map(R => ({...newRule(R.type || 'shadows', R.action || 'remove'), ...R, samples: [...(R.samples || [])]}));
   activeRule = 0;
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
   syncInk(); syncLevels(); updateNotes(); syncRules();
@@ -1546,67 +1567,168 @@ function applyPreset(p){
   remember(); schedule(); updateChecks();
   toast(`Applied “${p.name}”.`);
 }
-function syncPresets(selected){
-  const sel = $('presetSel');
-  sel.innerHTML = `<option value="">${presets.length ? 'Choose a preset…' : 'No presets saved yet'}</option>` + presets.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
-  const i = selected != null ? presets.findIndex(p => p.name === selected) : -1;
-  sel.value = i >= 0 ? String(i) : '';
-  $('presetUpdate').disabled = $('presetDelete').disabled = i < 0;
+function chosen(){ const v = $('presetSel').value; if (!v) return null; const where = v[0], list = where === 's' ? shared : presets, p = list[+v.slice(1)]; return p ? {p, where} : null; }
+function syncPresets(selName, where){
+  const opt = (p, key) => `<option value="${key}">${esc(p.name)}</option>`;
+  let html = `<option value="">${shared.length || presets.length ? 'Choose a preset…' : 'No presets saved yet'}</option>`;
+  if (SYNC_URL){
+    if (shared.length) html += `<optgroup label="Shared with all computers">${shared.map((p, i) => opt(p, 's' + i)).join('')}</optgroup>`;
+    if (presets.length) html += `<optgroup label="This computer only">${presets.map((p, i) => opt(p, 'l' + i)).join('')}</optgroup>`;
+  } else html += presets.map((p, i) => opt(p, 'l' + i)).join('');
+  $('presetSel').innerHTML = html;
+  let key = '';
+  if (selName != null){ const list = where === 's' ? shared : presets, i = list.findIndex(p => sameName(p.name, selName)); if (i >= 0) key = where + i; }
+  $('presetSel').value = key;
   $('presetConfirm').hidden = true;
+  syncPresetButtons(); syncSyncNote();
 }
-const chosenPreset = () => { const v = $('presetSel').value; return v === '' ? null : presets[+v]; };
-$('presetSel').addEventListener('change', () => { const p = chosenPreset(); syncPresets(p ? p.name : null); if (p) applyPreset(p); });
+function syncPresetButtons(){
+  const c = chosen();
+  $('presetUpdate').disabled = $('presetDelete').disabled = !c || syncBusy;
+  $('presetNew').disabled = syncBusy;
+  $('presetShare').hidden = !(SYNC_URL && c && c.where === 'l'); $('presetShare').disabled = syncBusy;
+}
+function syncSyncNote(){
+  const n = $('syncNote'), at = sharedAt ? new Date(sharedAt).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : '';
+  n.hidden = !SYNC_URL;
+  if (SYNC_URL){
+    const mine = presets.length ? `<br>${presets.length === 1 ? '1 preset is' : presets.length + ' presets are'} on this computer only. <button class="link" type="button" data-act="shareall">Share ${presets.length === 1 ? 'it' : 'them'} with all computers</button>` : '';
+    n.innerHTML = syncState === 'busy' ? 'Updating the shared presets…'
+      : syncState === 'loading' ? 'Loading the shared presets…'
+      : syncState === 'ok' ? `Shared presets are up to date${at ? ` (checked ${at})` : ''}. <button class="link" type="button" data-act="refresh">Refresh</button>${mine}`
+      : `Couldn’t reach the shared presets${at ? `, so these are from ${at}` : ''}. <button class="link" type="button" data-act="refresh">Try again</button>${mine}`;
+  }
+  $('presetHelp').innerHTML = 'A preset keeps the look, finish, dots, knock-out, Levels, colour ranges, tone, ink and shirt colour. Open the art first, then choose the preset. ' +
+    (SYNC_URL ? 'Shared presets are the same on every workshop computer. <button class="link" type="button" data-act="export">Export</button> saves a backup file, and <button class="link" type="button" data-act="import">Import</button> shares the presets in one.'
+              : (IN_CLAUDE && SYNC_ADDRESS ? 'Shared presets work on the staff web address; here they stay in this browser. ' : 'Presets live in this browser: ') +
+                '<button class="link" type="button" data-act="export">Export</button> them to a file and <button class="link" type="button" data-act="import">Import</button> it on the other computers.');
+}
+async function refreshShared(quiet){
+  if (!SYNC_URL || syncBusy) return;
+  try {
+    const d = await (await fetch(SYNC_URL, {cache: 'no-store'})).json();
+    if (!d.ok) throw new Error(d.error);
+    useShared(d.presets); syncState = 'ok';
+  } catch(e){ syncState = 'off'; if (!quiet) toast('Couldn’t reach the shared presets. Check the internet connection.'); }
+  const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null);
+}
+function askCode(){
+  return new Promise(res => { codeAsk = res; $('teamCode').value = ''; $('presetForm').hidden = true; $('presetConfirm').hidden = true; $('codeForm').hidden = false; $('teamCode').focus(); });
+}
+function answerCode(v){ $('codeForm').hidden = true; if (codeAsk){ const r = codeAsk; codeAsk = null; r(v); } }
+$('codeForm').addEventListener('submit', e => { e.preventDefault(); answerCode($('teamCode').value.trim() || null); });
+$('codeCancel').addEventListener('click', () => answerCode(null));
+async function remote(body){ // a change to the shared list; answers {ok, presets} or {ok: false, error}
+  let code = teamCode;
+  for (let tries = 0; tries < 3; tries++){
+    if (!code){ code = await askCode(); if (!code) return {ok: false, error: 'cancelled'}; }
+    syncBusy = true; syncState = 'busy'; syncPresetButtons(); syncSyncNote();
+    let d;
+    try { d = await (await fetch(SYNC_URL, {method: 'POST', body: JSON.stringify({...body, code})})).json(); } // plain text body, so no CORS pre-check
+    catch(e){ d = {ok: false, error: 'offline'}; }
+    syncBusy = false;
+    if (d.ok){ teamCode = code; try { localStorage.setItem('tsw-dtf-team', code); } catch(e){} useShared(d.presets); syncState = 'ok'; return d; }
+    syncState = d.error === 'offline' ? 'off' : 'ok';
+    if (d.error !== 'code') return d;
+    teamCode = null; code = null; try { localStorage.removeItem('tsw-dtf-team'); } catch(e){}
+    toast('That team code isn’t right. Try again.');
+  }
+  return {ok: false, error: 'code'};
+}
+function remoteProblem(d){
+  const say = {offline: 'Couldn’t reach the shared presets.', locked: 'Too many wrong team codes. Try again in 10 minutes.', full: 'The shared list is full. Delete some presets first.',
+               big: 'That preset is too big to share.', code: 'That team code isn’t right.'};
+  return say[d.error] || 'The shared presets didn’t take that. Try again.';
+}
+$('presetSel').addEventListener('change', () => { const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); if (c) applyPreset(c.p); });
 $('presetNew').addEventListener('click', () => {
   const look = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
   const shirt = (SHIRTS.find(([, hex]) => hex.toLowerCase() === st.shirt.toLowerCase()) || ['custom shirt'])[0];
   $('presetName').value = `${look}, ${shirt.toLowerCase()} tee`;
   $('presetSize').checked = false;
   $('presetSizeTxt').textContent = art ? `Include the print size (${st.widthCm.toFixed(1)} × ${(st.widthCm*art.h/art.w).toFixed(1)} cm)` : 'Include the print size';
-  $('presetConfirm').hidden = true; $('presetForm').hidden = false; $('presetName').focus(); $('presetName').select();
+  $('presetConfirm').hidden = true; $('codeForm').hidden = true; $('presetForm').hidden = false; $('presetName').focus(); $('presetName').select();
 });
 $('presetCancel').addEventListener('click', () => { $('presetForm').hidden = true; });
-$('presetForm').addEventListener('submit', e => {
+$('presetForm').addEventListener('submit', async e => {
   e.preventDefault();
   const name = $('presetName').value.trim().slice(0, 48);
   if (!name){ toast('Give the preset a name.'); $('presetName').focus(); return; }
-  const p = capturePreset(name, $('presetSize').checked), i = presets.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
-  if (i >= 0) presets[i] = p; else presets.push(p);
-  savePresets(); syncPresets(name); $('presetForm').hidden = true;
-  toast(i >= 0 ? `Updated “${name}”.` : `Saved “${name}”.`);
+  const p = capturePreset(name, $('presetSize').checked);
+  $('presetForm').hidden = true;
+  if (SYNC_URL){
+    const d = await remote({action: 'save', preset: p});
+    if (d.ok){ dropLocal(name); syncPresets(name, 's'); toast(`Saved “${name}” for every computer.`); return; }
+    putLocal(p); syncPresets(name, 'l');
+    toast(d.error === 'cancelled' ? `Saved “${name}” on this computer only. Click Share when you have the team code.` : `${remoteProblem(d)} “${name}” is saved on this computer for now: click Share later.`);
+    return;
+  }
+  const existed = putLocal(p); syncPresets(name, 'l'); toast(existed ? `Updated “${name}”.` : `Saved “${name}”.`);
 });
-$('presetUpdate').addEventListener('click', () => {
-  const p = chosenPreset(); if (!p) return;
-  const i = presets.indexOf(p); presets[i] = capturePreset(p.name, !!p.size);
-  savePresets(); syncPresets(p.name); toast(`Updated “${p.name}” with the current settings.`);
+$('presetUpdate').addEventListener('click', async () => {
+  const c = chosen(); if (!c) return;
+  const p = capturePreset(c.p.name, !!c.p.size);
+  if (c.where === 's'){
+    const d = await remote({action: 'save', preset: p});
+    syncPresets(p.name, 's');
+    toast(d.ok ? `Updated “${p.name}” for every computer.` : d.error === 'cancelled' ? 'Not updated.' : remoteProblem(d));
+    return;
+  }
+  putLocal(p); syncPresets(p.name, 'l'); toast(`Updated “${p.name}” with the current settings.`);
 });
 $('presetDelete').addEventListener('click', () => {
-  const p = chosenPreset(); if (!p) return;
-  $('presetConfirmTxt').textContent = `Delete “${p.name}”?`; $('presetForm').hidden = true; $('presetConfirm').hidden = false;
+  const c = chosen(); if (!c) return;
+  $('presetConfirmTxt').textContent = c.where === 's' ? `Delete “${c.p.name}” from every computer?` : `Delete “${c.p.name}”?`;
+  $('presetForm').hidden = true; $('codeForm').hidden = true; $('presetConfirm').hidden = false;
 });
 $('presetNo').addEventListener('click', () => { $('presetConfirm').hidden = true; });
-$('presetYes').addEventListener('click', () => {
-  const p = chosenPreset(); if (!p) return;
-  presets.splice(presets.indexOf(p), 1); savePresets(); syncPresets(null); toast(`Deleted “${p.name}”.`);
+$('presetYes').addEventListener('click', async () => {
+  const c = chosen(); if (!c) return;
+  $('presetConfirm').hidden = true;
+  if (c.where === 's'){
+    const d = await remote({action: 'delete', name: c.p.name});
+    if (d.ok){ syncPresets(null); toast(`Deleted “${c.p.name}” from every computer.`); }
+    else { syncPresets(c.p.name, 's'); toast(d.error === 'cancelled' ? 'Not deleted.' : remoteProblem(d)); }
+    return;
+  }
+  dropLocal(c.p.name); syncPresets(null); toast(`Deleted “${c.p.name}”.`);
 });
-$('presetExport').addEventListener('click', () => {
-  if (!presets.length){ toast('There are no presets to export yet.'); return; }
-  saveFile(new Blob([JSON.stringify({app: 'Tshirt Workshop DTF Halftone', v: 1, presets}, null, 2)], {type: 'application/json'}), 'dtf-halftone-presets.json');
+async function shareLocal(list){ // send this computer's presets to the shared list
+  if (!list.length) return;
+  const d = await remote({action: 'saveMany', presets: list});
+  if (d.ok){ for (const p of list) dropLocal(p.name); syncPresets(list.length === 1 ? list[0].name : null, 's'); toast(list.length === 1 ? `“${list[0].name}” is now shared with every computer.` : `Shared ${list.length} presets with every computer.`); }
+  else { const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); toast(d.error === 'cancelled' ? 'Not shared yet.' : remoteProblem(d)); }
+}
+$('presetShare').addEventListener('click', () => { const c = chosen(); if (c && c.where === 'l') shareLocal([c.p]); });
+function exportPresets(){
+  const all = [...shared, ...presets];
+  if (!all.length){ toast('There are no presets to export yet.'); return; }
+  saveFile(new Blob([JSON.stringify({app: 'Tshirt Workshop DTF Halftone', v: 1, presets: all}, null, 2)], {type: 'application/json'}), 'dtf-halftone-presets.json');
+}
+for (const id of ['syncNote', 'presetHelp']) $(id).addEventListener('click', e => {
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'export') exportPresets();
+  else if (act === 'import') $('presetFile').click();
+  else if (act === 'refresh') refreshShared(false);
+  else if (act === 'shareall') shareLocal([...presets]);
 });
-$('presetImport').addEventListener('click', () => $('presetFile').click());
 $('presetFile').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = '';
   if (!f) return;
-  try {
-    const data = JSON.parse(await f.text()), list = (Array.isArray(data) ? data : data.presets || []).filter(x => x && typeof x.name === 'string' && x.s);
-    if (!list.length){ toast('That file has no presets in it.'); return; }
-    for (const p of list){ const i = presets.findIndex(x => x.name.toLowerCase() === p.name.toLowerCase()); if (i >= 0) presets[i] = p; else presets.push(p); }
-    savePresets(); syncPresets(null);
-    toast(`Imported ${list.length} preset${list.length === 1 ? '' : 's'}. Presets with the same name were replaced.`);
-  } catch(err){ toast('That file isn’t a presets file. Export one from this tool first.'); }
+  let list;
+  try { const data = JSON.parse(await f.text()); list = [].concat(Array.isArray(data) ? data : data.presets || []).filter(isPreset).map(p => { const c = {...p}; delete c.updated; return c; }); }
+  catch(err){ toast('That file isn’t a presets file. Export one from this tool first.'); return; }
+  if (!list.length){ toast('That file has no presets in it.'); return; }
+  for (const p of list) putLocal(p);
+  syncPresets(null);
+  if (SYNC_URL) shareLocal(list);
+  else toast(`Imported ${list.length} preset${list.length === 1 ? '' : 's'}. Presets with the same name were replaced.`);
 });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && SYNC_URL && Date.now() - (sharedAt || 0) > 30000) refreshShared(true); });
 
 syncShirt(); syncLook(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape); syncInk(); updateNotes();
 syncPresets(null);
+refreshShared(true);
 if (st.look === 'shadows') ensureShadowRule(); else syncRules();
 syncLevels(); syncLifeNote();
 
