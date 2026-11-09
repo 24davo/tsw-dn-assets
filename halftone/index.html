@@ -51,6 +51,17 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 
 .work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px}
 .stage-col{display:flex;flex-direction:column;min-width:0;min-height:0}
+.tabs{display:flex;align-items:flex-end;gap:2px;padding:6px 12px 0;padding-left:max(12px,env(safe-area-inset-left,0px));background:var(--bg);border-bottom:1px solid var(--line-strong);overflow-x:auto;scrollbar-width:thin;flex:none}
+.tab{display:flex;align-items:center;min-width:0;max-width:240px;border:1px solid var(--line);border-bottom:0;border-radius:var(--r) var(--r) 0 0;background:var(--soft);flex:none}
+.tab.on{background:var(--panel);border-color:var(--line-strong);margin-bottom:-1px;padding-bottom:1px}
+.tab-name{display:flex;align-items:center;gap:7px;min-width:0;height:32px;padding:0 10px;border:0;background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.tab.on .tab-name{color:var(--ink)}
+.tab-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.tab-dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none}
+.tab-x{width:24px;height:24px;margin-right:4px;border:0;border-radius:var(--r);background:none;color:var(--muted);font:inherit;font-size:16px;line-height:1;cursor:pointer;flex:none}
+.tab-x:hover{background:var(--line);color:var(--ink)}
+.tab-add{width:32px;height:32px;margin-left:4px;border:1px dashed var(--line-strong);border-bottom:0;border-radius:var(--r) var(--r) 0 0;background:none;color:var(--muted);font:inherit;font-size:18px;line-height:1;cursor:pointer;flex:none}
+.tab-add:hover{color:var(--ink);border-color:var(--ink)}
 .stage-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 16px;padding-block:6px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:12px;background:var(--panel);border-bottom:1px solid var(--line)}
 .stage-bar .tray{border:0;padding:0;background:none}
 .bar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -59,6 +70,9 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .stage.pannable #view{cursor:grab}
 .stage.panning #view{cursor:grabbing}
 .stage.picking #view{cursor:crosshair}
+.stage.brushing #view{cursor:none}
+.stage.brushing.space #view{cursor:grab}
+.brush-view{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .overlay{position:absolute;left:max(12px,env(safe-area-inset-left,0px));right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;pointer-events:none}
 .overlay>*{pointer-events:auto}
 .o-bottom{bottom:12px;align-items:flex-end}
@@ -90,6 +104,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .pp-d{font-size:12px;line-height:1.3;color:var(--muted)}
 .i-checks{background:repeating-conic-gradient(#cccccc 0 25%,#ffffff 0 50%) 0 0/8px 8px}
 .i-alpha{background:linear-gradient(90deg,#000000,#ffffff)}
+.i-white{background:radial-gradient(circle,#e0168a 0 30%,transparent 32%),#ffffff}
 .i-base{background:linear-gradient(90deg,#000000 50%,#ffffff 50%)}
 .i-map{background:linear-gradient(90deg,#f2f2f2 34%,#ff2e93 34% 67%,#5a5a5a 67%)}
 .i-sel{background:radial-gradient(circle,#ffffff 0 28%,#808080 46%,#000000 66%)}
@@ -268,18 +283,20 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <button class="btn" id="redoBtn" type="button" disabled>Redo</button>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
       <button class="btn" type="button" id="openBtn">Open art</button>
-      <input type="file" id="fileIn" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
+      <input type="file" id="fileIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
       <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
     </div>
   </header>
 
   <main class="work">
     <div class="stage-col">
+      <div class="tabs" id="tabs" role="tablist" aria-label="Open designs"></div>
       <div class="stage-bar">
         <div class="tray" role="group" aria-label="View" id="viewTray" title="Press V to step through the views">
           <span class="tray-label">View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
+          <button class="chip" type="button" data-view="white" aria-pressed="false">On white</button>
           <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
           <button class="chip" type="button" data-view="map" aria-pressed="false">Ink map</button>
           <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
@@ -292,6 +309,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       </div>
     <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
       <canvas id="view"></canvas>
+      <canvas class="brush-view" id="brushView" aria-hidden="true"></canvas>
       <div class="overlay o-bottom" id="oBottom">
         <div class="stack">
           <div class="tray legend" id="legend" hidden></div>
@@ -314,6 +332,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <div class="pane-pick" id="paneB" hidden><button class="pp-btn" type="button" id="paneBBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Right side shows" data-tip="Choose what this side shows."></button><div class="pp-menu" id="paneBMenu" role="listbox" hidden></div></div>
       <div class="busy" id="busy" hidden>Updating…</div>
       <div class="tray crop-bar" id="cropBar" hidden><span id="cropTxt"></span><button class="btn small" type="button" id="cropCancel">Cancel</button><button class="btn small primary" type="button" id="cropApply">Apply crop</button></div>
+      <div class="hint" id="brushHint" hidden></div>
       <div class="hint" id="pickHint" hidden>Click the colour to knock out · Esc to cancel</div>
       <div class="drop" id="drop" hidden>Drop the art to open it</div>
     </section>
@@ -560,6 +579,26 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
+      <section class="group step" id="touchGroup">
+        <h2>Touch up</h2>
+        <p class="f-note">Brush away stray pixels and rough edges, paint over gaps, or bring the original back. Brushes work on the art itself, before every other step, and every stroke is in History.</p>
+        <div class="chips" id="brushChips" role="group" aria-label="Brush">
+          <button class="chip" type="button" data-brush="erase" aria-pressed="false">Eraser</button>
+          <button class="chip" type="button" data-brush="paint" aria-pressed="false">Paint</button>
+          <button class="chip" type="button" data-brush="restore" aria-pressed="false">Restore</button>
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="brush">Brush size</label><output id="brushOut" for="brush">2.0 mm</output></div>
+          <input type="range" id="brush" min="0" max="100" step="1" value="50">
+        </div>
+        <div class="knock" id="paintRow" hidden>
+          <span class="colorbox"><input type="color" id="paintPick" value="#ffffff" aria-label="Paint colour"></span>
+          <button class="chip" type="button" id="paintFromArt">Pick from art</button>
+          <span class="f-note">or Alt-click the art</span>
+        </div>
+        <p class="f-note">Choose a brush, then drag on the preview. [ and ] change the size, hold Space to move around, Esc puts the brush down.</p>
+      </section>
+
       <section class="group step" id="checkGroup">
         <h2>Check &amp; save</h2>
         <div class="checks" id="checks"></div>
@@ -583,6 +622,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
+            <li>Open several designs at once: each opens in its own tab (+ or Open art, or drop several files) with its own settings, touch-ups and history. A dot on a tab means it isn’t saved yet.</li>
+            <li>Touch up brushes: Eraser clears stray pixels, Paint fills gaps in a colour Alt-clicked from the art, Restore brings the original back. [ and ] change the size, hold Space to move.</li>
             <li>For a crisp outline on a dark tee, tick Hard edge and add a little Trim the edge in the Edge step. Any colour trims a background-removal fringe; Only near the knock-out colour keeps dark parts like tyres.</li>
             <li>For a quick black-shirt clean-up with no halftone, use Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
@@ -832,8 +873,8 @@ const LOOKS = {
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', hard: 0}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
-const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut','hard'];
+            edge: 0, etol: 30, emode: 'any', hard: 0, brushV: 50, paintHex: '#ffffff'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut','hard','brushV','paintHex'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
@@ -849,6 +890,9 @@ let cropping = null; // while drawing a crop: {prev, F, rect: [x0, y0, x1, y1] i
 let folds = [];      // the panel's sections, filled once their titles become fold buttons
 let showEdge = true; // the dashed print-area edge on the shirt views
 let resetsReady = false; // each step's Reset link, set up near the end
+// tabs: every open design, each with its own art, settings, crop, touch-ups and history; cur is the one on screen
+let docs = [], cur = null, docSeq = 0;
+const MAX_DOCS = 8;
 try { showEdge = localStorage.getItem('tsw-dtf-edge') !== 'off'; } catch(e){}
 // colour ranges; not saved between visits, because sampled colours belong to one piece of art
 let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt', viewBeforeClear = 'shirt';
@@ -930,13 +974,26 @@ function drawScaled(ctx, img, sx, sy, sw, sh, W, H){ // the part of img at (sx, 
   ctx.clearRect(0, 0, W, H);
   ctx.drawImage(src, rx, ry, cw, ch, 0, 0, W, H);
 }
-function drawArt(ctx, W, H){ // the cropped art at W × H
-  const c = art.crop, s = art.q ? art.q.scale : 1;
-  if (art.smooth && s > 1 && art.q.kind === 'blocky'){ // back to one pixel per block, then enlarged smoothly
-    const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(c.w/s)); t.height = Math.max(1, Math.round(c.h/s));
-    const x = t.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(art.el, c.x, c.y, c.w, c.h, 0, 0, t.width, t.height);
-    drawScaled(ctx, t, 0, 0, t.width, t.height, W, H);
-  } else drawScaled(ctx, art.el, c.x, c.y, c.w, c.h, W, H);
+let baseCanvas = null, baseKey = ''; // the resized art, kept so a brush stroke only redraws the touch-ups
+function drawArt(ctx, W, H){ // the cropped art at W × H, with the touch-ups
+  const c = art.crop, s = art.q ? art.q.scale : 1, key = [art.id, c.x, c.y, c.w, c.h, W, H, !!art.smooth].join();
+  if (baseCanvas && baseKey === key) ctx.drawImage(baseCanvas, 0, 0);
+  else {
+    if (art.smooth && s > 1 && art.q.kind === 'blocky'){ // back to one pixel per block, then enlarged smoothly
+      const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(c.w/s)); t.height = Math.max(1, Math.round(c.h/s));
+      const x = t.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(art.el, c.x, c.y, c.w, c.h, 0, 0, t.width, t.height);
+      drawScaled(ctx, t, 0, 0, t.width, t.height, W, H);
+    } else drawScaled(ctx, art.el, c.x, c.y, c.w, c.h, W, H);
+    if (W*H <= 16e6){ baseCanvas = baseCanvas || document.createElement('canvas'); baseCanvas.width = W; baseCanvas.height = H; baseCanvas.getContext('2d').drawImage(ctx.canvas, 0, 0); baseKey = key; }
+    else { baseCanvas = null; baseKey = ''; }
+  }
+  if (art.strokesN && art.eraseL){
+    const ls = art.ls;
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(art.eraseL, c.x*ls, c.y*ls, c.w*ls, c.h*ls, 0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(art.paintL, c.x*ls, c.y*ls, c.w*ls, c.h*ls, 0, 0, W, H);
+    ctx.restore();
+  }
 }
 function buildMips(cv){
   const levels = [cv]; let c = cv;
@@ -959,9 +1016,11 @@ const ORIG_LEGEND = [['#ffffff', 'Original: solid'], ['#808080', 'Original: see-
 const PANES = [ // [kind, group, name, what it shows, picture]
   ['orig', 'before', 'On shirt', 'The original art on the shirt colour.', 'shirt'],
   ['origclear', 'before', 'On transparent', 'The original on checks: see-through parts show the checks.', 'checks'],
+  ['origwhite', 'before', 'On white', 'The original over a white fill: see-through parts show paler.', 'white'],
   ['origbase', 'before', 'Alpha', 'The original’s transparency: white is solid, grey is see-through.', 'alpha'],
   ['shirt', 'after', 'On shirt', 'The print on the shirt colour.', 'shirt'],
   ['clear', 'after', 'On transparent', 'The print on checks: the checks are clear film.', 'checks'],
+  ['white', 'after', 'On white', 'The print over a white fill, like a white layer behind it in Photoshop.', 'white'],
   ['base', 'after', 'White base', 'White shows where ink and its white base print.', 'base'],
   ['map', 'after', 'Ink map', 'White prints solid, pink turns into dots, grey is removed.', 'map'],
   ['sel', 'after', 'Selection', 'The active colour range: white is selected.', 'sel']
@@ -971,7 +1030,10 @@ const CHECKS = 'repeating-conic-gradient(#cccccc 0 25%, #ffffff 0 50%) 0 0/8px 8
 const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? Math.round((1 - lastOn/s.vis)*100) : 0; return [[CHECKS, cut > 0 ? `Clear film: ink area down ${cut}%` : 'Clear film, no ink']]; };
 const ORIGCLEAR_LEGEND = [[CHECKS, 'Original: the checks show where it was clear or see-through']];
 const isClear = kind => kind === 'clear' || kind === 'origclear';
-const toClear = kind => ({orig: 'origclear', shirt: 'clear'}[kind] || kind); // what Hold for transparent shows in Split
+const isWhite = kind => kind === 'white' || kind === 'origwhite'; // the film over a solid white fill
+const toClear = kind => ({orig: 'origclear', shirt: 'clear', origwhite: 'origclear', white: 'clear'}[kind] || kind); // what Hold for transparent shows in Split
+const WHITE_LEGEND = [['#ffffff', 'White fill behind the film: what shows is what prints (white ink blends in)']];
+const ORIGWHITE_LEGEND = [['#ffffff', 'Original over a white fill']];
 const selLegend = () => [['#ffffff', `Selected by colour range ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
 function buildMask(kind){
   const m = masks[kind];
@@ -991,15 +1053,15 @@ function buildSelMask(){ // the active colour range's selection in grey, like Ph
   x.putImageData(im, 0, 0); selMips = buildMips(selCanvas); selKey = paintN;
 }
 // what is on screen now: one view, or the two sides of Split (Hold for original swaps in the original)
-function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB].map(k => compare ? toClear(k) : k) : [compare ? ({shirt: 'orig', clear: 'origclear'}[st.view] || 'origbase') : st.view]; }
+function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB].map(k => compare ? toClear(k) : k) : [compare ? ({shirt: 'orig', clear: 'origclear', white: 'origwhite'}[st.view] || 'origbase') : st.view]; }
 function prepareViews(){
   const ks = st.view === 'split' ? [st.paneA, st.paneB] : [st.view];
   for (const k of ks){ if (masks[k]) buildMask(k); else if (k === 'sel') buildSelMask(); }
-  if (ks.some(k => isMask(k) && !isClear(k))) buildOrigMask();
+  if (ks.some(k => isMask(k) && !isClear(k) && !isWhite(k))) buildOrigMask();
 }
 function levelsFor(kind){
-  if (kind === 'orig' || kind === 'origclear') return srcMips;
-  if (kind === 'clear') return outMips || srcMips;
+  if (kind === 'orig' || kind === 'origclear' || kind === 'origwhite') return srcMips;
+  if (kind === 'clear' || kind === 'white') return outMips || srcMips;
   if (kind === 'origbase') return origMips;
   if (kind === 'shirt') return outMips || srcMips;
   if (kind === 'sel') return rules.length ? selMips : null;
@@ -1016,7 +1078,7 @@ function buildOrigMask(){
   origCtx.putImageData(im, 0, 0); origMips = buildMips(origCanvas); origFor = srcV;
 }
 
-let srcTimer = 0;
+let srcTimer = 0, srcW0 = 0, srcH0 = 0;
 function buildSrcSoon(){ clearTimeout(srcTimer); srcTimer = setTimeout(buildSrc, 250); }
 function buildSrc(){
   if (!art) return;
@@ -1028,11 +1090,12 @@ function buildSrc(){
   bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer}, [data.data.buffer]);
   srcMips = buildMips(srcCanvas);
   prepareViews();
-  st.cx = W/2; st.cy = H/2;
+  if (W !== srcW0 || H !== srcH0){ st.cx = W/2; st.cy = H/2; srcW0 = W; srcH0 = H; }
   if (running) pending = true; else schedule();
 }
 
 function paint(m){
+  if (m.v >= shownUntil) shownStrokes = []; // the engine has caught up with the strokes, so their trails can go
   outCanvas.width = m.w; outCanvas.height = m.h;
   outCtx.putImageData(new ImageData(new Uint8ClampedArray(m.buf), m.w, m.h), 0, 0);
   outMips = buildMips(outCanvas);
@@ -1071,6 +1134,7 @@ function render(){
     pa.firstElementChild.setAttribute('aria-label', across ? 'Left side shows' : 'Top shows');
     pb.firstElementChild.setAttribute('aria-label', across ? 'Right side shows' : 'Bottom shows');
   }
+  geos = [];
   stage.style.background = paneBg(panes[0].kind);
   geos = panes.map(p => drawPane(p, dpr));
   geo = geos[0];
@@ -1079,7 +1143,7 @@ function render(){
     vctx.fillStyle = '#808080'; // mid grey reads on white and black shirts alike
     if (p.x > 0) vctx.fillRect(Math.round(p.x*dpr) - dpr, 0, 2*dpr, ch); else vctx.fillRect(0, Math.round(p.y*dpr) - dpr, cw, 2*dpr);
   }
-  syncZoomUI();
+  syncZoomUI(); drawBrush();
 }
 function place(el, x, y){ el.style.left = x + 'px'; el.style.top = y + 'px'; }
 function drawPane(p, dpr){
@@ -1101,6 +1165,7 @@ function drawPane(p, dpr){
     }
     g.OW = OW; g.OH = OH;
     if (isClear(p.kind)){ vctx.fillStyle = checker(dpr); vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // Photoshop-style transparency checks under the art
+    else if (isWhite(p.kind)){ vctx.fillStyle = '#ffffff'; vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // a solid white layer behind the art
     const k = g.k, L = k < 1 ? Math.min(levels.length - 1, Math.max(0, Math.floor(Math.log2(1/k)))) : 0, mip = levels[L];
     vctx.imageSmoothingEnabled = k < 1; vctx.imageSmoothingQuality = 'high';
     vctx.drawImage(mip, 0, 0, mip.width, mip.height, g.dx, g.dy, OW*k, OH*k);
@@ -1198,7 +1263,7 @@ $('zoomTray').addEventListener('click', e => {
   if (b.dataset.zoom === 'life') lifeZoom(); else setZoom(b.dataset.zoom === 'fit' ? 'fit' : +b.dataset.zoom);
 });
 
-const viewOrder = () => rules.length ? ['shirt', 'clear', 'base', 'map', 'sel', 'split'] : ['shirt', 'clear', 'base', 'map', 'split'];
+const viewOrder = () => rules.length ? ['shirt', 'clear', 'white', 'base', 'map', 'sel', 'split'] : ['shirt', 'clear', 'white', 'base', 'map', 'split'];
 function setView(v){
   st.view = v;
   for (const b of $('viewTray').querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === v));
@@ -1217,7 +1282,7 @@ function setView(v){
 function syncLegend(){
   const items = [], seen = new Set();
   for (const k of kindsShown()){
-    const list = k === 'origbase' ? ORIG_LEGEND : k === 'sel' ? selLegend() : k === 'clear' ? clearLegend() : k === 'origclear' ? ORIGCLEAR_LEGEND : VIEWS[k] ? VIEWS[k].legend : [];
+    const list = k === 'origbase' ? ORIG_LEGEND : k === 'sel' ? selLegend() : k === 'clear' ? clearLegend() : k === 'origclear' ? ORIGCLEAR_LEGEND : k === 'white' ? WHITE_LEGEND : k === 'origwhite' ? ORIGWHITE_LEGEND : VIEWS[k] ? VIEWS[k].legend : [];
     for (const it of list) if (!seen.has(it[1])){ seen.add(it[1]); items.push(it); }
   }
   const lg = $('legend');
@@ -1325,6 +1390,7 @@ $('cropDraw').addEventListener('click', () => cropping ? endCrop(false) : startC
 $('cropApply').addEventListener('click', () => endCrop(true));
 $('cropCancel').addEventListener('click', () => endCrop(false));
 function startCrop(){
+  endBrush();
   if (!art) return;
   if (picking) endPick();
   const F = Math.min(1, 2400/Math.max(art.fullW, art.fullH)), c = document.createElement('canvas');
@@ -1415,16 +1481,19 @@ let drag = null;
 view.addEventListener('pointerdown', e => {
   if (cropping){ cropDown(e); return; }
   if (picking){ pickAt(e); return; }
+  if (brushTool && !spaceDown){ brushDown(e); return; }
   if (st.zoom === 'fit') return;
   drag = {x: e.clientX, y: e.clientY, cx: st.cx, cy: st.cy};
   view.setPointerCapture(e.pointerId); stage.classList.add('panning');
 });
 view.addEventListener('pointermove', e => {
   if (cropping){ cropMove(e); return; }
+  if (brushTool && !drag){ brushMove(e); return; }
   if (!drag || !geo) return;
   st.cx = drag.cx - (e.clientX - drag.x)*geo.dpr/geo.k; st.cy = drag.cy - (e.clientY - drag.y)*geo.dpr/geo.k; render();
 });
-const endDrag = () => { drag = null; stage.classList.remove('panning'); if (cropping) cropping.drag = null; };
+view.addEventListener('pointerleave', () => { if (brushAt && !stroke){ brushAt = null; drawBrush(); } });
+const endDrag = () => { if (stroke) brushUp(); drag = null; stage.classList.remove('panning'); if (cropping) cropping.drag = null; };
 view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag);
 view.addEventListener('wheel', e => {
   if (!geo || cropping) return;
@@ -1450,8 +1519,134 @@ cmp.addEventListener('pointerup', cmpOff); cmp.addEventListener('pointerleave', 
 cmp.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); cmpOn(); } });
 cmp.addEventListener('keyup', cmpOff); cmp.addEventListener('blur', cmpOff);
 
+/* ---------- Touch up: eraser, paint and restore brushes ----------
+   A stroke is kept in the file's own pixels, so crops and print sizes never move it. Strokes are replayed onto two
+   layers, what's erased and what's painted, at up to 4000 px, which drawArt lays over the art before every other step. */
+let brushHintTimer = 0, brushTool = null, stroke = null, shownStrokes = [], shownUntil = 0, brushAt = null, spaceDown = false, paintPicking = false, artSeq = 0;
+const BRUSH_NAMES = {erase: 'Eraser', paint: 'Paint', restore: 'Restore'};
+const brushMm = () => 0.2*Math.pow(100, st.brushV/100); // the slider runs 0.2 to 20 mm, finer at the small end
+const brushR = () => brushMm()/2*art.crop.w/(st.widthCm*10); // the brush radius in file pixels
+function syncBrush(){
+  for (const b of $('brushChips').querySelectorAll('[data-brush]')) b.setAttribute('aria-pressed', String(b.dataset.brush === brushTool));
+  const mm = brushMm(); $('brush').value = st.brushV; $('brushOut').textContent = `${mm < 10 ? mm.toFixed(1) : Math.round(mm)} mm`;
+  $('paintRow').hidden = brushTool !== 'paint'; $('paintPick').value = st.paintHex;
+  stage.classList.toggle('brushing', !!brushTool);
+  $('brushHint').hidden = !brushTool; clearTimeout(brushHintTimer);
+  if (brushTool && !paintPicking) brushHintTimer = setTimeout(() => { $('brushHint').hidden = true; }, 4000); // out of the way of the art once read
+  if (brushTool) $('brushHint').textContent = paintPicking ? 'Click a colour in the art to paint with · Esc to cancel'
+    : `${BRUSH_NAMES[brushTool]} · drag on the art · [ ] size · hold Space to move${brushTool === 'paint' ? ' · Alt-click picks the colour' : ''} · Esc to stop`;
+  drawBrush();
+}
+function setBrush(tool){
+  if (tool && !art) return;
+  if (tool){ if (cropping) endCrop(false); if (picking) endPick(); }
+  brushTool = tool; paintPicking = false; if (!tool) brushAt = null;
+  syncBrush();
+}
+function endBrush(){ if (brushTool) setBrush(null); }
+$('brushChips').addEventListener('click', e => { const b = e.target.closest('[data-brush]'); if (b) setBrush(brushTool === b.dataset.brush ? null : b.dataset.brush); });
+$('brush').addEventListener('input', e => { st.brushV = +e.target.value; syncBrush(); remember(); });
+$('paintPick').addEventListener('input', e => { st.paintHex = e.target.value; remember(); });
+$('paintFromArt').addEventListener('click', () => { if (brushTool !== 'paint') setBrush('paint'); paintPicking = true; syncBrush(); });
+function toFile(e){ // the pointer in the file's own pixels
+  const r = view.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, g = geoAt(px, py);
+  if (!g || !g.OW || !art) return null;
+  const f = art.crop.w/g.OW;
+  return {x: art.crop.x + (px*g.dpr - g.dx)/g.k*f, y: art.crop.y + (py*g.dpr - g.dy)/g.k*f};
+}
+function brushDown(e){
+  const p = toFile(e); if (!p) return;
+  if (e.altKey || paintPicking){ pickPaint(p); return; }
+  stroke = {mode: brushTool, r: brushR(), color: st.paintHex, pts: [p.x, p.y]};
+  view.setPointerCapture(e.pointerId); brushAt = p; drawBrush();
+}
+function brushMove(e){
+  const p = toFile(e); brushAt = p;
+  if (stroke && p){ const q = stroke.pts; if (Math.hypot(p.x - q[q.length - 2], p.y - q[q.length - 1]) >= Math.max(0.5, stroke.r*0.15)) q.push(p.x, p.y); }
+  drawBrush();
+}
+function brushUp(){
+  const s = stroke; stroke = null;
+  if (!s || !art) return;
+  art.strokes.length = art.strokesN; art.strokes.push(s); art.strokesN++; // a new stroke after an undo drops the strokes ahead
+  applyStroke(art, s); shownStrokes.push(s);
+  noteChange(BRUSH_NAMES[s.mode]);
+  buildSrc(); shownUntil = srcV;
+  drawBrush();
+}
+function pickPaint(p){
+  paintPicking = false;
+  const x = Math.floor((p.x - art.crop.x)/art.crop.w*srcCanvas.width), y = Math.floor((p.y - art.crop.y)/art.crop.h*srcCanvas.height);
+  if (x < 0 || y < 0 || x >= srcCanvas.width || y >= srcCanvas.height){ toast('Click on the art to pick a colour.'); syncBrush(); return; }
+  const d = srcCtx.getImageData(x, y, 1, 1).data;
+  if (d[3] < 8){ toast('That spot is clear. Click on a colour in the art.'); syncBrush(); return; }
+  st.paintHex = rgbHex(d[0], d[1], d[2]); remember(); syncBrush(); toast(`Painting with ${st.paintHex.toUpperCase()}.`);
+}
+function editLayers(a){
+  if (a.eraseL) return;
+  a.ls = Math.min(1, 4000/Math.max(a.fullW, a.fullH));
+  const mk = () => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(a.fullW*a.ls)); c.height = Math.max(1, Math.round(a.fullH*a.ls)); return c; };
+  a.eraseL = mk(); a.paintL = mk();
+}
+function applyStroke(a, s){
+  editLayers(a);
+  const ls = a.ls, p = s.pts;
+  const draw = (L, op, colour) => {
+    const x = L.getContext('2d'); x.save(); x.globalCompositeOperation = op; x.strokeStyle = colour;
+    x.lineWidth = Math.max(1, s.r*2*ls); x.lineCap = x.lineJoin = 'round';
+    x.beginPath(); x.moveTo(p[0]*ls, p[1]*ls); if (p.length === 2) x.lineTo(p[0]*ls + 0.01, p[1]*ls);
+    for (let i = 2; i < p.length; i += 2) x.lineTo(p[i]*ls, p[i+1]*ls);
+    x.stroke(); x.restore();
+  };
+  if (s.mode === 'erase'){ draw(a.eraseL, 'source-over', '#000'); draw(a.paintL, 'destination-out', '#000'); }
+  else if (s.mode === 'paint'){ draw(a.paintL, 'source-over', s.color); draw(a.eraseL, 'destination-out', '#000'); }
+  else { draw(a.eraseL, 'destination-out', '#000'); draw(a.paintL, 'destination-out', '#000'); }
+}
+function rebuildEdits(a){ // replays the strokes still in use, after an undo or a reset
+  if (!a.eraseL && !a.strokesN) return;
+  editLayers(a);
+  for (const L of [a.eraseL, a.paintL]) L.getContext('2d').clearRect(0, 0, L.width, L.height);
+  for (let i = 0; i < a.strokesN; i++) applyStroke(a, a.strokes[i]);
+}
+function drawBrush(){ // the stroke being drawn (and the last ones until the engine catches up), and the brush outline
+  const c = $('brushView');
+  if (c.width !== view.width || c.height !== view.height){ c.width = view.width; c.height = view.height; }
+  const x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height);
+  if (!art || !geos.length) return;
+  const list = stroke ? [...shownStrokes, stroke] : shownStrokes;
+  for (const g of geos){
+    if (!g.OW) continue;
+    const f = g.OW/art.crop.w*g.k, X = v => g.dx + (v - art.crop.x)*f, Y = v => g.dy + (v - art.crop.y)*f;
+    x.save(); x.beginPath(); x.rect(g.x*g.dpr, g.y*g.dpr, g.w*g.dpr, g.h*g.dpr); x.clip();
+    for (const s of list){
+      x.globalAlpha = s.mode === 'paint' ? 0.9 : 0.55; x.strokeStyle = s.mode === 'paint' ? s.color : s.mode === 'erase' ? '#ff2d7a' : '#2bd47d';
+      x.lineWidth = Math.max(1, s.r*2*f); x.lineCap = x.lineJoin = 'round';
+      const p = s.pts; x.beginPath(); x.moveTo(X(p[0]), Y(p[1])); if (p.length === 2) x.lineTo(X(p[0]) + 0.01, Y(p[1]));
+      for (let i = 2; i < p.length; i += 2) x.lineTo(X(p[i]), Y(p[i+1]));
+      x.stroke();
+    }
+    x.globalAlpha = 1;
+    if (brushTool && brushAt && !spaceDown){
+      const r = Math.max(2, brushR()*f), cx = X(brushAt.x), cy = Y(brushAt.y), lw = Math.max(1, g.dpr);
+      x.lineWidth = lw; x.strokeStyle = 'rgba(0,0,0,0.8)'; x.beginPath(); x.arc(cx, cy, r + lw, 0, 7); x.stroke();
+      x.strokeStyle = 'rgba(255,255,255,0.95)'; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke();
+    }
+    x.restore();
+  }
+}
+window.addEventListener('keydown', e => {
+  if (!brushTool) return;
+  const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
+  if (typing || e.metaKey || e.ctrlKey) return;
+  if (e.key === 'Escape'){ if (paintPicking){ paintPicking = false; syncBrush(); } else setBrush(null); }
+  else if (e.key === '[' || e.key === ']'){ st.brushV = clampN(st.brushV + (e.key === ']' ? 5 : -5), 0, 100); syncBrush(); remember(); }
+  else if (e.key === ' '){ e.preventDefault(); if (!spaceDown){ spaceDown = true; stage.classList.add('space'); drawBrush(); } }
+});
+window.addEventListener('keyup', e => { if (e.key === ' ' && spaceDown){ spaceDown = false; stage.classList.remove('space'); drawBrush(); } });
+
 /* ---------- knock-out colour picker ---------- */
 function startPick(target){ // target: 'knock', or the number of the colour range being sampled
+  endBrush();
   pickFor = target; picking = true; stage.classList.add('picking');
   $('pickHint').textContent = target === 'knock' ? 'Click the colour to knock out · Esc to cancel' : 'Click a colour in the art to add it to the selection · Esc to cancel';
   $('pickHint').hidden = false; syncPickChips();
@@ -1773,6 +1968,7 @@ function updateChecks(){
                        : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
+  if (art.strokesN) rows.push(['info', '✎', `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}`, 'Brushed by hand in Touch up. They’re part of the saved PNG.']);
   const hardOn = st.hard && st.finish !== 'cut';
   if (hardOn || st.edge) rows.push(['info', '→', 'Edge tidied', [hardOn ? `Hard edge at ${st.hard}%` : '', st.edge ? `trimmed ${pxMm(st.edge)} off the outline${st.emode === 'near' ? ', knock-out colour only' : ''}` : ''].filter(Boolean).join(', ').replace(/^./, ch => ch.toUpperCase()) + '.']);
   if (s && outReady && s.total){
@@ -1915,21 +2111,95 @@ $('smoothBtn').addEventListener('change', e => { if (!art) return; art.smooth = 
 /* ---------- opening art ---------- */
 function setArt(el, w, h, name, isSample, dpi, kind){
   if (cropping) endCrop(false);
+  endBrush(); shownStrokes = [];
   art = {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}, // w and h follow the crop
-         isVector: !!(kind && kind.vector), jpegQ: kind && kind.jpegQ || null, smooth: false, q: null};
+         isVector: !!(kind && kind.vector), jpegQ: kind && kind.jpegQ || null, smooth: false, q: null,
+         id: ++artSeq, strokes: [], strokesN: 0}; // touch-up strokes, in the file's pixels
   syncCrop(); clearDoneMarks();
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
-  const fi = $('fileInfo'); $('nameSuffix').value = ''; // a suffix belongs to one piece of art
-  fi.innerHTML = (isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(name)}</b><span>${w.toLocaleString()} × ${h.toLocaleString()} px</span>` +
-    '<button class="qpill" type="button" id="qualityPill" hidden></button>';
+  $('nameSuffix').value = ''; // a suffix belongs to one piece of art
+  syncFileInfo();
   st.knock = null; syncKnock();
   Object.assign(lv, LV0); hist = null; syncLevels(); drawHisto(); // Levels belong to one piece of art
   setWidth(isSample ? 25 : w/(dpi || DPI)*2.54, true);
   setZoom('fit');
   buildSrc(); render(); updateChecks();
   resetSteps(isSample ? 'Sample art' : `Opened ${name}`);
+  if (cur) cur.art = art;
+  renderTabs();
   const a = art; setTimeout(() => analyseArt(a), 30); // after the first paint
 }
+function syncFileInfo(){
+  $('fileInfo').innerHTML = (art.isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(art.name)}</b><span>${art.fullW.toLocaleString()} × ${art.fullH.toLocaleString()} px</span>` +
+    '<button class="qpill" type="button" id="qualityPill" hidden></button>';
+}
+
+/* ---------- tabs: several designs open at once, like Photoshop ---------- */
+function stashDoc(){ // keeps everything about the design on screen in its tab
+  if (!cur || !art) return;
+  commitStep();
+  Object.assign(cur, {art, snap: snapshot(), activeRule, steps, stepPos, unsaved, zoom: st.zoom, cx: st.cx, cy: st.cy,
+    suffix: $('nameSuffix').value, done: [...document.querySelectorAll('.panel > .group.done')].map(g => g.id)});
+}
+function loadDoc(d){ // puts a tab's design on screen: its art, settings, history and view
+  if (cropping) endCrop(false);
+  if (picking) endPick();
+  endBrush(); shownStrokes = [];
+  cur = d; art = d.art;
+  restoring = true;
+  const snap = d.snap;
+  for (const k of PRESET_KEYS) st[k] = snap.s[k];
+  st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
+  Object.assign(lv, snap.lv);
+  rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(d.activeRule || 0, Math.max(0, rules.length - 1));
+  outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; lastSel = null; selKey = -1;
+  hist = null; srcStats = null; $('saveBtn').disabled = true;
+  syncFileInfo(); syncCrop();
+  syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
+  syncInk(); syncLevels(); drawHisto(); updateNotes(); syncRules(); syncKnock();
+  setWidth(snap.w, true);
+  $('nameSuffix').value = d.suffix || '';
+  clearDoneMarks(); for (const id of d.done || []) if ($(id)) $(id).classList.add('done');
+  steps = d.steps; stepPos = d.stepPos; unsaved = d.unsaved; renderSteps();
+  buildSrc();
+  st.zoom = d.zoom; st.cx = d.cx; st.cy = d.cy; stage.classList.toggle('pannable', st.zoom !== 'fit');
+  restoring = false;
+  render(); updateChecks(); renderTabs();
+}
+function switchTo(d){ if (d === cur) return; stashDoc(); loadDoc(d); }
+function newDoc(){ // a new tab for the art being opened; the sample's tab is reused
+  if (!art || art.isSample){ if (!cur){ cur = {id: ++docSeq}; docs.push(cur); } return; }
+  stashDoc();
+  cur = {id: ++docSeq}; docs.push(cur);
+}
+const docFull = () => docs.length >= MAX_DOCS && !(art && art.isSample);
+function closeDoc(d){
+  if (docs.length < 2) return;
+  const go = () => {
+    const i = docs.indexOf(d); if (i < 0) return;
+    docs.splice(i, 1);
+    if (d === cur){ cur = null; loadDoc(docs[Math.min(i, docs.length - 1)]); } else renderTabs();
+    d.art = null; d.steps = null; // let the browser free the image
+  };
+  if (d !== cur && d.unsaved && d.art && !d.art.isSample) switchTo(d); // show it, so the question is about what's on screen
+  if (d === cur) guardThen(go, false, true); else go();
+}
+function renderTabs(){
+  $('tabs').innerHTML = docs.map(d => {
+    const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
+    return `<div class="tab${d === cur ? ' on' : ''}"><button class="tab-name" type="button" role="tab" aria-selected="${d === cur}" data-doc="${d.id}" title="${esc(name)}${dirty ? ' · not saved' : ''}">` +
+      `${dirty ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}<span class="tab-t">${esc(name)}</span></button>` +
+      (docs.length > 1 ? `<button class="tab-x" type="button" data-close="${d.id}" aria-label="Close ${esc(name)}" data-tip="Close this design">×</button>` : '') + '</div>';
+  }).join('') + '<button class="tab-add" type="button" id="tabAdd" aria-label="Open art in a new tab" data-tip="Open art in a new tab. Dropping or pasting art opens a new tab too.">+</button>';
+}
+$('tabs').addEventListener('click', e => {
+  const x = e.target.closest('[data-close]'); if (x){ const d = docs.find(d => d.id === +x.dataset.close); if (d) closeDoc(d); return; }
+  const t = e.target.closest('[data-doc]'); if (t){ const d = docs.find(d => d.id === +t.dataset.doc); if (d) switchTo(d); return; }
+  if (e.target.closest('#tabAdd')) openArt();
+});
+$('tabs').addEventListener('auxclick', e => { const t = e.target.closest('[data-doc]'); if (e.button === 1 && t){ const d = docs.find(d => d.id === +t.dataset.doc); if (d) closeDoc(d); } }); // middle-click closes, as in browsers
+function openArt(){ if (docFull()){ toast(`Up to ${MAX_DOCS} designs can be open at once. Close a tab first.`); return; } $('fileIn').click(); }
+async function openFiles(list){ for (const f of list) await openFile(f); }
 async function readPngDpi(file){
   try {
     const b = new Uint8Array(await file.slice(0, 65536).arrayBuffer()), v = new DataView(b.buffer);
@@ -1951,20 +2221,22 @@ async function openFile(f){
   const im = new Image(); im.decoding = 'async'; im.src = URL.createObjectURL(f);
   try { await im.decode(); } catch(e){ toast('That file wouldn’t open. Try saving it as a PNG.'); return; }
   if (!im.naturalWidth || !im.naturalHeight){ toast('That file has no size set. Save it as a PNG and try again.'); return; }
+  if (docFull()){ toast(`Up to ${MAX_DOCS} designs can be open at once. Close a tab first.`); return; }
   const dpi = /png/i.test(f.type) || /\.png$/i.test(f.name || '') ? await readPngDpi(f) : null;
   const jpegQ = /jpe?g/i.test(f.type) || /\.jpe?g$/i.test(f.name || '') ? await readJpegQuality(f) : null;
   endPick();
+  newDoc();
   setArt(im, im.naturalWidth, im.naturalHeight, f.name || 'Pasted art', false, dpi,
          {vector: /svg/i.test(f.type) || /\.svg$/i.test(f.name || ''), jpegQ});
 }
-$('fileIn').addEventListener('change', e => { openFile(e.target.files[0]); e.target.value = ''; });
-$('openBtn').addEventListener('click', () => guardThen(() => $('fileIn').click(), true));
+$('fileIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; openFiles(list); });
+$('openBtn').addEventListener('click', openArt);
 let dragDepth = 0;
 window.addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')){ dragDepth++; $('drop').hidden = false; } });
 window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('drop').hidden = true; });
 window.addEventListener('dragover', e => { e.preventDefault(); });
-window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const f = e.dataTransfer?.files?.[0]; if (f) guardThen(() => openFile(f)); });
-window.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it){ const f = it.getAsFile(); guardThen(() => openFile(f)); } });
+window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const list = [...(e.dataTransfer?.files || [])]; if (list.length) openFiles(list); });
+window.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) openFile(it.getAsFile()); });
 
 /* ---------- saving: transparent PNG at 300 dpi, settings written into the file ---------- */
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -2010,7 +2282,7 @@ function settingsText(){
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
-         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
+         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
 let saving = false;
@@ -2031,7 +2303,7 @@ async function savePng(){ // answers true once the PNG is saved
   } finally {
     $('busy').textContent = 'Updating…'; saving = false; $('saveBtn').disabled = !outReady;
   }
-  if (ok){ commitStep(); unsaved = false; }
+  if (ok){ commitStep(); unsaved = false; renderTabs(); }
   return ok;
 }
 $('saveBtn').addEventListener('click', () => { savePng(); });
@@ -2322,9 +2594,10 @@ const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v =
 function snapshot(){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   s.knock = st.knock; s.knockFrom = knockFrom;
-  return {s, lv: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]})), w: st.widthCm, crop: art ? {...art.crop} : null};
+  return {s, lv: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]})), w: st.widthCm, crop: art ? {...art.crop} : null, n: art ? art.strokesN : 0};
 }
 function describeStep(a, b){ // a short name for what changed from a to b
+  if ((a.n || 0) !== (b.n || 0)) return (b.n || 0) > (a.n || 0) && art && art.strokes[b.n - 1] ? BRUSH_NAMES[art.strokes[b.n - 1].mode] : 'Touch-ups removed';
   if (JSON.stringify(a.crop) !== JSON.stringify(b.crop)) return b.crop ? `Crop ${b.crop.w} × ${b.crop.h} px` : 'Crop';
   if (Math.abs(a.w - b.w) > 1e-6) return `Print size ${toMm(b.w)} mm wide`;
   for (const k of Object.keys(STEP_NAMES)) if (a.s[k] !== b.s[k]) return STEP_NAMES[k](b.s[k]);
@@ -2354,6 +2627,7 @@ function applySnap(snap){
   st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
   Object.assign(lv, snap.lv);
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1));
+  if (art && (snap.n || 0) !== art.strokesN){ art.strokesN = Math.min(snap.n || 0, art.strokes.length); rebuildEdits(art); buildSrcSoon(); }
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
   syncInk(); syncLevels(); updateNotes(); syncRules();
   if (art && snap.crop && JSON.stringify(snap.crop) !== JSON.stringify(art.crop)){ art.crop = {...snap.crop}; art.w = art.crop.w; art.h = art.crop.h; syncCrop(); setWidth(snap.w, true); buildSrcSoon(); }
@@ -2365,6 +2639,7 @@ function goStep(i){ if (i < 0 || i >= steps.length || i === stepPos) return; ste
 function undo(){ commitStep(); goStep(stepPos - 1); }
 function redo(){ commitStep(); goStep(stepPos + 1); }
 function renderSteps(){
+  renderTabs();
   const list = $('historyList'), time = t => new Date(t).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
   list.innerHTML = steps.map((x, i) => `<li class="${i === stepPos ? 'now' : i > stepPos ? 'ahead' : ''}"><button type="button" data-step="${i}"><span>${esc(x.label)}</span><time>${time(x.at)}</time></button></li>`).join('');
   const now = list.querySelector('.now'); if (now) list.scrollTop = now.offsetTop - list.clientHeight/2;
@@ -2384,12 +2659,14 @@ window.addEventListener('keyup', e => { if ((e.key === 't' || e.key === 'T') && 
 /* ---------- before opening other art or leaving: offer to save unsaved work ---------- */
 let pendingGo = null, pendingGesture = false;
 const hasUnsaved = () => unsaved && art && !art.isSample;
-function guardThen(go, needsGesture){
+function guardThen(go, needsGesture, closing){
   commitStep();
   if (!hasUnsaved()){ go(); return; }
   pendingGo = go; pendingGesture = !!needsGesture;
   $('askSaveTitle').textContent = 'Save this design first?';
-  $('askSaveText').textContent = 'You’ve changed it since it was last saved. Save the PNG before opening other art, or carry on without saving.';
+  $('askSaveText').textContent = closing ? 'You’ve changed it since it was last saved. Save the PNG before closing its tab, or close it without saving.'
+    : 'You’ve changed it since it was last saved. Save the PNG before opening other art, or carry on without saving.';
+  $('askNoSave').textContent = closing ? 'Close without saving' : 'Don’t save';
   $('askSaveBtn').textContent = 'Save PNG'; delete $('askSaveBtn').dataset.next; $('askNoSave').hidden = false;
   $('askSave').hidden = false; $('askSaveBtn').focus();
 }
@@ -2405,7 +2682,7 @@ $('askSaveBtn').addEventListener('click', async () => {
   $('askSaveBtn').textContent = 'Open art'; $('askSaveBtn').dataset.next = '1'; $('askNoSave').hidden = true;
   $('askSave').hidden = false; $('askSaveBtn').focus();
 });
-window.addEventListener('beforeunload', e => { commitStep(); if (hasUnsaved()){ e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { commitStep(); if (hasUnsaved() || docs.some(d => d !== cur && d.unsaved && d.art && !d.art.isSample)){ e.preventDefault(); e.returnValue = ''; } });
 
 /* ---------- sections start folded; Expand all opens every one ---------- */
 const SECTION_TIPS = {
@@ -2419,13 +2696,14 @@ const SECTION_TIPS = {
   rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
   toneGroup: 'How much ink goes down: lighten or darken it, add contrast, drop dots too small to hold, and join nearly solid dots.',
   inkGroup: 'Full colour prints the art’s own colours. Mono prints every dot in one colour.',
+  touchGroup: 'Brush away stray pixels, paint over gaps or rough edges, or bring the original back. Every stroke is in History.',
   edgeGroup: 'Tidy the outline: a hard edge with no soft pixels, and a trim off the outside of the outline, of any colour or just the knock-out colour.',
   finishGroup: 'The key decision: halftone dots (pick the lpi), or a clean cut with no dots where every pixel is solid or removed. Set it first so every other step shows in this style.',
   checkGroup: 'A last check that the film will print and wash well, then save the PNG.'
 };
 try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
 // a Reset link in the title of each step that has settings (Levels and Crop have their own)
-for (const id of ['finishGroup', 'sizeGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'toneGroup', 'inkGroup']){
+for (const id of ['finishGroup', 'sizeGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'touchGroup', 'toneGroup', 'inkGroup']){
   const g = $(id), h = g.querySelector(':scope > h2'), head = document.createElement('div');
   head.className = 'g-head'; g.insertBefore(head, h); head.appendChild(h);
   head.insertAdjacentHTML('beforeend', `<div class="g-actions"><button class="link step-reset" type="button" data-reset="${id}" hidden>Reset</button></div>`);
@@ -2475,6 +2753,7 @@ const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
+  endBrush();
   noteChange('Reset to defaults');
   Object.assign(st, DEFAULTS); st.knock = null; knockFrom = 'shirt';
   Object.assign(lv, LV0); rules = []; activeRule = 0;
@@ -2482,6 +2761,7 @@ function resetToDefaults(){ // every setting back to the start, the crop and siz
   syncInk(); syncLevels(); updateNotes(); syncRules(); syncPresets(null);
   if (art){
     art.crop = {x: 0, y: 0, w: art.fullW, h: art.fullH}; art.w = art.fullW; art.h = art.fullH; syncCrop();
+    art.strokesN = 0; rebuildEdits(art);
     setWidth(art.isSample ? 25 : art.fullW/(art.dpi || DPI)*2.54, true); buildSrcSoon(); setZoom('fit');
   }
   clearDoneMarks(); remember(); schedule(); updateChecks();
@@ -2499,6 +2779,7 @@ const STEP_RESETS = {
   knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null})},
   rangeGroup: {name: 'Select', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
   edgeGroup: {name: 'Edge', vals: () => ({...EDGE_KEYS})},
+  touchGroup: {name: 'Touch up', same: () => !art || !art.strokesN, reset: () => { art.strokesN = 0; rebuildEdits(art); buildSrcSoon(); }},
   toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), drop: lookVal('drop'), solid: lookVal('solid')})},
   inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex})}
 };
@@ -2520,7 +2801,7 @@ document.querySelector('.panel').addEventListener('click', e => {
 resetsReady = true; syncResets();
 function clearDoneMarks(){ for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
 $('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); syncFoldAll(); if (open) drawHisto(); });
-syncFoldAll(); syncStepButtons();
+syncFoldAll(); syncStepButtons(); syncBrush();
 
 /* ---------- rollover help: a short tip on hover, or on keyboard focus ---------- */
 const TIPS = [
@@ -2535,9 +2816,13 @@ const TIPS = [
   ['#edge', 'How far in from the outside of the outline to trim. Off leaves the edge as it is.'],
   ['[data-emode="any"]', 'Trim every colour: shrinks the whole outline, like Photoshop’s Contract.'],
   ['[data-emode="near"]', 'Trim only colours close to the knock-out colour, so the same colour further in keeps its ink.'],
+  ['[data-brush="erase"]', 'Brush pixels away to clear film.'], ['[data-brush="paint"]', 'Paint over gaps or rough edges in one colour. Alt-click the art to pick it.'],
+  ['[data-brush="restore"]', 'Brush the original art back where you erased or painted.'], ['#paintFromArt', 'Click a colour in the art to paint with.'],
+  ['#openBtn', 'Open art in a new tab. Choose several files to open each in its own tab.'],
   ['#hardOn', 'Make soft, see-through pixels solid or removed before the dots are made, like a Threshold action.'],
   ['[data-view="shirt"]', 'The print on the shirt colour.'],
   ['[data-view="clear"]', 'The print on transparent checks: the checks are clear film. Press T to flick to it.'],
+  ['[data-view="white"]', 'The print over a solid white fill, like a white layer behind it in Photoshop, to see exactly what prints. The shirt colour and knock-out stay as they are.'],
   ['[data-view="base"]', 'White shows where ink (with its white base) prints. Black is clear film.'],
   ['[data-view="map"]', 'White prints solid, pink turns into dots, grey is removed.'],
   ['[data-view="sel"]', 'The active colour range’s selection: white is selected, grey is partly selected.'],
@@ -2585,6 +2870,7 @@ for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el
 // open in Split when the screen has room for two views side by side
 if (stage.clientWidth >= 960 && stage.clientWidth >= stage.clientHeight*1.1) setView('split');
 syncFinish();
+cur = {id: ++docSeq}; docs = [cur]; renderTabs(); // the first tab holds the sample until art is opened
 sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); });
 })();
 </script>
