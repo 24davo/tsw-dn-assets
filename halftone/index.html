@@ -156,6 +156,14 @@ input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .colorbox input{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);border:0;padding:0;cursor:pointer}
 .hex{width:96px;height:34px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;text-transform:uppercase}
 .hex:focus{border-color:var(--ink);outline:none}
+.preset-sel{width:100%;height:40px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.preset-sel:hover{border-color:var(--ink)}
+.preset-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chip[disabled]{opacity:.45;cursor:default;pointer-events:none}
+.preset-form{display:grid;gap:10px;padding:12px;border:1.5px solid var(--ink);border-radius:var(--r)}
+.preset-form input[type="text"]{height:38px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:600}
+.preset-form input[type="text"]:focus{border-color:var(--ink);outline:none}
+.preset-confirm{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;font-weight:600}
 .size{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .num{display:flex;align-items:center;height:42px;border:1.5px solid var(--line);border-radius:var(--r);padding:0 10px;gap:6px}
 .num:focus-within{border-color:var(--ink)}
@@ -244,6 +252,24 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     </section>
 
     <aside class="panel" aria-label="Halftone settings">
+      <section class="group" id="presetGroup">
+        <h2>Presets</h2>
+        <select class="preset-sel" id="presetSel" aria-label="Choose a preset"><option value="">Choose a preset…</option></select>
+        <div class="preset-actions">
+          <button class="chip" type="button" id="presetNew">Save new</button>
+          <button class="chip" type="button" id="presetUpdate" disabled title="Save the current settings over the chosen preset">Update</button>
+          <button class="chip" type="button" id="presetDelete" disabled>Delete</button>
+        </div>
+        <form class="preset-form" id="presetForm" hidden>
+          <input type="text" id="presetName" maxlength="48" placeholder="e.g. Black tee, shadows out" aria-label="Preset name" autocomplete="off">
+          <label class="check-row"><input type="checkbox" id="presetSize"> <span id="presetSizeTxt">Include the print size</span></label>
+          <div class="preset-actions"><button class="btn small primary" type="submit">Save preset</button><button class="btn small" type="button" id="presetCancel">Cancel</button></div>
+        </form>
+        <div class="preset-confirm" id="presetConfirm" hidden><span id="presetConfirmTxt"></span><button class="link" type="button" id="presetYes">Delete</button><button class="link" type="button" id="presetNo">Keep it</button></div>
+        <p class="f-note">A preset keeps the look, finish, dots, knock-out, Levels, colour ranges, tone, ink and shirt colour. Open the art first, then choose the preset. Presets live in this browser: <button class="link" type="button" id="presetExport">Export</button> them to a file and <button class="link" type="button" id="presetImport">Import</button> it on the other computers.</p>
+        <input type="file" id="presetFile" accept=".json,application/json" hidden>
+      </section>
+
       <section class="group">
         <h2>Look</h2>
         <div class="looks" id="looks">
@@ -419,6 +445,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
             <li>For a quick black-shirt clean-up with no halftone, use Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
+            <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
             <li>Click a section’s title to fold it away. The tool remembers your layout.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
@@ -1495,7 +1522,91 @@ async function sampleArt(){
 }
 
 /* ---------- start ---------- */
+/* ---------- presets: kept in this browser, shared between computers by exporting a file ---------- */
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt'];
+let presets = [];
+try { const v = JSON.parse(localStorage.getItem('tsw-dtf-presets') || '[]'); if (Array.isArray(v)) presets = v.filter(x => x && x.name && x.s); } catch(e){}
+function savePresets(){ try { localStorage.setItem('tsw-dtf-presets', JSON.stringify(presets)); } catch(e){ toast('This browser could not keep presets. Export them to a file instead.'); } }
+function capturePreset(name, withSize){
+  const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
+  s.knock = st.knock; s.knockFrom = knockFrom;
+  const p = {name, v: 1, s, levels: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]}))};
+  if (withSize && art) p.size = {w: +st.widthCm.toFixed(2), h: +(st.widthCm*art.h/art.w).toFixed(2)};
+  return p;
+}
+function applyPreset(p){
+  for (const k of PRESET_KEYS) if (k in p.s) st[k] = p.s[k];
+  st.knock = p.s.knock || null; knockFrom = st.knock ? (p.s.knockFrom || 'hand') : 'shirt';
+  Object.assign(lv, LV0, p.levels || {});
+  rules = (p.rules || []).slice(0, MAX_RULES).map(R => ({...newRule(R.type || 'shadows', R.action || 'remove'), ...R, samples: [...(R.samples || [])]}));
+  activeRule = 0;
+  syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
+  syncInk(); syncLevels(); updateNotes(); syncRules();
+  if (p.size && art){ setWidth(Math.min(p.size.w, p.size.h*art.w/art.h), true); buildSrcSoon(); } // fits inside the saved width and height
+  remember(); schedule(); updateChecks();
+  toast(`Applied “${p.name}”.`);
+}
+function syncPresets(selected){
+  const sel = $('presetSel');
+  sel.innerHTML = `<option value="">${presets.length ? 'Choose a preset…' : 'No presets saved yet'}</option>` + presets.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+  const i = selected != null ? presets.findIndex(p => p.name === selected) : -1;
+  sel.value = i >= 0 ? String(i) : '';
+  $('presetUpdate').disabled = $('presetDelete').disabled = i < 0;
+  $('presetConfirm').hidden = true;
+}
+const chosenPreset = () => { const v = $('presetSel').value; return v === '' ? null : presets[+v]; };
+$('presetSel').addEventListener('change', () => { const p = chosenPreset(); syncPresets(p ? p.name : null); if (p) applyPreset(p); });
+$('presetNew').addEventListener('click', () => {
+  const look = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
+  const shirt = (SHIRTS.find(([, hex]) => hex.toLowerCase() === st.shirt.toLowerCase()) || ['custom shirt'])[0];
+  $('presetName').value = `${look}, ${shirt.toLowerCase()} tee`;
+  $('presetSize').checked = false;
+  $('presetSizeTxt').textContent = art ? `Include the print size (${st.widthCm.toFixed(1)} × ${(st.widthCm*art.h/art.w).toFixed(1)} cm)` : 'Include the print size';
+  $('presetConfirm').hidden = true; $('presetForm').hidden = false; $('presetName').focus(); $('presetName').select();
+});
+$('presetCancel').addEventListener('click', () => { $('presetForm').hidden = true; });
+$('presetForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('presetName').value.trim().slice(0, 48);
+  if (!name){ toast('Give the preset a name.'); $('presetName').focus(); return; }
+  const p = capturePreset(name, $('presetSize').checked), i = presets.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
+  if (i >= 0) presets[i] = p; else presets.push(p);
+  savePresets(); syncPresets(name); $('presetForm').hidden = true;
+  toast(i >= 0 ? `Updated “${name}”.` : `Saved “${name}”.`);
+});
+$('presetUpdate').addEventListener('click', () => {
+  const p = chosenPreset(); if (!p) return;
+  const i = presets.indexOf(p); presets[i] = capturePreset(p.name, !!p.size);
+  savePresets(); syncPresets(p.name); toast(`Updated “${p.name}” with the current settings.`);
+});
+$('presetDelete').addEventListener('click', () => {
+  const p = chosenPreset(); if (!p) return;
+  $('presetConfirmTxt').textContent = `Delete “${p.name}”?`; $('presetForm').hidden = true; $('presetConfirm').hidden = false;
+});
+$('presetNo').addEventListener('click', () => { $('presetConfirm').hidden = true; });
+$('presetYes').addEventListener('click', () => {
+  const p = chosenPreset(); if (!p) return;
+  presets.splice(presets.indexOf(p), 1); savePresets(); syncPresets(null); toast(`Deleted “${p.name}”.`);
+});
+$('presetExport').addEventListener('click', () => {
+  if (!presets.length){ toast('There are no presets to export yet.'); return; }
+  saveFile(new Blob([JSON.stringify({app: 'Tshirt Workshop DTF Halftone', v: 1, presets}, null, 2)], {type: 'application/json'}), 'dtf-halftone-presets.json');
+});
+$('presetImport').addEventListener('click', () => $('presetFile').click());
+$('presetFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text()), list = (Array.isArray(data) ? data : data.presets || []).filter(x => x && typeof x.name === 'string' && x.s);
+    if (!list.length){ toast('That file has no presets in it.'); return; }
+    for (const p of list){ const i = presets.findIndex(x => x.name.toLowerCase() === p.name.toLowerCase()); if (i >= 0) presets[i] = p; else presets.push(p); }
+    savePresets(); syncPresets(null);
+    toast(`Imported ${list.length} preset${list.length === 1 ? '' : 's'}. Presets with the same name were replaced.`);
+  } catch(err){ toast('That file isn’t a presets file. Export one from this tool first.'); }
+});
+
 syncShirt(); syncLook(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape); syncInk(); updateNotes();
+syncPresets(null);
 if (st.look === 'shadows') ensureShadowRule(); else syncRules();
 syncLevels(); syncLifeNote();
 
