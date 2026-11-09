@@ -874,7 +874,8 @@ const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
             edge: 0, etol: 30, emode: 'any', hard: 0, brushV: 50, paintHex: '#ffffff'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
-const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut','hard','brushV','paintHex'];
+// remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
@@ -2756,6 +2757,7 @@ function resetToDefaults(){ // every setting back to the start, the crop and siz
   endBrush();
   noteChange('Reset to defaults');
   Object.assign(st, DEFAULTS); st.knock = null; knockFrom = 'shirt';
+  st.paneA = 'orig'; st.paneB = 'shirt'; syncPaneOptions(); if (st.view === 'split'){ prepareViews(); syncLegend(); }
   Object.assign(lv, LV0); rules = []; activeRule = 0;
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
   syncInk(); syncLevels(); updateNotes(); syncRules(); syncPresets(null);
