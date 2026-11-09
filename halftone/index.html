@@ -276,7 +276,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     </section>
 
     <aside class="panel" aria-label="Halftone settings">
-      <div class="panel-bar"><span class="kicker">Tools</span><button class="link" type="button" id="foldAll">Expand all</button></div>
+      <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
 
       <section class="group" id="presetGroup">
         <h2>Presets</h2>
@@ -1575,7 +1575,7 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '
 /* ---------- opening art ---------- */
 function setArt(el, w, h, name, isSample, dpi){
   if (cropping) endCrop(false);
-  art = {el, w, h, name, isSample, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}}; // w and h follow the crop
+  art = {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}}; // w and h follow the crop
   syncCrop(); clearDoneMarks();
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
   const fi = $('fileInfo');
@@ -2108,6 +2108,24 @@ function stepDone(g){
   else savePng();
   syncFoldAll();
 }
+const DEFAULTS = {look: 'knock', lpi: 35, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50};
+function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
+  if (cropping) endCrop(false);
+  if (picking) endPick();
+  noteChange('Reset to defaults');
+  Object.assign(st, DEFAULTS); st.knock = null; knockFrom = 'shirt';
+  Object.assign(lv, LV0); rules = []; activeRule = 0;
+  syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
+  syncInk(); syncLevels(); updateNotes(); syncRules(); syncPresets(null);
+  if (art){
+    art.crop = {x: 0, y: 0, w: art.fullW, h: art.fullH}; art.w = art.fullW; art.h = art.fullH; syncCrop();
+    setWidth(art.isSample ? 25 : art.fullW/(art.dpi || DPI)*2.54, true); buildSrcSoon(); setZoom('fit');
+  }
+  clearDoneMarks(); remember(); schedule(); updateChecks();
+  toast('Back to the default settings. Undo (Cmd/Ctrl+Z) brings yours back.');
+}
+$('resetAll').addEventListener('click', resetToDefaults);
 function clearDoneMarks(){ for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
 $('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); syncFoldAll(); if (open) drawHisto(); });
 syncFoldAll(); syncStepButtons();
@@ -2119,6 +2137,7 @@ const TIPS = [
   ['#openBtn', 'Open a PNG, JPG, WebP or SVG. You can also drop art on the window or paste it.'],
   ['#saveBtn', 'Save a transparent PNG at 300 dpi with no see-through pixels, ready for the film.'],
   ['#foldAll', 'Open or close every section.'],
+  ['#resetAll', 'Put every setting back to the tool’s defaults and remove the crop. Undo brings them back.'],
   ['[data-view="shirt"]', 'The print on the shirt colour.'],
   ['[data-view="clear"]', 'The print on transparent checks: the checks are clear film. Press T to flick to it.'],
   ['[data-view="base"]', 'White shows where ink (with its white base) prints. Black is clear film.'],
