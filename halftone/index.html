@@ -211,6 +211,13 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .f-head output{font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .f-note{margin:0;font-size:12px;color:var(--muted)}
 .name-field{margin-top:14px}
+.trace-body{display:grid;gap:14px}
+.trace-pal{display:grid;gap:6px}
+.tp-row{display:flex;align-items:center;gap:10px;font-size:13px}
+.tp-row.off .tp-hex,.tp-row.off .tp-area{color:var(--muted)}
+.tp-row.off .colorbox{opacity:.45}
+.tp-hex{font-weight:700;font-variant-numeric:tabular-nums;min-width:74px}
+.tp-area{flex:1;color:var(--muted)}
 .eswatch{display:inline-block;width:12px;height:12px;border:1px solid var(--line-strong);border-radius:var(--r);vertical-align:-1px}
 .name-field .opt{font-weight:500;color:var(--muted)}
 .name-field input{height:38px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:600}
@@ -439,6 +446,32 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <p class="f-note" id="cropNote">No crop: the whole file is used.</p>
       </section>
 
+      <section class="group step" id="traceGroup">
+        <h2>Vector trace</h2>
+        <p class="f-note">For simple flat-colour logos and text, 2 to 5 colours: the art is traced into clean shapes and redrawn sharp at the print size. Not for photos, gradients or soft shading.</p>
+        <label class="check-row"><input type="checkbox" id="traceOn"> Trace the art</label>
+        <div class="trace-body" id="traceBody" hidden>
+          <div class="field">
+            <div class="f-head"><span>Colours</span><span class="opt" id="traceInfo"></span></div>
+            <div class="chips" id="traceK" role="group" aria-label="Number of colours">
+              <button class="chip" type="button" data-k="2">2</button><button class="chip" type="button" data-k="3">3</button><button class="chip" type="button" data-k="4">4</button><button class="chip" type="button" data-k="5">5</button>
+            </div>
+          </div>
+          <div class="trace-pal" id="tracePal"></div>
+          <label class="check-row"><input type="checkbox" id="traceBg" checked> Clear the background (where it touches the edge)</label>
+          <div class="field">
+            <div class="f-head"><label for="traceSmooth">Smoothness</label><output id="traceSmoothOut" for="traceSmooth">50</output></div>
+            <input type="range" id="traceSmooth" min="0" max="100" step="1" value="50">
+          </div>
+          <div class="field">
+            <div class="f-head"><label for="traceSpecks">Remove specks</label><output id="traceSpecksOut" for="traceSpecks">Off</output></div>
+            <input type="range" id="traceSpecks" min="0" max="100" step="1" value="30">
+          </div>
+          <div class="preset-actions"><button class="btn small" type="button" id="traceSvgBtn">Save SVG</button></div>
+          <p class="f-note">Click a swatch to set an exact colour (a brand colour, say), or Clear one to leave it as clear film. Save SVG saves the shapes at the print size in mm, in these colours (before Levels and dots), ready for Illustrator.</p>
+        </div>
+      </section>
+
       <section class="group step" id="sizeGroup">
         <h2>Print size</h2>
         <div class="size">
@@ -659,6 +692,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
+            <li>Small or blurry flat-colour logos (2 to 4 colours): turn on Vector trace, pick the number of colours you can see, and the art is redrawn sharp at any size. Save SVG gives the vector too.</li>
             <li>Open several designs at once: each opens in its own tab (+ or Open art, or drop several files) with its own settings, touch-ups and history. A dot on a tab means it isn’t saved yet.</li>
             <li>Touch up brushes: Eraser clears stray pixels, Paint fills gaps in a colour Alt-clicked from the art, Restore brings the original back. [ and ] change the size, hold Space to move.</li>
             <li>For a crisp outline on a dark tee, tick Hard edge and add a little Trim the edge in the Edge step. Any colour trims a background-removal fringe; Only near the knock-out colour keeps dark parts like tyres.</li>
@@ -1070,12 +1104,329 @@ function drawScaled(ctx, img, sx, sy, sw, sh, W, H){ // the part of img at (sx, 
   ctx.clearRect(0, 0, W, H);
   ctx.drawImage(src, rx, ry, cw, ch, 0, 0, W, H);
 }
+/* ---------- vector trace: flat-colour art (2 to 5 colours) into smooth shapes ----------
+   1. Colours: k-means on a sample of the pixels picks the k main colours; every pixel takes the nearest one, and
+      see-through pixels (under half solid) are clear. Colours that end up almost the same are merged.
+   2. Clean-up: a 3 × 3 majority pass smooths ragged edges, then patches smaller than the speck size take the colour
+      around them. The background (the colour that covers most of the outside edge) can be cleared where it touches
+      the edge, so the same colour inside the design stays.
+   3. Shapes: each colour, stacked biggest first, is traced as itself plus everything above it (so neighbouring
+      colours never leave a gap). The mask is softened, its 50% line found with marching squares, thinned with
+      Douglas-Peucker, then drawn as curves, keeping sharp corners sharp. */
+function trRand(seed){ let s = seed >>> 0; return () => ((s = (s*1664525 + 1013904223) >>> 0)/4294967296); }
+function trQuantise(d, W, H, k){ // answers {L (labels, 255 = clear), pal [[r,g,b]...], area [...]} or null
+  const n = W*H, step = Math.max(1, Math.floor(n/40000)), S = [];
+  for (let j = 0; j < n; j += step){ const i = j*4; if (d[i+3] >= 128) S.push(d[i], d[i+1], d[i+2]); }
+  const m = S.length/3;
+  if (!m) return null;
+  const dist = (r, g, b, C, c) => { const dr = r - C[c*3], dg = g - C[c*3+1], db = b - C[c*3+2]; return 2*dr*dr + 4*dg*dg + 3*db*db; };
+  const C = new Float64Array(k*3), rnd = trRand(12345), D = new Float64Array(m);
+  let first = Math.floor(rnd()*m); C[0] = S[first*3]; C[1] = S[first*3+1]; C[2] = S[first*3+2];
+  for (let c = 1; c < k; c++){ // k-means++ seeding, with a fixed seed so the same art always traces the same
+    let tot = 0;
+    for (let i = 0; i < m; i++){ let best = Infinity; for (let q = 0; q < c; q++) best = Math.min(best, dist(S[i*3], S[i*3+1], S[i*3+2], C, q)); D[i] = best; tot += best; }
+    let r = rnd()*tot, pick = m - 1;
+    for (let i = 0; i < m; i++){ r -= D[i]; if (r <= 0){ pick = i; break; } }
+    C[c*3] = S[pick*3]; C[c*3+1] = S[pick*3+1]; C[c*3+2] = S[pick*3+2];
+  }
+  const A = new Int32Array(m);
+  for (let it = 0; it < 14; it++){
+    const sum = new Float64Array(k*4);
+    for (let i = 0; i < m; i++){
+      let best = 0, bd = Infinity;
+      for (let c = 0; c < k; c++){ const dd = dist(S[i*3], S[i*3+1], S[i*3+2], C, c); if (dd < bd){ bd = dd; best = c; } }
+      A[i] = best; sum[best*4] += S[i*3]; sum[best*4+1] += S[i*3+1]; sum[best*4+2] += S[i*3+2]; sum[best*4+3]++;
+    }
+    for (let c = 0; c < k; c++) if (sum[c*4+3]){ C[c*3] = sum[c*4]/sum[c*4+3]; C[c*3+1] = sum[c*4+1]/sum[c*4+3]; C[c*3+2] = sum[c*4+2]/sum[c*4+3]; }
+  }
+  // merge colours closer than about 20 levels: asking for more colours than the art has shouldn't split one colour in two
+  const keep = [];
+  for (let c = 0; c < k; c++){
+    const twin = keep.find(q => Math.hypot(C[c*3] - C[q*3], C[c*3+1] - C[q*3+1], C[c*3+2] - C[q*3+2]) < 20);
+    if (twin === undefined) keep.push(c);
+  }
+  const pal = keep.map(c => [Math.round(C[c*3]), Math.round(C[c*3+1]), Math.round(C[c*3+2])]);
+  const K = pal.length, PC = new Float64Array(K*3); pal.forEach((p, i) => { PC[i*3] = p[0]; PC[i*3+1] = p[1]; PC[i*3+2] = p[2]; });
+  const L = new Uint8Array(n), area = new Array(K).fill(0);
+  for (let j = 0, i = 0; j < n; j++, i += 4){
+    if (d[i+3] < 128){ L[j] = 255; continue; }
+    let best = 0, bd = Infinity;
+    for (let c = 0; c < K; c++){ const dd = dist(d[i], d[i+1], d[i+2], PC, c); if (dd < bd){ bd = dd; best = c; } }
+    L[j] = best; area[best]++;
+  }
+  return {L, pal, area};
+}
+function trSoften(d, W, H, sigma){ // a light blur of the colours (weighted by solidity) before picking colours: JPEG noise and
+  // enlargement steps would otherwise make wobbly edges. An edge stays where it was; only the noise goes.
+  const R = Math.max(1, Math.ceil(sigma*2.5)), K = new Float32Array(2*R + 1); let ks = 0;
+  for (let i = -R; i <= R; i++){ K[i + R] = Math.exp(-i*i/(2*sigma*sigma)); ks += K[i + R]; }
+  for (let i = 0; i < K.length; i++) K[i] /= ks;
+  const n = W*H, P = new Float32Array(n*4), T = new Float32Array(n*4);
+  for (let j = 0, i = 0; j < n; j++, i += 4){ const a = d[i+3]/255; P[i] = d[i]*a; P[i+1] = d[i+1]*a; P[i+2] = d[i+2]*a; P[i+3] = d[i+3]; }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const lo = Math.max(0, x - R), hi = Math.min(W - 1, x + R), o = (y*W + x)*4; let r = 0, g = 0, b = 0, a = 0, w = 0;
+    for (let t = lo; t <= hi; t++){ const k = K[t - x + R], q = (y*W + t)*4; r += k*P[q]; g += k*P[q+1]; b += k*P[q+2]; a += k*P[q+3]; w += k; }
+    T[o] = r/w; T[o+1] = g/w; T[o+2] = b/w; T[o+3] = a/w;
+  }
+  for (let x = 0; x < W; x++) for (let y = 0; y < H; y++){
+    const lo = Math.max(0, y - R), hi = Math.min(H - 1, y + R), o = (y*W + x)*4; let r = 0, g = 0, b = 0, a = 0, w = 0;
+    for (let t = lo; t <= hi; t++){ const k = K[t - y + R], q = (t*W + x)*4; r += k*T[q]; g += k*T[q+1]; b += k*T[q+2]; a += k*T[q+3]; w += k; }
+    const al = a/w, m = al > 0 ? 255/al : 0; d[o] = r/w*m; d[o+1] = g/w*m; d[o+2] = b/w*m; d[o+3] = al;
+  }
+}
+function trMajority(L, W, H){ // each pixel takes the colour most of its 3 × 3 neighbourhood has, when 5 or more agree
+  const out = L.slice(), cnt = new Uint8Array(256);
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++){
+    const j = y*W + x; let best = L[j], bc = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){ const v = L[j + dy*W + dx]; if (++cnt[v] > bc){ bc = cnt[v]; best = v; } }
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) cnt[L[j + dy*W + dx]] = 0;
+    if (bc >= 5) out[j] = best;
+  }
+  L.set(out);
+}
+function trDespeckle(L, W, H, minArea){ // patches under minArea pixels take the colour most common around them
+  if (minArea < 2) return;
+  const n = W*H, seen = new Uint8Array(n), stack = new Int32Array(n), comp = new Int32Array(n);
+  for (let s = 0; s < n; s++){
+    if (seen[s]) continue;
+    const lab = L[s]; let top = 0, cn = 0; stack[top++] = s; seen[s] = 1;
+    while (top){
+      const j = stack[--top]; comp[cn++] = j; const x = j % W;
+      if (x > 0 && !seen[j-1] && L[j-1] === lab){ seen[j-1] = 1; stack[top++] = j-1; }
+      if (x < W - 1 && !seen[j+1] && L[j+1] === lab){ seen[j+1] = 1; stack[top++] = j+1; }
+      if (j >= W && !seen[j-W] && L[j-W] === lab){ seen[j-W] = 1; stack[top++] = j-W; }
+      if (j + W < n && !seen[j+W] && L[j+W] === lab){ seen[j+W] = 1; stack[top++] = j+W; }
+    }
+    if (cn >= minArea) continue;
+    const cnt = new Map();
+    for (let q = 0; q < cn; q++){
+      const j = comp[q], x = j % W;
+      for (const nb of [x > 0 ? j-1 : -1, x < W - 1 ? j+1 : -1, j - W, j + W]) if (nb >= 0 && nb < n && L[nb] !== lab) cnt.set(L[nb], (cnt.get(L[nb]) || 0) + 1);
+    }
+    let best = -1, bc = 0; for (const [l, c] of cnt) if (c > bc){ bc = c; best = l; }
+    if (best >= 0) for (let q = 0; q < cn; q++) L[comp[q]] = best;
+  }
+}
+function trBackground(L, W, H){ // the colour covering most of the outside edge, or -1 when the edge is mostly clear already
+  const cnt = new Map(); let total = 0;
+  const add = j => { total++; cnt.set(L[j], (cnt.get(L[j]) || 0) + 1); };
+  for (let x = 0; x < W; x++){ add(x); add((H - 1)*W + x); }
+  for (let y = 1; y < H - 1; y++){ add(y*W); add(y*W + W - 1); }
+  let best = -1, bc = 0; for (const [l, c] of cnt) if (l !== 255 && c > bc){ bc = c; best = l; }
+  return best >= 0 && bc >= total*0.5 && (cnt.get(255) || 0) < total*0.2 ? best : -1;
+}
+function trClearFromEdge(L, W, H, lab){ // that colour becomes clear where it joins the outside edge; the same colour inside stays
+  const n = W*H, stack = new Int32Array(n); let top = 0;
+  const push = j => { if (L[j] === lab){ L[j] = 255; stack[top++] = j; } };
+  for (let x = 0; x < W; x++){ push(x); push((H - 1)*W + x); }
+  for (let y = 0; y < H; y++){ push(y*W); push(y*W + W - 1); }
+  while (top){ const j = stack[--top], x = j % W; if (x > 0) push(j-1); if (x < W - 1) push(j+1); if (j >= W) push(j-W); if (j + W < n) push(j+W); }
+}
+function trBlur(F, W, H, sigma){
+  const R = Math.max(1, Math.ceil(sigma*2.5)), K = new Float32Array(2*R + 1); let ks = 0;
+  for (let i = -R; i <= R; i++){ K[i + R] = Math.exp(-i*i/(2*sigma*sigma)); ks += K[i + R]; }
+  for (let i = 0; i < K.length; i++) K[i] /= ks;
+  const T = new Float32Array(W*H);
+  for (let y = 0; y < H; y++){ const o = y*W; for (let x = 0; x < W; x++){ let s = 0; const lo = Math.max(0, x - R), hi = Math.min(W - 1, x + R); for (let t = lo; t <= hi; t++) s += K[t - x + R]*F[o + t]; T[o + x] = s; } }
+  for (let x = 0; x < W; x++) for (let y = 0; y < H; y++){ let s = 0; const lo = Math.max(0, y - R), hi = Math.min(H - 1, y + R); for (let t = lo; t <= hi; t++) s += K[t - y + R]*T[t*W + x]; F[y*W + x] = s; }
+}
+function trMarch(F, W, H, t){ // closed outlines where F crosses t, as flat [x, y, ...] lists
+  const pts = new Map(), segA = [], segB = [];
+  const pt = (e, x0, y0, v0, x1, y1, v1) => { if (!pts.has(e)){ const s = (t - v0)/(v1 - v0); pts.set(e, [x0 + (x1 - x0)*s, y0 + (y1 - y0)*s]); } return e; };
+  for (let y = 0; y < H - 1; y++) for (let x = 0; x < W - 1; x++){
+    const a = F[y*W + x], b = F[y*W + x + 1], c = F[(y + 1)*W + x + 1], d = F[(y + 1)*W + x];
+    const idx = (a > t ? 8 : 0) | (b > t ? 4 : 0) | (c > t ? 2 : 0) | (d > t ? 1 : 0);
+    if (idx === 0 || idx === 15) continue;
+    const top = () => pt((y*W + x)*2, x, y, a, x + 1, y, b), right = () => pt((y*W + x + 1)*2 + 1, x + 1, y, b, x + 1, y + 1, c);
+    const bottom = () => pt(((y + 1)*W + x)*2, x, y + 1, d, x + 1, y + 1, c), left = () => pt((y*W + x)*2 + 1, x, y, a, x, y + 1, d);
+    const seg = (p, q) => { segA.push(p); segB.push(q); };
+    switch (idx){
+      case 1: case 14: seg(left(), bottom()); break;
+      case 2: case 13: seg(bottom(), right()); break;
+      case 3: case 12: seg(left(), right()); break;
+      case 4: case 11: seg(top(), right()); break;
+      case 6: case 9: seg(top(), bottom()); break;
+      case 7: case 8: seg(left(), top()); break;
+      default: { const mid = (a + b + c + d)/4 > t; // the two saddles: the middle decides which corners join
+        if (idx === 5 ? mid : !mid){ seg(left(), top()); seg(bottom(), right()); } else { seg(left(), bottom()); seg(top(), right()); } }
+    }
+  }
+  const at = new Map(), add = (e, s) => { const l = at.get(e); if (l) l.push(s); else at.set(e, [s]); };
+  for (let s = 0; s < segA.length; s++){ add(segA[s], s); add(segB[s], s); }
+  const used = new Uint8Array(segA.length), loops = [];
+  for (let s0 = 0; s0 < segA.length; s0++){
+    if (used[s0]) continue;
+    const loop = [], start = segA[s0]; let s = s0, e = start;
+    for (;;){
+      used[s] = 1; const p = pts.get(e); loop.push(p[0], p[1]);
+      const ne = segA[s] === e ? segB[s] : segA[s];
+      if (ne === start) break;
+      const l = at.get(ne), nx = l[0] === s ? l[1] : l[0];
+      if (nx === undefined || used[nx]) break;
+      s = nx; e = ne;
+    }
+    if (loop.length >= 6) loops.push(loop);
+  }
+  return loops;
+}
+function trSimplify(p, eps){ // Douglas-Peucker on a closed outline
+  const n = p.length/2;
+  if (n < 5) return p;
+  let far = 0, fd = -1;
+  for (let i = 1; i < n; i++){ const dx = p[2*i] - p[0], dy = p[2*i+1] - p[1], d2 = dx*dx + dy*dy; if (d2 > fd){ fd = d2; far = i; } }
+  const keep = new Uint8Array(n); keep[0] = keep[far] = 1;
+  const X = i => p[2*(i % n)], Y = i => p[2*(i % n) + 1], stack = [[0, far], [far, n]];
+  while (stack.length){
+    const [a, b] = stack.pop(); if (b - a < 2) continue;
+    const ax = X(a), ay = Y(a), dx = X(b) - ax, dy = Y(b) - ay, len = Math.hypot(dx, dy);
+    let mi = -1, md = 0;
+    for (let i = a + 1; i < b; i++){ const d = len > 1e-9 ? Math.abs((X(i) - ax)*dy - (Y(i) - ay)*dx)/len : Math.hypot(X(i) - ax, Y(i) - ay); if (d > md){ md = d; mi = i; } }
+    if (md > eps){ keep[mi % n] = 1; stack.push([a, mi], [mi, b]); }
+  }
+  const out = []; for (let i = 0; i < n; i++) if (keep[i]) out.push(p[2*i], p[2*i+1]);
+  return out;
+}
+function trPath(p, cornerCos){ // a closed outline as curves; turns sharper than the corner angle stay sharp
+  const n = p.length/2;
+  if (n < 3) return '';
+  const X = i => p[2*((i % n + n) % n)], Y = i => p[2*((i % n + n) % n) + 1], f = v => Math.round(v*100)/100;
+  const corner = new Uint8Array(n);
+  for (let i = 0; i < n; i++){
+    const ux = X(i) - X(i - 1), uy = Y(i) - Y(i - 1), vx = X(i + 1) - X(i), vy = Y(i + 1) - Y(i), lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+    if (lu > 0 && lv > 0 && (ux*vx + uy*vy)/(lu*lv) < cornerCos) corner[i] = 1;
+  }
+  let s = `M${f(X(0))} ${f(Y(0))}`;
+  for (let i = 0; i < n; i++){
+    const j = (i + 1) % n;
+    if (corner[i] && corner[j]){ s += `L${f(X(i + 1))} ${f(Y(i + 1))}`; continue; }
+    const c1x = corner[i] ? X(i) : X(i) + (X(i + 1) - X(i - 1))/6, c1y = corner[i] ? Y(i) : Y(i) + (Y(i + 1) - Y(i - 1))/6;
+    const c2x = corner[j] ? X(i + 1) : X(i + 1) - (X(i + 2) - X(i))/6, c2y = corner[j] ? Y(i + 1) : Y(i + 1) - (Y(i + 2) - Y(i))/6;
+    s += `C${f(c1x)} ${f(c1y)} ${f(c2x)} ${f(c2y)} ${f(X(i + 1))} ${f(Y(i + 1))}`;
+  }
+  return s + 'Z';
+}
+function trLayers(L, W, H, order, smooth, grow){ // order: colours bottom to top; grow: how much the file was enlarged to trace it. Answers [{c, d, loops, points}]
+  // a light softening only (so corners stay sharp); the curves do the smoothing. More smoothness: fewer points, fewer corners
+  const g = Math.max(1, grow || 1); // measured in the file's own pixels, so a small file's noise doesn't make wobbly edges
+  const sigma = smooth/100*1.2*g, eps = (0.45 + smooth/100*0.6)*g, cornerCos = Math.cos((50 + smooth/100*30)*Math.PI/180);
+  const rank = new Int16Array(256).fill(-1); order.forEach((c, i) => { rank[c] = i; });
+  const PW = W + 2, PH = H + 2, out = [];
+  for (let li = 0; li < order.length; li++){
+    const F = new Float32Array(PW*PH); // padded with an empty border, so every outline closes
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (rank[L[y*W + x]] >= li) F[(y + 1)*PW + x + 1] = 1;
+    if (sigma >= 0.3) trBlur(F, PW, PH, sigma);
+    const loops = trMarch(F, PW, PH, 0.5).map(l => trSimplify(l.map(v => v - 1), eps)).filter(l => l.length >= 6);
+    out.push({c: order[li], loops, d: loops.map(l => trPath(l, cornerCos)).join(''), points: loops.reduce((a, l) => a + l.length/2, 0)});
+  }
+  return out;
+}
+// The trace for an art: worked out at 1200 px on the long side (small art is enlarged smoothly first, so edges come out
+// smooth), cached in three layers so changing a colour doesn't trace again. A ready trace is drawn as a vector at the
+// print size, so it's sharp whatever the file's pixels.
+let traceBusy = null;
+const TRACE0 = {on: true, k: 3, smooth: 50, specks: 30, bg: true, clear: [], colors: []};
+const traceKeyL = a => { const t = a.trace, c = a.crop; return [a.id, c.x, c.y, c.w, c.h, t.k, t.specks, t.bg ? 1 : 0].join(); };
+const traceKeyP = a => traceKeyL(a) + '|' + a.trace.smooth + '|' + (a.trace.clear || []).map(v => v ? 1 : 0).join('');
+const traceKey = a => traceKeyP(a) + '|' + (a.trace.colors || []).join(',');
+function traceFor(a){ // the ready trace for this art, or null while it's worked out (the art shows as it is meanwhile)
+  if (!a.trace || !a.trace.on) return null;
+  if (a.trRes && a.trRes.key === traceKey(a)) return a.trRes;
+  if (traceBusy !== a){ traceBusy = a; setTimeout(() => runTrace(a), 20); }
+  return null;
+}
+async function runTrace(a){
+  let ok = true;
+  try {
+    $('busy').textContent = 'Tracing…'; $('busy').hidden = false;
+    await new Promise(r => setTimeout(r, 30));
+    const t = a.trace;
+    if (!t || !t.on) return;
+    const kL = traceKeyL(a);
+    if (!a.trL || a.trL.key !== kL){
+      const c = a.crop, ws = 1200/Math.max(c.w, c.h), W = Math.max(8, Math.round(c.w*ws)), H = Math.max(8, Math.round(c.h*ws));
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      const x = cv.getContext('2d', {willReadFrequently: true}); drawScaled(x, a.el, c.x, c.y, c.w, c.h, W, H);
+      const px = x.getImageData(0, 0, W, H).data;
+      trSoften(px, W, H, 0.5*Math.max(1, ws)); // about half a pixel of the file, however much it was enlarged
+      const q = trQuantise(px, W, H, t.k);
+      if (!q){ t.on = false; toast('There’s nothing solid enough to trace.'); return; }
+      trMajority(q.L, W, H);
+      trDespeckle(q.L, W, H, Math.round(Math.pow(t.specks/100, 2)*600));
+      const bg = trBackground(q.L, W, H);
+      if (t.bg && bg >= 0) trClearFromEdge(q.L, W, H, bg);
+      const area = new Array(q.pal.length).fill(0); for (const v of q.L) if (v !== 255) area[v]++;
+      a.trL = {key: kL, L: q.L, W, H, pal: q.pal, area, bg, grow: ws};
+    }
+    const kP = traceKeyP(a);
+    if (!a.trP || a.trP.key !== kP){
+      const L = a.trL, clear = t.clear || [];
+      let lab = L.L;
+      if (clear.some(Boolean)){ lab = L.L.slice(); for (let j = 0; j < lab.length; j++) if (lab[j] !== 255 && clear[lab[j]]) lab[j] = 255; }
+      const order = L.pal.map((_, i) => i).filter(i => L.area[i] > 0 && !clear[i]).sort((x, y) => L.area[y] - L.area[x]); // biggest at the bottom
+      a.trP = {key: kP, layers: trLayers(lab, L.W, L.H, order, t.smooth, L.grow)};
+    }
+    const svg = traceSvg(a), img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    await img.decode();
+    a.trRes = {key: traceKey(a), img, points: a.trP.layers.reduce((n, l) => n + l.points, 0)};
+  } catch(e){ ok = false; toast('The trace didn’t work on this art. Try fewer colours.'); }
+  finally { traceBusy = null; $('busy').textContent = 'Updating…'; if (!running) $('busy').hidden = true; }
+  if (art === a){ syncTrace(); syncQuality(); if (ok) buildSrc(); }
+}
+function traceSvg(a, mm){ // the traced shapes as an SVG: at the print size in mm when saving
+  const L = a.trL, t = a.trace, col = i => (t.colors && t.colors[i]) || rgbHex(L.pal[i][0], L.pal[i][1], L.pal[i][2]);
+  const size = mm ? ` width="${mm[0]}mm" height="${mm[1]}mm"` : ` width="${L.W}" height="${L.H}"`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${L.W} ${L.H}"${size}>` + a.trP.layers.map(l => `<path fill="${col(l.c)}" fill-rule="evenodd" d="${l.d}"/>`).join('') + '</svg>';
+}
+function syncTrace(){
+  const t = art && art.trace, on = !!(t && t.on);
+  $('traceOn').checked = on; $('traceBody').hidden = !on;
+  if (!on) return;
+  syncChips('traceK', 'k', t.k);
+  $('traceBg').checked = !!t.bg;
+  $('traceSmooth').value = t.smooth; $('traceSmoothOut').textContent = t.smooth;
+  $('traceSpecks').value = t.specks; $('traceSpecksOut').textContent = specksTxt(t.specks);
+  const L = art.trL && art.trL.key === traceKeyL(art) ? art.trL : null;
+  if (!L){ $('tracePal').innerHTML = '<p class="f-note">Tracing…</p>'; $('traceInfo').textContent = ''; return; }
+  const tot = L.W*L.H;
+  $('tracePal').innerHTML = L.pal.map((p, i) => {
+    const hex = (t.colors[i] || rgbHex(p[0], p[1], p[2])), gone = !L.area[i], cleared = !!t.clear[i];
+    const note = gone ? 'Background, cleared' : cleared ? 'Clear film' : `${Math.max(0.1, L.area[i]/tot*100).toFixed(L.area[i]/tot < 0.1 ? 1 : 0)}% of the art`;
+    return `<div class="tp-row${cleared || gone ? ' off' : ''}"><span class="colorbox"><input type="color" data-tc="${i}" value="${hex}" aria-label="Colour ${i + 1}"${gone ? ' disabled' : ''}></span>` +
+      `<span class="tp-hex">${hex.toUpperCase()}</span><span class="tp-area">${note}</span>` +
+      (gone ? '' : `<button class="chip" type="button" data-tclear="${i}" aria-pressed="${cleared}">Clear</button>`) + '</div>';
+  }).join('');
+  $('traceInfo').textContent = art.trRes && art.trRes.key === traceKey(art) ? `${art.trP.layers.length} colour${art.trP.layers.length === 1 ? '' : 's'} · ${art.trRes.points.toLocaleString()} points` : '';
+}
+function specksTxt(v){ // the speck size as a width on the print
+  if (!v) return 'Off';
+  const L = art && art.trL, mmPerPx = L ? st.widthCm*10/L.W : st.widthCm*10/1200;
+  return `under ${(Math.sqrt(Math.pow(v/100, 2)*600)*mmPerPx).toFixed(1)} mm`;
+}
+function traceChange(label, f){ if (!art) return; art.trace = art.trace || {...TRACE0, clear: [], colors: []}; f(art.trace); noteChange(label); syncTrace(); syncQuality(); buildSrcSoon(); syncResets(); }
+$('traceOn').addEventListener('change', e => traceChange(e.target.checked ? 'Vector trace' : 'Vector trace off', t => { t.on = e.target.checked; }));
+$('traceK').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) traceChange(`Trace in ${b.dataset.k} colours`, t => { t.k = +b.dataset.k; t.clear = []; t.colors = []; }); });
+$('traceBg').addEventListener('change', e => traceChange(e.target.checked ? 'Trace: background cleared' : 'Trace: background kept', t => { t.bg = e.target.checked; t.clear = []; t.colors = []; }));
+$('traceSmooth').addEventListener('input', e => { $('traceSmoothOut').textContent = e.target.value; });
+$('traceSmooth').addEventListener('change', e => traceChange(`Trace smoothness ${e.target.value}`, t => { t.smooth = +e.target.value; }));
+$('traceSpecks').addEventListener('input', e => { $('traceSpecksOut').textContent = specksTxt(+e.target.value); });
+$('traceSpecks').addEventListener('change', e => traceChange('Trace specks', t => { t.specks = +e.target.value; }));
+$('tracePal').addEventListener('input', e => { const i = e.target.dataset.tc; if (i == null || !art || !art.trace) return; art.trace.colors[+i] = e.target.value.toLowerCase(); e.target.closest('.tp-row').querySelector('.tp-hex').textContent = e.target.value.toUpperCase(); buildSrcSoon(); });
+$('tracePal').addEventListener('change', e => { if (e.target.dataset.tc != null) noteChange('Trace colour'); });
+$('tracePal').addEventListener('click', e => { const b = e.target.closest('[data-tclear]'); if (b) traceChange('Trace colour cleared', t => { const i = +b.dataset.tclear; t.clear[i] = !t.clear[i]; }); });
+$('traceSvgBtn').addEventListener('click', () => {
+  if (!art || !art.trRes || art.trRes.key !== traceKey(art)){ toast('The trace isn’t ready yet.'); return; }
+  saveFile(new Blob([traceSvg(art, [toMm(st.widthCm), toMm(st.widthCm*art.h/art.w)])], {type: 'image/svg+xml'}), fileName('svg'));
+});
+
 let baseCanvas = null, baseKey = ''; // the resized art, kept so a brush stroke only redraws the touch-ups
 function drawArt(ctx, W, H){ // the cropped art at W × H, with the touch-ups
-  const c = art.crop, s = art.q ? art.q.scale : 1, key = [art.id, c.x, c.y, c.w, c.h, W, H, !!art.smooth].join();
+  const tr = traceFor(art); // a vector trace, when it's on and ready
+  const c = art.crop, s = art.q ? art.q.scale : 1, key = [art.id, c.x, c.y, c.w, c.h, W, H, !!art.smooth, tr ? tr.key : ''].join();
   if (baseCanvas && baseKey === key) ctx.drawImage(baseCanvas, 0, 0);
   else {
-    if (art.smooth && s > 1 && art.q.kind === 'blocky'){ // back to one pixel per block, then enlarged smoothly
+    if (tr){ ctx.clearRect(0, 0, W, H); ctx.drawImage(tr.img, 0, 0, W, H); }
+    else if (art.smooth && s > 1 && art.q.kind === 'blocky'){ // back to one pixel per block, then enlarged smoothly
       const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(c.w/s)); t.height = Math.max(1, Math.round(c.h/s));
       const x = t.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(art.el, c.x, c.y, c.w, c.h, 0, 0, t.width, t.height);
       drawScaled(ctx, t, 0, 0, t.width, t.height, W, H);
@@ -2082,6 +2433,7 @@ function updateChecks(){
                        : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
+  if (art.trace && art.trace.on) rows.push(['info', '✦', `Vector trace${art.trP ? `, ${art.trP.layers.length} colour${art.trP.layers.length === 1 ? '' : 's'}` : ''}`, 'The art is redrawn from traced shapes, sharp at any size.']);
   if (st.sharp) rows.push(['info', '↗', `Sharpened ${st.sharp}% at ${(+st.sradius).toFixed(1)} px`, 'Unsharp mask on the art at print size, before the dots.']);
   if (art.strokesN) rows.push(['info', '✎', `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}`, 'Brushed by hand in Touch up. They’re part of the saved PNG.']);
   const hardOn = st.hard && st.finish !== 'cut';
@@ -2189,6 +2541,7 @@ async function readJpegQuality(file){
 }
 function qualityInfo(){
   const q = art.q || {scale: 1, kind: ''}, wMm = toMm(st.widthCm);
+  if (art.trace && art.trace.on) return {c: 'good', pill: 'Vector trace', t: 'Traced into vector shapes: sharp at any size', d: 'The trace is redrawn at the print size, so the file’s own pixels no longer limit how sharp it prints.'};
   if (art.isVector) return {c: 'good', pill: 'Vector · sharp', t: 'Vector art: sharp at any size', d: 'SVG files are drawn fresh at the print size.'};
   const real = Math.round(art.w/q.scale), dpi = Math.max(1, Math.round(real/(st.widthCm/2.54))), sharpMm = Math.floor(real/240*25.4);
   const need = Math.ceil(st.widthCm/2.54*DPI), times = Math.ceil(DPI/dpi*10)/10;
@@ -2232,6 +2585,7 @@ function setArt(el, w, h, name, isSample, dpi, kind){
   syncCrop(); clearDoneMarks();
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
   $('nameSuffix').value = ''; // a suffix belongs to one piece of art
+  syncTrace();
   syncFileInfo();
   st.knock = null; syncKnock();
   Object.assign(lv, LV0); hist = null; syncLevels(); drawHisto(); // Levels belong to one piece of art
@@ -2246,7 +2600,7 @@ function setArt(el, w, h, name, isSample, dpi, kind){
 function makeArt(el, w, h, name, isSample, dpi, kind){
   return {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}, // w and h follow the crop
           isVector: !!(kind && kind.vector), jpegQ: kind && kind.jpegQ || null, smooth: false, q: null,
-          id: ++artSeq, strokes: [], strokesN: 0, file: null}; // strokes: touch-ups, in the file's pixels; file: the opened file, kept for a refresh
+          id: ++artSeq, strokes: [], strokesN: 0, file: null, trace: null}; // strokes: touch-ups, in the file's pixels; file: the opened file, kept for a refresh
 }
 function syncFileInfo(){
   $('fileInfo').innerHTML = (art.isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(art.name)}</b>` +
@@ -2275,7 +2629,7 @@ function loadDoc(d){ // puts a tab's design on screen: its art, settings, histor
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(d.activeRule || 0, Math.max(0, rules.length - 1));
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; lastSel = null; selKey = -1;
   hist = null; srcStats = null; $('saveBtn').disabled = true;
-  syncFileInfo(); syncCrop();
+  syncFileInfo(); syncCrop(); syncTrace();
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
   syncInk(); syncLevels(); drawHisto(); updateNotes(); syncRules(); syncKnock();
   setWidth(snap.w, true);
@@ -2384,7 +2738,7 @@ const idbDone = tx => new Promise((res, rej) => { tx.oncomplete = () => res(); t
 function docRecord(d){
   const live = d === cur, a = live ? art : d.art;
   return {name: a.name, dpi: a.dpi, jpegQ: a.jpegQ, isVector: a.isVector, fullW: a.fullW, fullH: a.fullH, smooth: !!a.smooth,
-    strokes: a.strokes, strokesN: a.strokesN, snap: live ? snapshot() : d.snap, activeRule: live ? activeRule : d.activeRule,
+    strokes: a.strokes, strokesN: a.strokesN, trace: a.trace, snap: live ? snapshot() : d.snap, activeRule: live ? activeRule : d.activeRule,
     steps: live ? steps : d.steps, stepPos: live ? stepPos : d.stepPos, unsaved: live ? unsaved : d.unsaved,
     zoom: live ? st.zoom : d.zoom, cx: live ? st.cx : d.cx, cy: live ? st.cy : d.cy, suffix: live ? $('nameSuffix').value : d.suffix,
     done: live ? [...document.querySelectorAll('.panel > .group.done')].map(g => g.id) : d.done};
@@ -2424,7 +2778,7 @@ async function restoreDocs(){ // answers how many designs came back
       const im = new Image(); im.decoding = 'async'; im.src = URL.createObjectURL(file);
       try { await im.decode(); } catch(e){ continue; }
       const a = makeArt(im, rec.fullW, rec.fullH, rec.name, false, rec.dpi, {vector: rec.isVector, jpegQ: rec.jpegQ});
-      Object.assign(a, {file, quiet: true, smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0});
+      Object.assign(a, {file, quiet: true, smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0, trace: rec.trace || null});
       if (rec.snap.crop){ a.crop = {...rec.snap.crop}; a.w = a.crop.w; a.h = a.crop.h; }
       if (a.strokesN) rebuildEdits(a);
       back.push({id: ++docSeq, key, art: a, fileKept: true, snap: rec.snap, activeRule: rec.activeRule || 0, steps: rec.steps && rec.steps.length ? rec.steps : [{snap: rec.snap, label: `Opened ${rec.name}`, at: Date.now()}],
@@ -2507,10 +2861,11 @@ async function withDpi(blob, dpi, texts){
 /* name_twedit_280w_30lpi.png: the art's name, our mark, the print width in mm, the lines per inch for halftones
    (Clean cut leaves it out), then anything typed in "Add to the file name". Opening a saved edit again starts
    from its first name, so the marks don't pile up. */
-function fileName(){
+function fileName(kind){
   const clean = t => t.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
   const base = art.isSample ? 'sample-art' : clean((art.name || 'art').replace(/\.[a-z0-9]+$/i, '').replace(/_twedit(_.*)?$/i, '')) || 'art';
   const extra = clean($('nameSuffix').value);
+  if (kind === 'svg') return `${base}_twedit_${toMm(st.widthCm)}w_vector` + (extra ? `_${extra}` : '') + '.svg';
   return `${base}_twedit_${toMm(st.widthCm)}w` + (st.finish === 'cut' ? '' : `_${st.lpi}lpi`) + (extra ? `_${extra}` : '') + '.png';
 }
 function syncFileName(){ if (art) $('nameNote').innerHTML = `Saves as <b>${esc(fileName())}</b>`; }
@@ -2525,7 +2880,7 @@ function settingsText(){
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
-         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
+         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (art.trace && art.trace.on ? `; vector trace ${art.trace.k} colours` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
 let saving = false;
@@ -2838,9 +3193,10 @@ const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v =
 function snapshot(){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   s.knock = st.knock; s.knockFrom = knockFrom;
-  return {s, lv: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]})), w: st.widthCm, crop: art ? {...art.crop} : null, n: art ? art.strokesN : 0};
+  return {s, lv: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]})), w: st.widthCm, crop: art ? {...art.crop} : null, tr: art && art.trace ? JSON.parse(JSON.stringify(art.trace)) : null, n: art ? art.strokesN : 0};
 }
 function describeStep(a, b){ // a short name for what changed from a to b
+  if (JSON.stringify(a.tr || null) !== JSON.stringify(b.tr || null)) return b.tr && b.tr.on ? 'Vector trace' : 'Vector trace off';
   if ((a.n || 0) !== (b.n || 0)) return (b.n || 0) > (a.n || 0) && art && art.strokes[b.n - 1] ? BRUSH_NAMES[art.strokes[b.n - 1].mode] : 'Touch-ups removed';
   if (JSON.stringify(a.crop) !== JSON.stringify(b.crop)) return b.crop ? `Crop ${b.crop.w} × ${b.crop.h} px` : 'Crop';
   if (Math.abs(a.w - b.w) > 1e-6) return `Print size ${toMm(b.w)} mm wide`;
@@ -2875,6 +3231,7 @@ function applySnap(snap){
   st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
   Object.assign(lv, LV0, snap.lv);
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1));
+  if (art && JSON.stringify(snap.tr || null) !== JSON.stringify(art.trace || null)){ art.trace = snap.tr ? JSON.parse(JSON.stringify(snap.tr)) : null; syncTrace(); syncQuality(); buildSrcSoon(); }
   if (art && (snap.n || 0) !== art.strokesN){ art.strokesN = Math.min(snap.n || 0, art.strokes.length); rebuildEdits(art); buildSrcSoon(); }
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
   syncInk(); syncLevels(); updateNotes(); syncRules();
@@ -2944,6 +3301,7 @@ const SECTION_TIPS = {
   lookGroup: 'A starting point that sets several steps at once. Remove shadows is the quick black-tee clean-up.',
   cropGroup: 'Trim empty margins or draw a crop. Do it first, so the print size measures the real art.',
   sizeGroup: 'The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
+  traceGroup: 'Trace simple flat-colour art (2 to 5 colours) into clean vector shapes, redrawn sharp at the print size. Save it as an SVG too.',
   sharpGroup: 'Unsharp mask on the art at print size: crisper edges and detail before the dots. Light or Medium suits most soft files.',
   levelsGroup: 'Brightness/Contrast and Levels, like Photoshop’s, on the art’s colours before anything else. Move the black point right so more of the art counts as shadow.',
   knockGroup: 'Colours close to the shirt (or the colour you set) drop out so the shirt shows through.',
@@ -2957,7 +3315,7 @@ const SECTION_TIPS = {
 };
 try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
 // a Reset link in the title of each step that has settings (Levels and Crop have their own)
-for (const id of ['finishGroup', 'sizeGroup', 'sharpGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'touchGroup', 'toneGroup', 'inkGroup']){
+for (const id of ['finishGroup', 'traceGroup', 'sizeGroup', 'sharpGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'touchGroup', 'toneGroup', 'inkGroup']){
   const g = $(id), h = g.querySelector(':scope > h2'), head = document.createElement('div');
   head.className = 'g-head'; g.insertBefore(head, h); head.appendChild(h);
   head.insertAdjacentHTML('beforeend', `<div class="g-actions"><button class="link step-reset" type="button" data-reset="${id}" hidden>Reset</button></div>`);
@@ -3016,7 +3374,7 @@ function resetToDefaults(){ // every setting back to the start, the crop and siz
   syncInk(); syncLevels(); updateNotes(); syncRules(); syncPresets(null);
   if (art){
     art.crop = {x: 0, y: 0, w: art.fullW, h: art.fullH}; art.w = art.fullW; art.h = art.fullH; syncCrop();
-    art.strokesN = 0; rebuildEdits(art);
+    art.strokesN = 0; rebuildEdits(art); art.trace = null; syncTrace();
     setWidth(art.isSample ? 25 : art.fullW/(art.dpi || DPI)*2.54, true); buildSrcSoon(); setZoom('fit');
   }
   clearDoneMarks(); remember(); schedule(); updateChecks();
@@ -3035,6 +3393,7 @@ const STEP_RESETS = {
   rangeGroup: {name: 'Select', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
   edgeGroup: {name: 'Edge', vals: () => ({...EDGE_KEYS})},
   sharpGroup: {name: 'Sharpen', vals: () => ({...SHARP_KEYS})},
+  traceGroup: {name: 'Vector trace', same: () => !art || !art.trace || !art.trace.on, reset: () => { art.trace = null; syncTrace(); buildSrcSoon(); }},
   touchGroup: {name: 'Touch up', same: () => !art || !art.strokesN, reset: () => { art.strokesN = 0; rebuildEdits(art); buildSrcSoon(); }},
   toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), drop: lookVal('drop'), solid: lookVal('solid')})},
   inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex})}
@@ -3077,6 +3436,10 @@ const TIPS = [
   ['#openBtn', 'Open art in a new tab. Choose several files to open each in its own tab.'],
   ['#allApplyBtn', 'Copy this tab’s settings to every other open tab, like applying a preset. Crops and touch-ups stay as they are.'],
   ['#allSaveBtn', 'Save a PNG of every open tab, one after another. The browser may ask once to allow several downloads.'],
+  ['#traceOn', 'Trace the art into flat-colour vector shapes and use them instead of the file’s pixels.'], ['#traceK', 'How many colours the art has. Pick the number you can see; tiny edge colours don’t count.'],
+  ['#traceBg', 'Clear the colour around the outside (a white or black background), but keep the same colour inside the design.'],
+  ['#traceSmooth', 'Low keeps detail and sharp corners; high gives smoother curves with fewer points.'], ['#traceSpecks', 'Leave out stray specks and noise smaller than this.'],
+  ['#traceSvgBtn', 'Save the traced shapes as an SVG at the print size, for Illustrator or other suppliers.'],
   ['[data-sharp="0"]', 'No sharpening.'], ['[data-sharp="50"]', 'Light: 50% at 0.8 px. A gentle lift for slightly soft art.'],
   ['[data-sharp="100"]', 'Medium: 100% at 1 px. Good for resized or soft files.'], ['[data-sharp="160"]', 'Strong: 160% at 1.2 px. For quite soft files. Check for halos at 1:1.'],
   ['#hardOn', 'Make soft, see-through pixels solid or removed before the dots are made, like a Threshold action.'],
