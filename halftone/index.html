@@ -50,14 +50,16 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .btn.small{height:34px;padding:0 12px;font-size:13px}
 
 .work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px}
-.stage{position:relative;min-height:0;overflow:hidden;touch-action:none;background:#111111}
+.stage-col{display:flex;flex-direction:column;min-width:0;min-height:0}
+.stage-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 16px;padding-block:6px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.stage-bar .tray{border:0;padding:0;background:none}
+.stage{flex:1;position:relative;min-height:0;overflow:hidden;touch-action:none;background:#111111}
 #view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:default}
 .stage.pannable #view{cursor:grab}
 .stage.panning #view{cursor:grabbing}
 .stage.picking #view{cursor:crosshair}
 .overlay{position:absolute;left:max(12px,env(safe-area-inset-left,0px));right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;pointer-events:none}
 .overlay>*{pointer-events:auto}
-.o-top{top:12px}
 .o-bottom{bottom:12px;align-items:flex-end}
 .tray{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
 .tray-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 4px 0 2px}
@@ -95,7 +97,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .group.done .step-n{border-color:var(--good);background:var(--good-bg);color:var(--good)}
 .group.done .step-n::before{content:"✓"}
 .step-foot{display:flex;padding-top:4px}
-.crop-bar{position:absolute;left:50%;top:70px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100% - 24px);padding:6px 6px 6px 12px;font-size:13px;font-weight:600}
+.crop-bar{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100% - 24px);padding:6px 6px 6px 12px;font-size:13px;font-weight:600}
 .stage.cropping #view{cursor:crosshair}
 .stage.cropping .pane-pick,.stage.cropping #legend{display:none!important}
 .g-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -146,7 +148,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .tip{position:fixed;z-index:40;max-width:260px;padding:7px 10px;border-radius:var(--r);background:var(--toast);color:var(--toast-ink);font-size:12px;font-weight:500;line-height:1.35;pointer-events:none}
 #zoomOut{min-width:44px;padding-right:4px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
 .busy{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none}
-.hint{position:absolute;left:50%;top:76px;transform:translateX(-50%);padding:8px 14px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap}
+.hint{position:absolute;left:50%;top:16px;transform:translateX(-50%);padding:8px 14px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap}
 .drop{position:absolute;inset:12px;display:grid;place-items:center;border:2px dashed var(--accent);border-radius:var(--r);background:color-mix(in srgb,var(--panel) 88%,transparent);font-size:18px;font-weight:800;letter-spacing:-.02em;pointer-events:none}
 
 .panel{overflow:auto;background:var(--panel);border-left:1px solid var(--line);padding-bottom:24px}
@@ -211,7 +213,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
   .stage{height:64vh;min-height:380px}
   .stage.is-split{height:100vh;min-height:640px}
   .panel{border-left:0;border-top:1px solid var(--line);overflow:visible}
-  .o-top .tray-label{display:none}
+  .stage-bar .tray-label{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -236,11 +238,10 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
   </header>
 
   <main class="work">
-    <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
-      <canvas id="view"></canvas>
-      <div class="overlay o-top" id="oTop">
-        <div class="tray" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tray-label">Shirt</span></div>
+    <div class="stage-col">
+      <div class="stage-bar">
         <div class="tray" role="group" aria-label="View" id="viewTray" title="Press V to step through the views">
+          <span class="tray-label">View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
           <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
@@ -248,7 +249,10 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
         </div>
+        <div class="tray" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tray-label">Shirt</span></div>
       </div>
+    <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
+      <canvas id="view"></canvas>
       <div class="overlay o-bottom" id="oBottom">
         <div class="stack">
           <div class="tray legend" id="legend" hidden></div>
@@ -274,6 +278,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <div class="hint" id="pickHint" hidden>Click the colour to knock out · Esc to cancel</div>
       <div class="drop" id="drop" hidden>Drop the art to open it</div>
     </section>
+    </div>
 
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
@@ -881,7 +886,7 @@ function render(){
   const cw = Math.max(1, Math.round(r.width*dpr)), ch = Math.max(1, Math.round(r.height*dpr));
   if (view.width !== cw || view.height !== ch){ view.width = cw; view.height = ch; }
   if (cropping){ drawCropView(r, dpr, cw, ch); return; }
-  const topH = $('oTop').offsetHeight + 12, botH = $('oBottom').offsetHeight + 12;
+  const topH = 12, botH = $('oBottom').offsetHeight + 12;
   let panes;
   if (st.view !== 'split'){
     panes = [{kind: kindsShown()[0], x: 0, y: 0, w: r.width, h: r.height, top: topH + 12, bottom: botH + 12}];
@@ -1129,7 +1134,7 @@ function startCrop(){
   const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(art.el, 0, 0, c.width, c.height);
   const k = art.crop;
   cropping = {prev: c, F, rect: [k.x, k.y, k.x + k.w, k.y + k.h], drag: null, geo: null};
-  $('cropDraw').setAttribute('aria-pressed', 'true'); $('cropBar').style.top = `${$('oTop').offsetHeight + 20}px`; $('cropBar').hidden = false;
+  $('cropDraw').setAttribute('aria-pressed', 'true'); $('cropBar').hidden = false;
   stage.classList.add('cropping'); syncCropTxt(); render();
 }
 function endCrop(apply){
@@ -1146,7 +1151,7 @@ function syncCropTxt(){
 }
 const cropHandles = (X0, Y0, X1, Y1) => { const mx = (X0 + X1)/2, my = (Y0 + Y1)/2; return [[X0, Y0, 'nw'], [mx, Y0, 'n'], [X1, Y0, 'ne'], [X1, my, 'e'], [X1, Y1, 'se'], [mx, Y1, 's'], [X0, Y1, 'sw'], [X0, my, 'w']]; };
 function drawCropView(r, dpr, cw, ch){
-  const P = cropping.prev, top = $('oTop').offsetHeight + $('cropBar').offsetHeight + 36, bottom = $('oBottom').offsetHeight + 24, side = 24;
+  const P = cropping.prev, top = $('cropBar').offsetHeight + 36, bottom = $('oBottom').offsetHeight + 24, side = 24;
   vctx.fillStyle = '#1a1a1a'; vctx.fillRect(0, 0, cw, ch);
   const bw = Math.max(40, r.width - side*2), bh = Math.max(40, r.height - top - bottom), s = Math.min(bw/P.width, bh/P.height);
   const k = s*dpr, dx = (side + (bw - P.width*s)/2)*dpr, dy = (top + (bh - P.height*s)/2)*dpr, W = P.width*k, H = P.height*k;
