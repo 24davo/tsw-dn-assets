@@ -154,6 +154,8 @@ input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .inkrow{display:flex;align-items:center;gap:10px;font-size:13px}
 .colorbox{position:relative;width:34px;height:34px;border:1.5px solid var(--line);border-radius:var(--r);overflow:hidden;flex:none}
 .colorbox input{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);border:0;padding:0;cursor:pointer}
+.hex{width:96px;height:34px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;text-transform:uppercase}
+.hex:focus{border-color:var(--ink);outline:none}
 .size{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .num{display:flex;align-items:center;height:42px;border:1.5px solid var(--line);border-radius:var(--r);padding:0 10px;gap:6px}
 .num:focus-within{border-color:var(--ink)}
@@ -209,6 +211,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <div class="tray" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tray-label">Shirt</span></div>
         <div class="tray" role="group" aria-label="View" id="viewTray" title="Press V to step through the views">
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
+          <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
           <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
           <button class="chip" type="button" data-view="map" aria-pressed="false">Halftone map</button>
           <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
@@ -336,9 +339,12 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <section class="group" id="knockGroup">
         <h2>Knock out</h2>
         <div class="knock">
-          <span class="sw" id="knockSw" aria-hidden="true"></span>
-          <span id="knockTxt">Measured from the shirt colour.</span>
-          <button class="link" type="button" id="pickBtn">Pick from art</button>
+          <span class="colorbox" title="Choose the knock-out colour"><input type="color" id="knockPick" value="#111111" aria-label="Knock-out colour"></span>
+          <input class="hex" type="text" id="knockHex" value="#111111" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Knock-out colour as a hex code">
+          <button class="chip" type="button" id="pickBtn">Pick from art</button>
+        </div>
+        <div class="knock">
+          <span id="knockTxt">Following the shirt colour.</span>
           <button class="link" type="button" id="knockReset" hidden>Use shirt colour</button>
         </div>
         <div class="field">
@@ -407,7 +413,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>22.5° is the usual angle for single-colour halftones. It hides the rows of dots best.</li>
             <li>On dark tees, “Shirt shows through” lets the shirt be your darkest colour, so the print is lighter and breathes.</li>
             <li>Keep the smallest dots around 0.3 mm or more so they hold in the wash.</li>
-            <li>Press V to step through On shirt, White base, Halftone map and Split. Hold for original in the base and map views shows where the art was see-through.</li>
+            <li>Press V to step through the views. Press T to flick between Transparent and the last view: the checks show every bit of ink that was removed.</li>
             <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
@@ -605,7 +611,7 @@ const masks = {base: {canvas: document.createElement('canvas'), mips: null, key:
 const origCanvas = document.createElement('canvas'), origCtx = origCanvas.getContext('2d');
 let lastCls = null, paintN = 0, origFor = 0, origMips = null;
 // colour ranges; not saved between visits, because sampled colours belong to one piece of art
-let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt';
+let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt', viewBeforeClear = 'shirt';
 const selCanvas = document.createElement('canvas');
 let art = null, srcV = 0, srcStats = null, srcMips = null, outMips = null, outReady = false, lastOn = 0;
 let runId = 0, running = false, pending = false, compare = false, picking = false;
@@ -697,7 +703,11 @@ const VIEWS = {
          legend: [['#f2f2f2', 'Solid ink'], ['#ff2e93', 'Turned into dots'], ['#5a5a5a', 'Removed']]}
 };
 const ORIG_LEGEND = [['#ffffff', 'Original: solid'], ['#808080', 'Original: see-through, prints as haze'], ['#000000', 'Clear film']];
-const PANES = [['orig', 'Original on shirt'], ['origbase', 'Original alpha'], ['shirt', 'Halftone on shirt'], ['base', 'White base'], ['map', 'Halftone map'], ['sel', 'Selection']];
+const PANES = [['orig', 'Original on shirt'], ['origclear', 'Original on transparent'], ['origbase', 'Original alpha'], ['shirt', 'Halftone on shirt'], ['clear', 'Halftone on transparent'], ['base', 'White base'], ['map', 'Halftone map'], ['sel', 'Selection']];
+const CHECKS = 'repeating-conic-gradient(#cccccc 0 25%, #ffffff 0 50%) 0 0/8px 8px';
+const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? Math.round((1 - lastOn/s.vis)*100) : 0; return [[CHECKS, cut > 0 ? `Clear film: ink area down ${cut}%` : 'Clear film, no ink']]; };
+const ORIGCLEAR_LEGEND = [[CHECKS, 'Original: the checks show where it was clear or see-through']];
+const isClear = kind => kind === 'clear' || kind === 'origclear';
 const selLegend = () => [['#ffffff', `Selected by colour range ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
 function buildMask(kind){
   const m = masks[kind];
@@ -717,14 +727,15 @@ function buildSelMask(){ // the active colour range's selection in grey, like Ph
   x.putImageData(im, 0, 0); selMips = buildMips(selCanvas); selKey = paintN;
 }
 // what is on screen now: one view, or the two sides of Split (Hold for original swaps in the original)
-function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB] : [compare ? (st.view === 'shirt' ? 'orig' : 'origbase') : st.view]; }
+function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB] : [compare ? ({shirt: 'orig', clear: 'origclear'}[st.view] || 'origbase') : st.view]; }
 function prepareViews(){
   const ks = st.view === 'split' ? [st.paneA, st.paneB] : [st.view];
   for (const k of ks){ if (masks[k]) buildMask(k); else if (k === 'sel') buildSelMask(); }
-  if (ks.some(isMask)) buildOrigMask();
+  if (ks.some(k => isMask(k) && !isClear(k))) buildOrigMask();
 }
 function levelsFor(kind){
-  if (kind === 'orig') return srcMips;
+  if (kind === 'orig' || kind === 'origclear') return srcMips;
+  if (kind === 'clear') return outMips || srcMips;
   if (kind === 'origbase') return origMips;
   if (kind === 'shirt') return outMips || srcMips;
   if (kind === 'sel') return rules.length ? selMips : null;
@@ -765,7 +776,7 @@ function paint(m){
   prepareViews();
   outReady = true; lastOn = m.on;
   $('saveBtn').disabled = false;
-  render(); updateChecks();
+  render(); updateChecks(); syncLegend();
 }
 
 /* ---------- the view: the print on the shirt colour, fit or zoomed ---------- */
@@ -823,6 +834,7 @@ function drawPane(p, dpr){
       g.dx = X + W/2 - st.cx*g.k; g.dy = Y + H/2 - st.cy*g.k;
     }
     g.OW = OW; g.OH = OH;
+    if (isClear(p.kind)){ vctx.fillStyle = checker(dpr); vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // Photoshop-style transparency checks under the art
     const k = g.k, L = k < 1 ? Math.min(levels.length - 1, Math.max(0, Math.floor(Math.log2(1/k)))) : 0, mip = levels[L];
     vctx.imageSmoothingEnabled = k < 1; vctx.imageSmoothingQuality = 'high';
     vctx.drawImage(mip, 0, 0, mip.width, mip.height, g.dx, g.dy, OW*k, OH*k);
@@ -833,6 +845,14 @@ function drawPane(p, dpr){
   }
   vctx.restore();
   return g;
+}
+let checkPat = null, checkDpr = 0;
+function checker(dpr){ // 8 px checks on screen whatever the zoom, white and light grey
+  if (checkPat && checkDpr === dpr) return checkPat;
+  const n = Math.max(1, Math.round(8*dpr)), c = document.createElement('canvas'); c.width = c.height = n*2;
+  const x = c.getContext('2d'); x.fillStyle = '#ffffff'; x.fillRect(0, 0, n*2, n*2); x.fillStyle = '#cccccc'; x.fillRect(0, 0, n, n); x.fillRect(n, n, n, n);
+  checkPat = vctx.createPattern(c, 'repeat'); checkDpr = dpr;
+  return checkPat;
 }
 function geoAt(x, y){ return geos.find(g => x >= g.x && x < g.x + g.w && y >= g.y && y < g.y + g.h) || geo; }
 new ResizeObserver(() => render()).observe(stage);
@@ -907,7 +927,7 @@ $('zoomTray').addEventListener('click', e => {
   if (b.dataset.zoom === 'life') lifeZoom(); else setZoom(b.dataset.zoom === 'fit' ? 'fit' : +b.dataset.zoom);
 });
 
-const viewOrder = () => rules.length ? ['shirt', 'base', 'map', 'sel', 'split'] : ['shirt', 'base', 'map', 'split'];
+const viewOrder = () => rules.length ? ['shirt', 'clear', 'base', 'map', 'sel', 'split'] : ['shirt', 'clear', 'base', 'map', 'split'];
 function setView(v){
   st.view = v;
   for (const b of $('viewTray').querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === v));
@@ -916,6 +936,7 @@ function setView(v){
   $('compareBtn').hidden = split;
   stage.classList.toggle('is-split', split);
   if (v !== 'sel') viewBeforeSel = v;
+  if (v !== 'clear') viewBeforeClear = v;
   syncShowChips();
   compare = false;
   prepareViews(); syncLegend(); render();
@@ -923,7 +944,7 @@ function setView(v){
 function syncLegend(){
   const items = [], seen = new Set();
   for (const k of kindsShown()){
-    const list = k === 'origbase' ? ORIG_LEGEND : k === 'sel' ? selLegend() : VIEWS[k] ? VIEWS[k].legend : [];
+    const list = k === 'origbase' ? ORIG_LEGEND : k === 'sel' ? selLegend() : k === 'clear' ? clearLegend() : k === 'origclear' ? ORIGCLEAR_LEGEND : VIEWS[k] ? VIEWS[k].legend : [];
     for (const it of list) if (!seen.has(it[1])){ seen.add(it[1]); items.push(it); }
   }
   const lg = $('legend');
@@ -947,6 +968,8 @@ window.addEventListener('keydown', e => {
   const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
   if ((e.key === 'v' || e.key === 'V') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)
     { const o = viewOrder(); setView(o[(o.indexOf(st.view) + 1) % o.length]); }
+  else if ((e.key === 't' || e.key === 'T') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)
+    setView(st.view === 'clear' ? viewBeforeClear : 'clear'); // flick to and from the transparent view
   else if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && geo){
     const k = st.zoom === 'fit' ? geo.k : st.zoom;
     if (e.key === '+' || e.key === '=') zoomTo(k*1.25);
@@ -1008,7 +1031,7 @@ function pickAt(e){
   const L = lvIdentity() ? null : levelsLut(), c3 = L ? [L[p[0]], L[p[1]], L[p[2]]] : [p[0], p[1], p[2]]; // pick the colour as Levels made it
   const target = pickFor, hex = rgbHex(c3[0], c3[1], c3[2]);
   endPick();
-  if (target === 'knock'){ st.knock = hex; syncKnock(); }
+  if (target === 'knock'){ st.knock = hex; knockFrom = 'art'; syncKnock(); }
   else if (rules[target]){
     const R = rules[target];
     if (!R.samples.includes(hex)) R.samples.push(hex);
@@ -1020,11 +1043,25 @@ function pickAt(e){
 $('pickBtn').addEventListener('click', () => picking ? endPick() : startPick('knock'));
 $('knockReset').addEventListener('click', () => { st.knock = null; syncKnock(); schedule(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && picking) endPick(); });
+let knockFrom = 'shirt'; // where the knock-out colour came from: the shirt, the art, or typed / chosen by hand
 function syncKnock(){
-  $('knockSw').style.background = st.knock || st.shirt;
-  $('knockTxt').textContent = st.knock ? `Measured from ${st.knock.toUpperCase()}, picked from the art.` : 'Measured from the shirt colour.';
+  const c = st.knock || st.shirt;
+  $('knockPick').value = c;
+  if (document.activeElement !== $('knockHex')) $('knockHex').value = c.toUpperCase();
+  $('knockTxt').textContent = !st.knock ? 'Following the shirt colour.' : knockFrom === 'art' ? 'Picked from the art.' : 'Set by hand.';
   $('knockReset').hidden = !st.knock;
 }
+function setKnock(hex){ st.knock = hex.toLowerCase(); knockFrom = 'hand'; syncKnock(); schedule(); }
+$('knockPick').addEventListener('input', e => setKnock(e.target.value));
+const readHex = v => { const m = String(v).trim().replace(/^#/, '').match(/^([0-9a-f]{3}|[0-9a-f]{6})$/i); if (!m) return null; const h = m[1].length === 3 ? m[1].replace(/./g, ch => ch + ch) : m[1]; return '#' + h; };
+$('knockHex').addEventListener('input', e => { const h = /^#?[0-9a-f]{6}$/i.test(e.target.value.trim()) ? readHex(e.target.value) : null; if (h) setKnock(h); });
+$('knockHex').addEventListener('change', e => { // typing is finished: apply it and tidy the box
+  const h = readHex(e.target.value);
+  if (h) setKnock(h); else toast('Type a hex colour like #1A1A1A.');
+  e.target.value = (st.knock || st.shirt).toUpperCase();
+});
+$('knockHex').addEventListener('blur', () => syncKnock());
+$('knockHex').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 
 /* ---------- controls ---------- */
 const shirtTray = $('shirtTray');
