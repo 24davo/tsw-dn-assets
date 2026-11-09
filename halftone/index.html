@@ -40,6 +40,8 @@ button,input{font:inherit;color:inherit}
 h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.05}
 .file{flex:1 1 220px;min-width:0;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
 .file b{color:var(--ink);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fsize{flex:none;height:26px;padding:0 9px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer}
+.fsize:hover{border-color:var(--ink)}
 .tag{flex:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border:1px solid var(--line-strong);border-radius:var(--r);color:var(--muted)}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 18px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;user-select:none}
@@ -51,16 +53,18 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 
 .work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px}
 .stage-col{display:flex;flex-direction:column;min-width:0;min-height:0}
-.tabs{display:flex;align-items:flex-end;gap:2px;padding:6px 12px 0;padding-left:max(12px,env(safe-area-inset-left,0px));background:var(--bg);border-bottom:1px solid var(--line-strong);overflow-x:auto;scrollbar-width:thin;flex:none}
-.tab{display:flex;align-items:center;min-width:0;max-width:240px;border:1px solid var(--line);border-bottom:0;border-radius:var(--r) var(--r) 0 0;background:var(--soft);flex:none}
-.tab.on{background:var(--panel);border-color:var(--line-strong);margin-bottom:-1px;padding-bottom:1px}
+.tabs{display:flex;align-items:flex-end;gap:16px;padding:6px 12px 0;padding-left:max(12px,env(safe-area-inset-left,0px));background:var(--bg);border-bottom:1px solid var(--line-strong);flex:none}
+.tabs-list{display:flex;align-items:flex-end;gap:2px;min-width:0;flex:1;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;margin-bottom:-1px}
+.tabs-actions{display:flex;align-items:center;gap:16px;height:32px;flex:none;white-space:nowrap}
+.tab{display:flex;align-items:center;min-width:0;max-width:240px;border:1px solid var(--line);border-bottom-color:var(--line-strong);border-radius:var(--r) var(--r) 0 0;background:var(--soft);flex:none}
+.tab.on{background:var(--panel);border-color:var(--line-strong);border-bottom-color:var(--panel)}
 .tab-name{display:flex;align-items:center;gap:7px;min-width:0;height:32px;padding:0 10px;border:0;background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .tab.on .tab-name{color:var(--ink)}
 .tab-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
 .tab-dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none}
 .tab-x{width:24px;height:24px;margin-right:4px;border:0;border-radius:var(--r);background:none;color:var(--muted);font:inherit;font-size:16px;line-height:1;cursor:pointer;flex:none}
 .tab-x:hover{background:var(--line);color:var(--ink)}
-.tab-add{width:32px;height:32px;margin-left:4px;border:1px dashed var(--line-strong);border-bottom:0;border-radius:var(--r) var(--r) 0 0;background:none;color:var(--muted);font:inherit;font-size:18px;line-height:1;cursor:pointer;flex:none}
+.tab-add{width:34px;height:34px;margin-left:4px;border:1px dashed var(--line-strong);border-bottom:1px solid var(--line-strong);border-radius:var(--r) var(--r) 0 0;background:none;color:var(--muted);font:inherit;font-size:18px;line-height:1;cursor:pointer;flex:none}
 .tab-add:hover{color:var(--ink);border-color:var(--ink)}
 .stage-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 16px;padding-block:6px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:12px;background:var(--panel);border-bottom:1px solid var(--line)}
 .stage-bar .tray{border:0;padding:0;background:none}
@@ -290,7 +294,10 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 
   <main class="work">
     <div class="stage-col">
-      <div class="tabs" id="tabs" role="tablist" aria-label="Open designs"></div>
+      <div class="tabs" id="tabs">
+        <div class="tabs-list" id="tabsList" role="tablist" aria-label="Open designs"></div>
+        <div class="tabs-actions" id="tabsActions" hidden><button class="link" type="button" id="allApplyBtn">Copy settings to all</button><button class="link" type="button" id="allSaveBtn">Save all</button></div>
+      </div>
       <div class="stage-bar">
         <div class="tray" role="group" aria-label="View" id="viewTray" title="Press V to step through the views">
           <span class="tray-label">View</span>
@@ -651,6 +658,14 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     <div class="cal-actions"><button class="btn" type="button" id="calCancel">Cancel</button><button class="btn primary" type="button" id="calSave">Save and show life size</button></div>
   </div>
 </div>
+<div class="cal" id="allDlg" role="dialog" aria-modal="true" aria-labelledby="allTitle" hidden>
+  <div class="cal-box ask-box">
+    <h2 class="cal-title" id="allTitle">Use these settings on every tab?</h2>
+    <p class="cal-text" id="allText"></p>
+    <label class="check-row"><input type="checkbox" id="allSize"> <span id="allSizeTxt">Include the print size</span></label>
+    <div class="cal-actions"><button class="btn" type="button" id="allCancel">Cancel</button><button class="btn primary" type="button" id="allApply">Apply</button></div>
+  </div>
+</div>
 <div class="cal" id="askSave" role="dialog" aria-modal="true" aria-labelledby="askSaveTitle" hidden>
   <div class="cal-box ask-box">
     <h2 class="cal-title" id="askSaveTitle">Save this design first?</h2>
@@ -947,7 +962,8 @@ function schedule(){
 }
 
 /* ---------- sizes ---------- */
-function maxWidthCm(){ if (!art) return MAX_SHORT; const a = art.h/art.w; return art.w >= art.h ? Math.min(MAX_LONG, MAX_SHORT/a) : Math.min(MAX_SHORT, MAX_LONG/a); }
+function maxWidthFor(a){ const r = a.h/a.w; return a.w >= a.h ? Math.min(MAX_LONG, MAX_SHORT/r) : Math.min(MAX_SHORT, MAX_LONG/r); }
+function maxWidthCm(){ return art ? maxWidthFor(art) : MAX_SHORT; }
 function outW(){ return Math.max(1, Math.round(st.widthCm/2.54*DPI)); }
 const toMm = cm => Math.round(cm*10); // sizes are kept in cm, and shown and typed in mm
 function outH(){ return Math.max(1, Math.round(outW()*art.h/art.w)); }
@@ -959,6 +975,7 @@ function setWidth(cm, quiet, typing){
   if (typing !== $('hcm')) $('hcm').value = toMm(h);
   $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px, saved at 300 dpi. Largest print is 400 × 500 mm either way round.`;
   $('sizeRead').textContent = `${toMm(w)} × ${toMm(h)} mm · ${outW()} × ${outH()} px`;
+  if ($('fileSize')) $('fileSize').textContent = `${toMm(w)} × ${toMm(h)} mm`;
   syncQuality();
   if (resetsReady) syncResets();
 }
@@ -2103,7 +2120,7 @@ function syncQuality(){
   $('smoothBtn').checked = !!art.smooth;
 }
 $('fileInfo').addEventListener('click', e => {
-  if (!e.target.closest('#qualityPill')) return;
+  if (!e.target.closest('#qualityPill, #fileSize')) return;
   const f = folds.find(f => f.g.id === 'sizeGroup'); if (f){ f.set(true); syncFoldAll(); }
   $('sizeGroup').scrollIntoView({block: 'start', behavior: 'smooth'});
 });
@@ -2131,7 +2148,9 @@ function setArt(el, w, h, name, isSample, dpi, kind){
   const a = art; setTimeout(() => analyseArt(a), 30); // after the first paint
 }
 function syncFileInfo(){
-  $('fileInfo').innerHTML = (art.isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(art.name)}</b><span>${art.fullW.toLocaleString()} × ${art.fullH.toLocaleString()} px</span>` +
+  $('fileInfo').innerHTML = (art.isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(art.name)}</b>` +
+    '<button class="fsize" type="button" id="fileSize" data-tip="The print size. Click to change it."></button>' +
+    `<span>${art.fullW.toLocaleString()} × ${art.fullH.toLocaleString()} px</span>` +
     '<button class="qpill" type="button" id="qualityPill" hidden></button>';
 }
 
@@ -2186,7 +2205,8 @@ function closeDoc(d){
   if (d === cur) guardThen(go, false, true); else go();
 }
 function renderTabs(){
-  $('tabs').innerHTML = docs.map(d => {
+  $('tabsActions').hidden = docs.filter(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample).length < 2;
+  $('tabsList').innerHTML = docs.map(d => {
     const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
     return `<div class="tab${d === cur ? ' on' : ''}"><button class="tab-name" type="button" role="tab" aria-selected="${d === cur}" data-doc="${d.id}" title="${esc(name)}${dirty ? ' · not saved' : ''}">` +
       `${dirty ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}<span class="tab-t">${esc(name)}</span></button>` +
@@ -2199,6 +2219,46 @@ $('tabs').addEventListener('click', e => {
   if (e.target.closest('#tabAdd')) openArt();
 });
 $('tabs').addEventListener('auxclick', e => { const t = e.target.closest('[data-doc]'); if (e.button === 1 && t){ const d = docs.find(d => d.id === +t.dataset.doc); if (d) closeDoc(d); } }); // middle-click closes, as in browsers
+/* Copy settings to all: this tab's set-up (like a preset: style, knock-out, Levels, colour ranges, ink, edge, shirt) goes to
+   every other tab as one History step there, so each can undo it. Crops and touch-ups belong to each design and stay. */
+const otherDocs = () => docs.filter(d => d !== cur && d.art && !d.art.isSample);
+$('allApplyBtn').addEventListener('click', () => {
+  const n = otherDocs().length; if (!n || !art) return;
+  $('allText').textContent = `The settings of “${art.name}” go to the other ${n} tab${n === 1 ? '' : 's'}: print style, knock-out, Levels, colour ranges, ink density and colour, edge and shirt colour. Crops and touch-ups stay as they are, and each tab can undo it in History.`;
+  $('allSizeTxt').textContent = `Include the print size (${toMm(st.widthCm)} × ${toMm(st.widthCm*art.h/art.w)} mm, fitted to each design)`;
+  $('allSize').checked = false; $('allApply').textContent = `Apply to ${n} tab${n === 1 ? '' : 's'}`;
+  $('allDlg').hidden = false; $('allApply').focus();
+});
+$('allCancel').addEventListener('click', () => { $('allDlg').hidden = true; });
+$('allDlg').addEventListener('click', e => { if (e.target === $('allDlg')) $('allDlg').hidden = true; });
+$('allApply').addEventListener('click', () => {
+  $('allDlg').hidden = true;
+  commitStep();
+  const src = snapshot(), withSize = $('allSize').checked, list = otherDocs(), sw = st.widthCm, sh = st.widthCm*art.h/art.w;
+  for (const d of list){
+    const snap = {...d.snap, s: {...src.s}, lv: {...src.lv}, rules: src.rules.map(R => ({...R, samples: [...R.samples]}))};
+    if (withSize){ const a = d.art; snap.w = Math.max(0.5, Math.min(sw, sh*a.w/a.h, maxWidthFor(a))); } // fits inside this tab's width and height
+    d.steps = d.steps.slice(0, d.stepPos + 1); d.steps.push({snap, label: `Settings from ${art.name}`, at: Date.now()});
+    if (d.steps.length > HIST_MAX) d.steps.shift();
+    d.stepPos = d.steps.length - 1; d.snap = snap; d.activeRule = Math.min(d.activeRule || 0, Math.max(0, snap.rules.length - 1)); d.unsaved = true;
+  }
+  renderTabs();
+  toast(`Settings copied to ${list.length} tab${list.length === 1 ? '' : 's'}. Click a tab to check it.`);
+});
+// Save all: each tab in turn is put on screen, worked out and saved, then you're back where you started
+$('allSaveBtn').addEventListener('click', async () => {
+  if (saving) return;
+  const start = cur, list = docs.filter(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample);
+  let saved = 0;
+  for (const d of list){
+    switchTo(d);
+    $('busy').textContent = `Saving ${saved + 1} of ${list.length}…`;
+    if (!(await savePng())) break;
+    saved++;
+  }
+  if (docs.includes(start)) switchTo(start);
+  toast(saved === list.length ? `Saved all ${saved} PNGs.` : `Saved ${saved} of ${list.length} PNGs. The rest weren’t saved.`);
+});
 function openArt(){ if (docFull()){ toast(`Up to ${MAX_DOCS} designs can be open at once. Close a tab first.`); return; } $('fileIn').click(); }
 async function openFiles(list){ for (const f of list) await openFile(f); }
 async function readPngDpi(file){
@@ -2821,6 +2881,8 @@ const TIPS = [
   ['[data-brush="erase"]', 'Brush pixels away to clear film.'], ['[data-brush="paint"]', 'Paint over gaps or rough edges in one colour. Alt-click the art to pick it.'],
   ['[data-brush="restore"]', 'Brush the original art back where you erased or painted.'], ['#paintFromArt', 'Click a colour in the art to paint with.'],
   ['#openBtn', 'Open art in a new tab. Choose several files to open each in its own tab.'],
+  ['#allApplyBtn', 'Copy this tab’s settings to every other open tab, like applying a preset. Crops and touch-ups stay as they are.'],
+  ['#allSaveBtn', 'Save a PNG of every open tab, one after another. The browser may ask once to allow several downloads.'],
   ['#hardOn', 'Make soft, see-through pixels solid or removed before the dots are made, like a Threshold action.'],
   ['[data-view="shirt"]', 'The print on the shirt colour.'],
   ['[data-view="clear"]', 'The print on transparent checks: the checks are clear film. Press T to flick to it.'],
