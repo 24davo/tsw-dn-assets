@@ -345,10 +345,10 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <p class="f-note">Pixels less solid than this are removed. Everything left prints fully solid, so the film has no see-through areas.</p>
         </div>
         <div class="field dotf">
-          <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">35 lpi</output></div>
-          <input type="range" id="lpi" min="15" max="65" step="1" value="35">
+          <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">30 lpi</output></div>
+          <input type="range" id="lpi" min="15" max="65" step="1" value="30">
           <div class="chips" id="lpiChips" role="group" aria-label="Common lines per inch"><button class="chip" type="button" data-lpi="30">30 lpi</button><button class="chip" type="button" data-lpi="35">35 lpi</button></div>
-          <p class="f-note" id="lpiNote">Dots every 0.73 mm.</p>
+          <p class="f-note" id="lpiNote">Dots every 0.85 mm.</p>
         </div>
         <div class="field dotf">
           <div class="f-head"><span>Angle</span></div>
@@ -699,7 +699,7 @@ const LOOKS = {
   full:  {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 96}
 };
 const $ = id => document.getElementById(id);
-const st = {look: 'knock', lpi: 35, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
+const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50};
 const KEEP = ['look','lpi','angle','shape','k0','k1','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
@@ -2120,7 +2120,7 @@ function stepDone(g){
   else savePng();
   syncFoldAll();
 }
-const DEFAULTS = {look: 'knock', lpi: 35, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
+const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
                   ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
@@ -2170,7 +2170,7 @@ const TIPS = [
   ['#presetNew', 'Save the current set-up under a new name.'], ['#presetUpdate', 'Save the current settings over the chosen preset.'],
   ['#presetDelete', 'Delete the chosen preset.'], ['#presetShare', 'Copy this computer’s preset to the shared list.'],
   ['#histUndo', 'Go back one step.'], ['#histRedo', 'Go forward one step.'],
-  ['[data-lpi="30"]', '30 lpi: slightly bigger dots, a common choice for tees.'], ['[data-lpi="35"]', '35 lpi: our usual dot size.'],
+  ['[data-lpi="30"]', '30 lpi: our standard. Prints without issue on most tees.'], ['[data-lpi="35"]', '35 lpi: finer dots. Check them closely at 1:1 before saving.'],
   ['#cropTrim', 'Cut away the empty margin around the art: clear pixels, or a plain background such as a JPG’s white.'],
   ['#cropDraw', 'Drag a crop on the preview. Enter applies it, Esc cancels.'], ['#cropReset', 'Use the whole file again.'],
   ['[data-ink="art"]', 'Print each dot in the art’s own colour.'], ['[data-ink="one"]', 'Print every dot in one ink colour.'],
