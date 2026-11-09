@@ -459,6 +459,26 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <p class="f-note" id="lifeNote"></p>
       </section>
 
+      <section class="group step" id="sharpGroup">
+        <h2>Sharpen</h2>
+        <p class="f-note">Like Photoshop’s Unsharp Mask, on the art at print size, before the dots. Brings back crispness lost in resizing or a soft file. Too much leaves bright and dark halos along edges.</p>
+        <div class="chips" id="sharpChips" role="group" aria-label="Sharpen">
+          <button class="chip" type="button" data-sharp="0" data-sr="1" aria-pressed="true">Off</button>
+          <button class="chip" type="button" data-sharp="50" data-sr="0.8" aria-pressed="false">Light</button>
+          <button class="chip" type="button" data-sharp="100" data-sr="1" aria-pressed="false">Medium</button>
+          <button class="chip" type="button" data-sharp="160" data-sr="1.2" aria-pressed="false">Strong</button>
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="sharp">Amount</label><output id="sharpOut" for="sharp">Off</output></div>
+          <input type="range" id="sharp" min="0" max="300" step="5" value="0">
+        </div>
+        <div class="field" id="sradiusField" hidden>
+          <div class="f-head"><label for="sradius">Radius</label><output id="sradiusOut" for="sradius">1.0 px</output></div>
+          <input type="range" id="sradius" min="0.3" max="2" step="0.1" value="1">
+          <p class="f-note">How wide a band along each edge it works on. 1 px suits most art at 300 dpi; go smaller for fine detail.</p>
+        </div>
+      </section>
+
       <section class="group step" id="levelsGroup">
         <div class="g-head"><h2>Levels</h2><div class="g-actions"><button class="link" type="button" id="lvAuto">Auto</button><button class="link" type="button" id="lvReset" hidden>Reset</button></div></div>
         <p class="f-note">Like Photoshop’s Levels, and it runs first. Drag the black point right to turn more dark detail into shadow, or the white point left for more highlights. The adjusted colours are what prints.</p>
@@ -707,6 +727,44 @@ function engine(){
     for (let r = 0; r < n; r++) t[order[r]] = (r + 0.5)/n;
     return (tiles[shape] = t);
   }
+  /* Unsharp mask on the art at print size, like Photoshop's: brightness only, so colours don't fringe. The blur it compares
+     against skips clear pixels, so edges against clear film get no dark halo. Small differences (grain, flat areas) are left
+     alone. It works down the image in strips, so the extra memory stays small even at 400 × 500 mm. */
+  function sharpenData(d, w, h, amount, sigma){
+    const n = w*h, R = Math.max(1, Math.ceil(sigma*2.5)), K = new Float32Array(2*R + 1), amt = amount/100;
+    let ks = 0;
+    for (let i = -R; i <= R; i++){ K[i + R] = Math.exp(-i*i/(2*sigma*sigma)); ks += K[i + R]; }
+    for (let i = 0; i < K.length; i++) K[i] /= ks;
+    const P = new Uint16Array(n), A = new Uint8Array(n); // brightness × alpha and alpha, from the art before sharpening
+    for (let j = 0, i = 0; j < n; j++, i += 4){ const a = d[i+3]; A[j] = a; if (a) P[j] = Math.round((0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2])*a); }
+    const SH = 64, rows = SH + 2*R, hp = new Float32Array(rows*w), ha = new Float32Array(rows*w);
+    for (let y0 = 0; y0 < h; y0 += SH){
+      const y1 = Math.min(h, y0 + SH), r0 = Math.max(0, y0 - R), r1 = Math.min(h, y1 + R);
+      for (let y = r0; y < r1; y++){ // across
+        const src = y*w, dst = (y - r0)*w;
+        for (let x = 0; x < w; x++){
+          const lo = x < R ? 0 : x - R, hi = x + R >= w ? w - 1 : x + R;
+          let sp = 0, sa = 0;
+          for (let t = lo; t <= hi; t++){ const k = K[t - x + R]; sp += k*P[src + t]; sa += k*A[src + t]; }
+          hp[dst + x] = sp; ha[dst + x] = sa;
+        }
+      }
+      for (let y = y0; y < y1; y++){ // down, then sharpen
+        const lo = Math.max(r0, y - R), hi = Math.min(r1 - 1, y + R);
+        for (let x = 0; x < w; x++){
+          const j = y*w + x, a = A[j];
+          if (!a) continue;
+          let sp = 0, sa = 0;
+          for (let t = lo; t <= hi; t++){ const k = K[t - y + R], q = (t - r0)*w + x; sp += k*hp[q]; sa += k*ha[q]; }
+          if (sa <= 0) continue;
+          const diff = P[j]/a - sp/sa;
+          if (diff > -2 && diff < 2) continue;
+          const delta = amt*diff, i = j*4;
+          d[i] += delta; d[i+1] += delta; d[i+2] += delta; // the clamped array keeps every value in 0–255
+        }
+      }
+    }
+  }
   function setSrc(w, h, buf){
     const d = new Uint8ClampedArray(buf);
     S = {w, h, d};
@@ -865,7 +923,10 @@ function engine(){
     }
   }
   function handle(m){
-    if (m.type === 'src') return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
+    if (m.type === 'src'){
+      if (m.sharp) sharpenData(new Uint8ClampedArray(m.buf), m.w, m.h, m.sharp.amount, m.sharp.sigma);
+      return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
+    }
     const r = run(m.p);
     return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel},
             transfer: r.sel ? [r.buf, r.cls, r.sel] : [r.buf, r.cls]};
@@ -888,7 +949,7 @@ const LOOKS = {
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', hard: 0, brushV: 50, paintHex: '#ffffff'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
@@ -955,6 +1016,7 @@ function schedule(){
   if (resetsReady) syncResets();
   noteChange();
   if (!srcV) return;
+  if (art && sharpKey() !== srcSharp){ srcSharp = sharpKey(); buildSrcSoon(); return; }
   if (running){ pending = true; return; }
   running = true;
   $('busy').hidden = false;
@@ -1096,7 +1158,8 @@ function buildOrigMask(){
   origCtx.putImageData(im, 0, 0); origMips = buildMips(origCanvas); origFor = srcV;
 }
 
-let srcTimer = 0, srcW0 = 0, srcH0 = 0;
+let srcTimer = 0, srcW0 = 0, srcH0 = 0, srcSharp = ''; // srcSharp: the sharpening the engine's copy of the art has
+const sharpKey = () => st.sharp ? `${st.sharp}:${st.sradius}` : '';
 function buildSrcSoon(){ clearTimeout(srcTimer); srcTimer = setTimeout(buildSrc, 250); }
 function buildSrc(){
   if (!art) return;
@@ -1105,7 +1168,8 @@ function buildSrc(){
   drawArt(srcCtx, W, H);
   const data = srcCtx.getImageData(0, 0, W, H);
   srcV++; srcStats = null;
-  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer}, [data.data.buffer]);
+  srcSharp = sharpKey();
+  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer, sharp: st.sharp ? {amount: st.sharp, sigma: st.sradius} : null}, [data.data.buffer]);
   srcMips = buildMips(srcCanvas);
   prepareViews();
   if (W !== srcW0 || H !== srcH0){ st.cx = W/2; st.cy = H/2; srcW0 = W; srcH0 = H; }
@@ -1739,12 +1803,16 @@ $('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncS
 
 const pxMm = v => v ? `${(v*25.4/DPI).toFixed(2)} mm · ${v} px` : 'Off'; // edge widths: print pixels at 300 dpi
 const EDGE_KEYS = {hard: 0, edge: 0, etol: 30, emode: 'any'};
+const SHARP_KEYS = {sharp: 0, sradius: 1};
 let hardWas = 50; // the hard edge threshold to go back to when it's ticked again
-const SLIDERS = [['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
+const SLIDERS = [['sharp', v => v ? `${v}%` : 'Off'], ['sradius', v => `${(+v).toFixed(1)} px`], ['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
                  ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`]];
 function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi);
+  for (const b of $('sharpChips').querySelectorAll('[data-sharp]')) b.setAttribute('aria-pressed', String(+b.dataset.sharp === st.sharp && (!st.sharp || Math.abs(+b.dataset.sr - st.sradius) < 1e-6)));
+  $('sradiusField').hidden = !st.sharp;
   const near = st.emode === 'near'; syncChips('emodeChips', 'emode', st.emode); $('emodeAny').hidden = near; $('emodeNear').hidden = !near; $('etolField').hidden = !st.edge || !near;
   $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
+$('sharpChips').addEventListener('click', e => { const b = e.target.closest('[data-sharp]'); if (!b) return; st.sharp = +b.dataset.sharp; if (st.sharp) st.sradius = +b.dataset.sr; syncSliders(); remember(); schedule(); });
 $('emodeChips').addEventListener('click', e => { const b = e.target.closest('[data-emode]'); if (!b) return; st.emode = b.dataset.emode; syncSliders(); remember(); schedule(); });
 $('hardOn').addEventListener('change', e => { st.hard = e.target.checked ? hardWas : 0; syncSliders(); remember(); schedule(); });
 $('lpiChips').addEventListener('click', e => { const b = e.target.closest('[data-lpi]'); if (!b) return; st.lpi = +b.dataset.lpi; syncSliders(); updateNotes(); remember(); schedule(); });
@@ -1986,6 +2054,7 @@ function updateChecks(){
                        : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
+  if (st.sharp) rows.push(['info', '↗', `Sharpened ${st.sharp}% at ${(+st.sradius).toFixed(1)} px`, 'Unsharp mask on the art at print size, before the dots.']);
   if (art.strokesN) rows.push(['info', '✎', `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}`, 'Brushed by hand in Touch up. They’re part of the saved PNG.']);
   const hardOn = st.hard && st.finish !== 'cut';
   if (hardOn || st.edge) rows.push(['info', '→', 'Edge tidied', [hardOn ? `Hard edge at ${st.hard}%` : '', st.edge ? `trimmed ${pxMm(st.edge)} off the outline${st.emode === 'near' ? ', knock-out colour only' : ''}` : ''].filter(Boolean).join(', ').replace(/^./, ch => ch.toUpperCase()) + '.']);
@@ -2096,7 +2165,7 @@ function qualityInfo(){
   const need = Math.ceil(st.widthCm/2.54*DPI), times = Math.ceil(DPI/dpi*10)/10;
   let c = dpi >= 240 ? 'good' : dpi >= 150 ? 'warn' : 'bad', t, d = '', pill;
   if (q.kind === 'blocky') d = `This file was already enlarged ${q.scale}× with hard pixels (they come in ${q.scale} × ${q.scale} blocks), so its real detail is ${real.toLocaleString()} px wide. `;
-  if (q.kind === 'soft') d = `This file looks already enlarged about ${q.scale}× (its edges are soft, spread over ${q.edge.toFixed(1)} px), so its real detail is about ${real.toLocaleString()} px wide. `;
+  if (q.kind === 'soft') d = `This file looks already enlarged about ${q.scale}× (its edges are soft, spread over ${q.edge.toFixed(1)} px), so its real detail is about ${real.toLocaleString()} px wide. Sharpen can bring some crispness back. `;
   const fix = times > 8 ? '' : q.kind ? `shrink it back to ${real.toLocaleString()} px wide and upscale that ${times}× with an AI upscaler` : `upscale it ${times}× (to ${need.toLocaleString()} px wide)`;
   if (c === 'good'){ t = `Sharp: ${dpi} dpi at ${wMm} mm wide`; d += q.kind ? 'Still plenty of detail at this size.' : 'Plenty of detail for a crisp print.'; pill = `${dpi} dpi`; }
   else if (c === 'warn'){ t = `${dpi} dpi at ${wMm} mm wide`; d += `Dots print crisp, but fine lines may look soft. Sharp up to ${sharpMm} mm wide${fix ? `, or ${fix} first` : ''}.`; pill = `${dpi} dpi · check`; }
@@ -2343,7 +2412,7 @@ function settingsText(){
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
-         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
+         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
 let saving = false;
@@ -2431,7 +2500,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'sharp', 'sradius'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -2453,7 +2522,7 @@ function capturePreset(name, withSize){
   return p;
 }
 function applyPreset(p){
-  for (const k of PRESET_KEYS) if (k in p.s) st[k] = p.s[k]; else if (k in EDGE_KEYS) st[k] = EDGE_KEYS[k]; // presets from before the Edge step: edges off
+  for (const k of PRESET_KEYS) if (k in p.s) st[k] = p.s[k]; else if (k in EDGE_KEYS) st[k] = EDGE_KEYS[k]; else if (k in SHARP_KEYS) st[k] = SHARP_KEYS[k]; // older presets: these steps off
   if ('edge' in p.s && !('emode' in p.s)){ st.emode = p.s.edge ? 'near' : 'any'; if (!p.s.edge && p.s.contract){ st.edge = p.s.contract; } } // the first Edge step had two sliders
   st.knock = p.s.knock || null; knockFrom = st.knock ? (p.s.knockFrom || 'hand') : 'shirt';
   Object.assign(lv, LV0, p.levels || {});
@@ -2651,6 +2720,7 @@ const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v =
   mid: v => `Ink amount ${sign(v)}`, con: v => `Contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
   knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt',
+  sharp: v => v ? `Sharpen ${v}%` : 'Sharpen off', sradius: v => `Sharpen radius ${(+v).toFixed(1)} px`,
   hard: v => v ? `Hard edge ${v}%` : 'Hard edge off', edge: v => v ? `Trim the edge ${pxMm(v)}` : 'Trim the edge off', etol: v => `Trim colour tolerance ${v}%`, emode: v => v === 'near' ? 'Trim the knock-out colour only' : 'Trim any colour'};
 function snapshot(){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
@@ -2752,6 +2822,7 @@ const SECTION_TIPS = {
   lookGroup: 'A starting point that sets several steps at once. Remove shadows is the quick black-tee clean-up.',
   cropGroup: 'Trim empty margins or draw a crop. Do it first, so the print size measures the real art.',
   sizeGroup: 'The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
+  sharpGroup: 'Unsharp mask on the art at print size: crisper edges and detail before the dots. Light or Medium suits most soft files.',
   levelsGroup: 'Like Photoshop’s Levels. Move the black point right so more of the art counts as shadow.',
   knockGroup: 'Colours close to the shirt (or the colour you set) drop out so the shirt shows through.',
   rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
@@ -2764,7 +2835,7 @@ const SECTION_TIPS = {
 };
 try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
 // a Reset link in the title of each step that has settings (Levels and Crop have their own)
-for (const id of ['finishGroup', 'sizeGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'touchGroup', 'toneGroup', 'inkGroup']){
+for (const id of ['finishGroup', 'sizeGroup', 'sharpGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'touchGroup', 'toneGroup', 'inkGroup']){
   const g = $(id), h = g.querySelector(':scope > h2'), head = document.createElement('div');
   head.className = 'g-head'; g.insertBefore(head, h); head.appendChild(h);
   head.insertAdjacentHTML('beforeend', `<div class="g-actions"><button class="link step-reset" type="button" data-reset="${id}" hidden>Reset</button></div>`);
@@ -2810,7 +2881,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any'};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', sharp: 0, sradius: 1};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -2841,6 +2912,7 @@ const STEP_RESETS = {
   knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null})},
   rangeGroup: {name: 'Select', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
   edgeGroup: {name: 'Edge', vals: () => ({...EDGE_KEYS})},
+  sharpGroup: {name: 'Sharpen', vals: () => ({...SHARP_KEYS})},
   touchGroup: {name: 'Touch up', same: () => !art || !art.strokesN, reset: () => { art.strokesN = 0; rebuildEdits(art); buildSrcSoon(); }},
   toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), drop: lookVal('drop'), solid: lookVal('solid')})},
   inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex})}
@@ -2883,6 +2955,8 @@ const TIPS = [
   ['#openBtn', 'Open art in a new tab. Choose several files to open each in its own tab.'],
   ['#allApplyBtn', 'Copy this tab’s settings to every other open tab, like applying a preset. Crops and touch-ups stay as they are.'],
   ['#allSaveBtn', 'Save a PNG of every open tab, one after another. The browser may ask once to allow several downloads.'],
+  ['[data-sharp="0"]', 'No sharpening.'], ['[data-sharp="50"]', 'Light: 50% at 0.8 px. A gentle lift for slightly soft art.'],
+  ['[data-sharp="100"]', 'Medium: 100% at 1 px. Good for resized or soft files.'], ['[data-sharp="160"]', 'Strong: 160% at 1.2 px. For quite soft files. Check for halos at 1:1.'],
   ['#hardOn', 'Make soft, see-through pixels solid or removed before the dots are made, like a Threshold action.'],
   ['[data-view="shirt"]', 'The print on the shirt colour.'],
   ['[data-view="clear"]', 'The print on transparent checks: the checks are clear film. Press T to flick to it.'],
