@@ -123,6 +123,16 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .cal-ends{display:flex;justify-content:space-between;width:100%;max-width:var(--rw,100%);font-size:12px;font-weight:600;color:var(--muted)}
 #calRange{width:100%;accent-color:var(--ink)}
 .cal-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.ask-box{width:min(500px,100%)}
+.panel-bar{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:8px;padding-block:10px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));background:var(--panel);border-bottom:1px solid var(--line)}
+.history{list-style:none;margin:0;padding:4px;display:grid;gap:2px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:var(--r)}
+.history:empty{display:none}
+.history button{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;padding:7px 10px;border:0;border-radius:3px;background:none;color:var(--ink);font-size:13px;text-align:left;cursor:pointer}
+.history button:hover{background:var(--soft)}
+.history .now button{background:var(--on);color:var(--on-ink);font-weight:600}
+.history .ahead button{color:var(--muted)}
+.history time{flex:none;font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
+.tip{position:fixed;z-index:40;max-width:260px;padding:7px 10px;border-radius:var(--r);background:var(--toast);color:var(--toast-ink);font-size:12px;font-weight:500;line-height:1.35;pointer-events:none}
 #zoomOut{min-width:44px;padding-right:4px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
 .busy{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none}
 .hint{position:absolute;left:50%;top:76px;transform:translateX(-50%);padding:8px 14px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap}
@@ -205,8 +215,10 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     </div>
     <div class="file" id="fileInfo"><span class="tag">Sample</span><b>Sample art</b></div>
     <div class="actions">
+      <button class="btn" id="undoBtn" type="button" disabled>Undo</button>
+      <button class="btn" id="redoBtn" type="button" disabled>Redo</button>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
-      <label class="btn" for="fileIn">Open art</label>
+      <button class="btn" type="button" id="openBtn">Open art</button>
       <input type="file" id="fileIn" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
       <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
     </div>
@@ -241,7 +253,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <input type="range" id="zoomRange" min="0" max="1000" step="1" value="0" aria-label="Zoom">
             <output id="zoomOut" for="zoomRange">Fit</output>
           </div>
-          <button class="btn small" type="button" id="compareBtn" title="Press and hold to see the art before halftoning">Hold for original</button>
+          <button class="btn small" type="button" id="compareBtn">Hold for original</button>
         </div>
       </div>
       <div class="tray pane-pick" id="paneA" hidden><select id="paneASel" aria-label="Left side shows"></select></div>
@@ -252,6 +264,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     </section>
 
     <aside class="panel" aria-label="Halftone settings">
+      <div class="panel-bar"><span class="kicker">Tools</span><button class="link" type="button" id="foldAll">Expand all</button></div>
       <section class="group" id="presetGroup">
         <h2>Presets</h2>
         <select class="preset-sel" id="presetSel" aria-label="Choose a preset"><option value="">Choose a preset…</option></select>
@@ -276,6 +289,13 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <p class="f-note" id="syncNote" hidden></p>
         <p class="f-note" id="presetHelp"></p>
         <input type="file" id="presetFile" accept=".json,application/json" hidden>
+      </section>
+
+      <section class="group" id="historyGroup">
+        <h2>History</h2>
+        <div class="preset-actions"><button class="chip" type="button" id="histUndo" disabled>Undo</button><button class="chip" type="button" id="histRedo" disabled>Redo</button></div>
+        <ol class="history" id="historyList"></ol>
+        <p class="f-note">The last 40 changes to this design. Click a step to go back to it. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes. History starts again when you open new art.</p>
       </section>
 
       <section class="group">
@@ -454,7 +474,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
             <li>For a quick black-shirt clean-up with no halftone, use Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
-            <li>Click a section’s title to fold it away. The tool remembers your layout.</li>
+            <li>Sections start folded: click a title to open it, or Expand all. Hover over anything for a short tip.</li>
+            <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
         </details>
@@ -474,6 +495,13 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     <input type="range" id="calRange" min="200" max="900" step="1" value="378" aria-label="Box size">
     <p class="cal-text">Set it up again on each screen you use, and after changing the display's scaling setting.</p>
     <div class="cal-actions"><button class="btn" type="button" id="calCancel">Cancel</button><button class="btn primary" type="button" id="calSave">Save and show life size</button></div>
+  </div>
+</div>
+<div class="cal" id="askSave" role="dialog" aria-modal="true" aria-labelledby="askSaveTitle" hidden>
+  <div class="cal-box ask-box">
+    <h2 class="cal-title" id="askSaveTitle">Save this design first?</h2>
+    <p class="cal-text" id="askSaveText"></p>
+    <div class="cal-actions"><button class="btn" type="button" id="askCancel">Cancel</button><button class="btn" type="button" id="askNoSave">Don’t save</button><button class="btn primary" type="button" id="askSaveBtn">Save PNG</button></div>
   </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
@@ -637,7 +665,7 @@ const st = {look: 'knock', lpi: 35, angle: 22.5, shape: 'round', k0: 10, k1: 70,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50};
 const KEEP = ['look','lpi','angle','shape','k0','k1','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
-function remember(){ try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
+function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
 const stage = $('stage'), view = $('view'), vctx = view.getContext('2d');
 const srcCanvas = document.createElement('canvas'), srcCtx = srcCanvas.getContext('2d', {willReadFrequently: true});
@@ -645,6 +673,8 @@ const outCanvas = document.createElement('canvas'), outCtx = outCanvas.getContex
 const masks = {base: {canvas: document.createElement('canvas'), mips: null, key: -1}, map: {canvas: document.createElement('canvas'), mips: null, key: -1}};
 const origCanvas = document.createElement('canvas'), origCtx = origCanvas.getContext('2d');
 let lastCls = null, paintN = 0, origFor = 0, origMips = null;
+// history: the last 40 changes to this design (see the History section)
+let steps = [], stepPos = -1, stepTimer = 0, stepLabel = null, restoring = false, unsaved = false;
 // colour ranges; not saved between visits, because sampled colours belong to one piece of art
 let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt', viewBeforeClear = 'shirt';
 const selCanvas = document.createElement('canvas');
@@ -687,6 +717,7 @@ function params(){
           levels: lvIdentity() ? null : {...lv}};
 }
 function schedule(){
+  noteChange();
   if (!srcV) return;
   if (running){ pending = true; return; }
   running = true;
@@ -743,6 +774,7 @@ const CHECKS = 'repeating-conic-gradient(#cccccc 0 25%, #ffffff 0 50%) 0 0/8px 8
 const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? Math.round((1 - lastOn/s.vis)*100) : 0; return [[CHECKS, cut > 0 ? `Clear film: ink area down ${cut}%` : 'Clear film, no ink']]; };
 const ORIGCLEAR_LEGEND = [[CHECKS, 'Original: the checks show where it was clear or see-through']];
 const isClear = kind => kind === 'clear' || kind === 'origclear';
+const toClear = kind => ({orig: 'origclear', shirt: 'clear'}[kind] || kind); // what Hold for transparent shows in Split
 const selLegend = () => [['#ffffff', `Selected by colour range ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
 function buildMask(kind){
   const m = masks[kind];
@@ -762,7 +794,7 @@ function buildSelMask(){ // the active colour range's selection in grey, like Ph
   x.putImageData(im, 0, 0); selMips = buildMips(selCanvas); selKey = paintN;
 }
 // what is on screen now: one view, or the two sides of Split (Hold for original swaps in the original)
-function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB] : [compare ? ({shirt: 'orig', clear: 'origclear'}[st.view] || 'origbase') : st.view]; }
+function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB].map(k => compare ? toClear(k) : k) : [compare ? ({shirt: 'orig', clear: 'origclear'}[st.view] || 'origbase') : st.view]; }
 function prepareViews(){
   const ks = st.view === 'split' ? [st.paneA, st.paneB] : [st.view];
   for (const k of ks){ if (masks[k]) buildMask(k); else if (k === 'sel') buildSelMask(); }
@@ -826,15 +858,16 @@ function render(){
     panes = [{kind: kindsShown()[0], x: 0, y: 0, w: r.width, h: r.height, top: topH + 12, bottom: botH + 12}];
   } else {
     const across = r.width >= r.height*1.1, pa = $('paneA'), pb = $('paneB'), pickH = pa.offsetHeight + 8;
+    const ka = compare ? toClear(st.paneA) : st.paneA, kb = compare ? toClear(st.paneB) : st.paneB;
     if (across){ // side by side
       const hw = Math.round(r.width/2);
-      panes = [{kind: st.paneA, x: 0, y: 0, w: hw, h: r.height, top: topH + pickH + 8, bottom: botH + 12},
-               {kind: st.paneB, x: hw, y: 0, w: r.width - hw, h: r.height, top: topH + pickH + 8, bottom: botH + 12}];
+      panes = [{kind: ka, x: 0, y: 0, w: hw, h: r.height, top: topH + pickH + 8, bottom: botH + 12},
+               {kind: kb, x: hw, y: 0, w: r.width - hw, h: r.height, top: topH + pickH + 8, bottom: botH + 12}];
       place(pa, 12, topH); place(pb, hw + 12, topH);
     } else { // stacked, for tall screens
       const hh = Math.round(r.height/2);
-      panes = [{kind: st.paneA, x: 0, y: 0, w: r.width, h: hh, top: topH + pickH + 8, bottom: 12},
-               {kind: st.paneB, x: 0, y: hh, w: r.width, h: r.height - hh, top: pickH + 20, bottom: botH + 12}];
+      panes = [{kind: ka, x: 0, y: 0, w: r.width, h: hh, top: topH + pickH + 8, bottom: 12},
+               {kind: kb, x: 0, y: hh, w: r.width, h: r.height - hh, top: pickH + 20, bottom: botH + 12}];
       place(pa, 12, topH); place(pb, 12, hh + 12);
     }
     pa.firstElementChild.setAttribute('aria-label', across ? 'Left side shows' : 'Top shows');
@@ -968,7 +1001,8 @@ function setView(v){
   for (const b of $('viewTray').querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === v));
   const split = v === 'split';
   $('paneA').hidden = $('paneB').hidden = !split;
-  $('compareBtn').hidden = split;
+  $('compareBtn').textContent = split ? 'Hold for transparent' : 'Hold for original';
+  $('compareBtn').dataset.tip = split ? 'Press and hold, or hold T, to see both sides on transparent checks. The checks are clear film.' : 'Press and hold to compare with the art before halftoning.';
   stage.classList.toggle('is-split', split);
   if (v !== 'sel') viewBeforeSel = v;
   if (v !== 'clear') viewBeforeClear = v;
@@ -1003,8 +1037,10 @@ window.addEventListener('keydown', e => {
   const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
   if ((e.key === 'v' || e.key === 'V') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)
     { const o = viewOrder(); setView(o[(o.indexOf(st.view) + 1) % o.length]); }
-  else if ((e.key === 't' || e.key === 'T') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)
-    setView(st.view === 'clear' ? viewBeforeClear : 'clear'); // flick to and from the transparent view
+  else if ((e.key === 't' || e.key === 'T') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey){
+    if (st.view === 'split'){ if (!e.repeat) cmpOn(); } // in Split, hold T to see both sides on the checks
+    else setView(st.view === 'clear' ? viewBeforeClear : 'clear'); // flick to and from the transparent view
+  }
   else if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && geo){
     const k = st.zoom === 'fit' ? geo.k : st.zoom;
     if (e.key === '+' || e.key === '=') zoomTo(k*1.25);
@@ -1156,6 +1192,7 @@ function syncFinish(){
 
 /* ---------- colour range: like Photoshop's Select > Color Range, as cards applied top to bottom ---------- */
 const RULE_TYPES = [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights'], ['sample', 'Sampled colours']];
+const ACTION_TIPS = {remove: 'Remove the selected parts.', fade: 'Turn the selected parts into dots, keeping some of the ink.', solid: 'Print the selected parts fully solid.'};
 const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['solid', 'Keep solid']];
 const RULE_DEFAULTS = [['shadows', 'remove'], ['highlights', 'solid'], ['midtones', 'fade'], ['sample', 'remove']];
 const MAX_RULES = 4;
@@ -1186,16 +1223,16 @@ function renderRules(){
       <div class="rule-head">
         <span class="rule-n">${i + 1}</span>
         <select data-k="type" aria-label="Colour range ${i + 1} selects">${RULE_TYPES.map(([v, t]) => `<option value="${v}"${v === R.type ? ' selected' : ''}>${t}</option>`).join('')}</select>
-        <button class="chip" type="button" data-act="show" aria-pressed="false" title="Show this selection in black and white">Show</button>
-        <button class="icon" type="button" data-act="del" title="Delete" aria-label="Delete colour range ${i + 1}">✕</button>
+        <button class="chip" type="button" data-act="show" aria-pressed="false" data-tip="Show this selection in black and white: white is selected.">Show</button>
+        <button class="icon" type="button" data-act="del" data-tip="Delete this colour range." aria-label="Delete colour range ${i + 1}">✕</button>
       </div>
       ${R.type !== 'sample' ? ruleSlider(i, 'range', 'Range', R.range) :
         `<div class="samples">${R.samples.map((h, j) => `<button class="sample" type="button" data-act="unsample" data-j="${j}" style="background:${h}" title="${h.toUpperCase()}: click to remove" aria-label="Remove ${h.toUpperCase()}"></button>`).join('')}` +
-        `<button class="chip" type="button" data-act="pick" aria-pressed="false">${R.samples.length ? 'Add a colour' : 'Pick a colour'}</button></div>`}
+        `<button class="chip" type="button" data-act="pick" aria-pressed="false" data-tip="Click colours in the art to add them to this selection.">${R.samples.length ? 'Add a colour' : 'Pick a colour'}</button></div>`}
       ${ruleSlider(i, 'fuzz', 'Fuzziness', R.fuzz)}
       <p class="f-note" data-note>${ruleNote(R)}</p>
-      <label class="check-row"><input type="checkbox" data-k="invert"${R.invert ? ' checked' : ''}> Invert</label>
-      <div class="chips" role="group" aria-label="What happens to the selection">${RULE_ACTIONS.map(([v, t]) => `<button class="chip" type="button" data-act="action" data-v="${v}" aria-pressed="${v === R.action}">${t}</button>`).join('')}</div>
+      <label class="check-row" data-tip="Select everything except this."><input type="checkbox" data-k="invert"${R.invert ? ' checked' : ''}> Invert</label>
+      <div class="chips" role="group" aria-label="What happens to the selection">${RULE_ACTIONS.map(([v, t]) => `<button class="chip" type="button" data-act="action" data-v="${v}" data-tip="${ACTION_TIPS[v]}" aria-pressed="${v === R.action}">${t}</button>`).join('')}</div>
       ${R.action === 'fade' ? ruleSlider(i, 'keep', 'Ink kept', R.keep) : ''}
     </div>`).join('');
   $('addRule').hidden = rules.length >= MAX_RULES;
@@ -1381,6 +1418,7 @@ function setArt(el, w, h, name, isSample, dpi){
   setWidth(isSample ? 25 : w/(dpi || DPI)*2.54, true);
   setZoom('fit');
   buildSrc(); render(); updateChecks();
+  resetSteps(isSample ? 'Sample art' : `Opened ${name}`);
 }
 async function readPngDpi(file){
   try {
@@ -1408,12 +1446,13 @@ async function openFile(f){
   setArt(im, im.naturalWidth, im.naturalHeight, f.name || 'Pasted art', false, dpi);
 }
 $('fileIn').addEventListener('change', e => { openFile(e.target.files[0]); e.target.value = ''; });
+$('openBtn').addEventListener('click', () => guardThen(() => $('fileIn').click(), true));
 let dragDepth = 0;
 window.addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')){ dragDepth++; $('drop').hidden = false; } });
 window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('drop').hidden = true; });
 window.addEventListener('dragover', e => { e.preventDefault(); });
-window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const f = e.dataTransfer?.files?.[0]; if (f) openFile(f); });
-window.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) openFile(it.getAsFile()); });
+window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const f = e.dataTransfer?.files?.[0]; if (f) guardThen(() => openFile(f)); });
+window.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it){ const f = it.getAsFile(); guardThen(() => openFile(f)); } });
 
 /* ---------- saving: transparent PNG at 300 dpi, settings written into the file ---------- */
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -1455,9 +1494,10 @@ function settingsText(){
          `; ${st.widthCm.toFixed(1)} x ${(st.widthCm*art.h/art.w).toFixed(1)} cm at 300 dpi`;
 }
 let saving = false;
-$('saveBtn').addEventListener('click', async () => {
-  if (saving || !art) return;
+async function savePng(){ // answers true once the PNG is saved
+  if (saving || !art) return false;
   saving = true; $('saveBtn').disabled = true;
+  let ok = false;
   try {
     await idle();
     $('busy').textContent = 'Preparing the PNG…'; $('busy').hidden = false;
@@ -1465,13 +1505,16 @@ $('saveBtn').addEventListener('click', async () => {
     const raw = await new Promise((res, rej) => outCanvas.toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
     const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop DTF Halftone'], ['Comment', settingsText()]]);
     $('busy').hidden = true;
-    await saveFile(png, fileName());
+    ok = await saveFile(png, fileName());
   } catch(err){
     $('busy').hidden = true; toast(err && err.message ? err.message : 'Saving didn’t work.');
   } finally {
     $('busy').textContent = 'Updating…'; saving = false; $('saveBtn').disabled = !outReady;
   }
-});
+  if (ok){ commitStep(); unsaved = false; }
+  return ok;
+}
+$('saveBtn').addEventListener('click', () => { savePng(); });
 async function downloadsCap(){
   if (!window.claude || typeof window.claude.use !== 'function') return null;
   try { return await Promise.race([window.claude.use('downloads'), new Promise(r => setTimeout(() => r(null), 10000))]); } catch(e){ return null; }
@@ -1479,19 +1522,20 @@ async function downloadsCap(){
 async function saveFile(blob, name){
   const dl = await downloadsCap();
   if (dl){
-    try { await dl.save({filename: name, data: blob}); toast(`Saved ${name}`); }
+    try { await dl.save({filename: name, data: blob}); toast(`Saved ${name}`); return true; }
     catch(e){
       const code = e && e.code;
       if (code === 'declined') toast('Not saved.');
       else if (code === 'rate_limited') toast('A save is already waiting for an answer.');
       else toast('Saving isn’t available here. Open this tool in a browser tab to save.');
+      return false;
     }
-    return;
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
   toast(`Saved ${name}`);
+  return true;
 }
 
 let toastTimer = 0;
@@ -1565,6 +1609,7 @@ function applyPreset(p){
   syncInk(); syncLevels(); updateNotes(); syncRules();
   if (p.size && art){ setWidth(Math.min(p.size.w, p.size.h*art.w/art.h), true); buildSrcSoon(); } // fits inside the saved width and height
   remember(); schedule(); updateChecks();
+  noteChange(`Preset “${p.name}”`);
   toast(`Applied “${p.name}”.`);
 }
 function chosen(){ const v = $('presetSel').value; if (!v) return null; const where = v[0], list = where === 's' ? shared : presets, p = list[+v.slice(1)]; return p ? {p, where} : null; }
@@ -1743,26 +1788,185 @@ function setUiTheme(light){
 $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentElement.classList.contains('ui-light')));
 { let ui = 'dark'; try { ui = localStorage.getItem('tsw-dtf-ui') || 'dark'; } catch(e){} setUiTheme(ui === 'light'); }
 
-/* ---------- fold any section by its title, remembered between visits ---------- */
+/* ---------- history: the last 40 changes to this design, to undo or go back to ---------- */
+const HIST_MAX = 40;
+const LOOK_NAMES = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'};
+const sign = v => (v > 0 ? '+' : '') + v;
+const STEP_NAMES = {look: v => `Look: ${LOOK_NAMES[v]}`, finish: v => v === 'cut' ? 'Finish: clean cut' : 'Finish: halftone dots', cut: v => `Threshold ${v}%`,
+  lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`,
+  mid: v => `Ink amount ${sign(v)}`, con: v => `Contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
+  ink: v => v === 'one' ? 'One ink colour' : 'Artwork colours', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
+  knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt'};
+function snapshot(){
+  const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
+  s.knock = st.knock; s.knockFrom = knockFrom;
+  return {s, lv: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]})), w: st.widthCm};
+}
+function describeStep(a, b){ // a short name for what changed from a to b
+  if (Math.abs(a.w - b.w) > 1e-6) return `Print size ${b.w.toFixed(1)} cm wide`;
+  for (const k of Object.keys(STEP_NAMES)) if (a.s[k] !== b.s[k]) return STEP_NAMES[k](b.s[k]);
+  if (JSON.stringify(a.lv) !== JSON.stringify(b.lv)) return `Levels ${b.lv.b} · ${b.lv.g.toFixed(2)} · ${b.lv.w}`;
+  if (a.rules.length !== b.rules.length) return b.rules.length > a.rules.length ? 'Added a colour range' : 'Deleted a colour range';
+  return 'Colour range';
+}
+function noteChange(label){ // called on every change; a step is written once things settle, so a slider drag is one step
+  if (restoring || !art) return;
+  if (label) stepLabel = label;
+  clearTimeout(stepTimer); stepTimer = setTimeout(commitStep, 600);
+}
+function commitStep(){
+  clearTimeout(stepTimer); stepTimer = 0;
+  if (!art || stepPos < 0) return;
+  const snap = snapshot(), cur = steps[stepPos];
+  if (JSON.stringify(snap) === JSON.stringify(cur.snap)){ stepLabel = null; return; }
+  const label = stepLabel || describeStep(cur.snap, snap); stepLabel = null;
+  steps = steps.slice(0, stepPos + 1); steps.push({snap, label, at: Date.now()});
+  if (steps.length > HIST_MAX) steps.shift();
+  stepPos = steps.length - 1; unsaved = true; renderSteps();
+}
+function resetSteps(label){ clearTimeout(stepTimer); stepLabel = null; steps = [{snap: snapshot(), label, at: Date.now()}]; stepPos = 0; unsaved = false; renderSteps(); }
+function applySnap(snap){
+  restoring = true;
+  for (const k of PRESET_KEYS) st[k] = snap.s[k];
+  st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
+  Object.assign(lv, snap.lv);
+  rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1));
+  syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
+  syncInk(); syncLevels(); updateNotes(); syncRules();
+  if (art && Math.abs(snap.w - st.widthCm) > 1e-6){ setWidth(snap.w, true); buildSrcSoon(); }
+  remember(); schedule(); updateChecks();
+  restoring = false;
+}
+function goStep(i){ if (i < 0 || i >= steps.length || i === stepPos) return; stepPos = i; applySnap(steps[i].snap); unsaved = true; renderSteps(); }
+function undo(){ commitStep(); goStep(stepPos - 1); }
+function redo(){ commitStep(); goStep(stepPos + 1); }
+function renderSteps(){
+  const list = $('historyList'), time = t => new Date(t).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+  list.innerHTML = steps.map((x, i) => `<li class="${i === stepPos ? 'now' : i > stepPos ? 'ahead' : ''}"><button type="button" data-step="${i}"><span>${esc(x.label)}</span><time>${time(x.at)}</time></button></li>`).join('');
+  const now = list.querySelector('.now'); if (now) list.scrollTop = now.offsetTop - list.clientHeight/2;
+  for (const id of ['histUndo', 'undoBtn']) $(id).disabled = stepPos <= 0;
+  for (const id of ['histRedo', 'redoBtn']) $(id).disabled = stepPos >= steps.length - 1;
+}
+$('historyList').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b){ commitStep(); goStep(+b.dataset.step); } });
+for (const id of ['histUndo', 'undoBtn']) $(id).addEventListener('click', undo);
+for (const id of ['histRedo', 'redoBtn']) $(id).addEventListener('click', redo);
+window.addEventListener('keydown', e => {
+  const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'z' && !typing){ e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+  if (e.key === 'Escape' && !$('askSave').hidden){ pendingGo = null; $('askSave').hidden = true; }
+});
+window.addEventListener('keyup', e => { if ((e.key === 't' || e.key === 'T') && st.view === 'split') cmpOff(); });
+
+/* ---------- before opening other art or leaving: offer to save unsaved work ---------- */
+let pendingGo = null, pendingGesture = false;
+const hasUnsaved = () => unsaved && art && !art.isSample;
+function guardThen(go, needsGesture){
+  commitStep();
+  if (!hasUnsaved()){ go(); return; }
+  pendingGo = go; pendingGesture = !!needsGesture;
+  $('askSaveTitle').textContent = 'Save this design first?';
+  $('askSaveText').textContent = 'You’ve changed it since it was last saved. Save the PNG before opening other art, or carry on without saving.';
+  $('askSaveBtn').textContent = 'Save PNG'; delete $('askSaveBtn').dataset.next; $('askNoSave').hidden = false;
+  $('askSave').hidden = false; $('askSaveBtn').focus();
+}
+$('askCancel').addEventListener('click', () => { pendingGo = null; $('askSave').hidden = true; });
+$('askNoSave').addEventListener('click', () => { const go = pendingGo; pendingGo = null; $('askSave').hidden = true; if (go) go(); });
+$('askSaveBtn').addEventListener('click', async () => {
+  if ($('askSaveBtn').dataset.next){ const go = pendingGo; pendingGo = null; $('askSave').hidden = true; if (go) go(); return; }
+  $('askSave').hidden = true;
+  if (!(await savePng())) return; // not saved: stay on this design
+  if (!pendingGesture){ const go = pendingGo; pendingGo = null; if (go) go(); return; }
+  // the file picker only opens from a fresh click
+  $('askSaveTitle').textContent = 'Saved'; $('askSaveText').textContent = 'The PNG is saved. Choose the next design.';
+  $('askSaveBtn').textContent = 'Open art'; $('askSaveBtn').dataset.next = '1'; $('askNoSave').hidden = true;
+  $('askSave').hidden = false; $('askSaveBtn').focus();
+});
+window.addEventListener('beforeunload', e => { commitStep(); if (hasUnsaved()){ e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- sections start folded; Expand all opens every one ---------- */
+const SECTION_TIPS = {
+  'presets': 'Save the whole set-up under a name and use it again. Shared presets are the same on every workshop computer.',
+  'history': 'Every change to this design. Click a step to go back to it.',
+  'look': 'Starting points. Remove shadows is the quick black-tee clean-up; the others turn the art into dots in different ways.',
+  'print-size': 'Set the size first. The art is resized to this at 300 dpi before anything else, so dots are true to the print.',
+  'levels': 'Like Photoshop’s Levels, applied first. Move the black point right so more of the art counts as shadow.',
+  'finish': 'Halftone dots, or a clean cut with no dots where every pixel is solid or removed.',
+  'knock-out': 'Colours close to this one drop out so the shirt shows through. Shading in between turns into dots.',
+  'colour-range': 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
+  'tone': 'Fine-tune the amount of ink and the contrast, and clean up tiny or nearly solid dots.',
+  'ink-colour': 'Print in the art’s own colours, or every dot in one colour.',
+  'film-check': 'A quick check that the film will print and wash well.'
+};
+try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
 {
-  let folded = {};
-  try { folded = JSON.parse(localStorage.getItem('tsw-dtf-folded') || '{}') || {}; } catch(e){}
+  const folds = [];
   for (const g of document.querySelectorAll('.panel > .group')){
     const h = g.querySelector(':scope > h2, :scope > .g-head > h2');
     if (!h) continue;
     const key = h.textContent.trim().toLowerCase().replace(/\s+/g, '-'), b = document.createElement('button');
     b.type = 'button'; b.className = 'sec-toggle'; b.textContent = h.textContent;
+    if (SECTION_TIPS[key]) b.dataset.tip = SECTION_TIPS[key];
     h.textContent = ''; h.appendChild(b);
     const set = open => { g.classList.toggle('folded', !open); b.setAttribute('aria-expanded', String(open)); };
-    set(!folded[key]);
-    b.addEventListener('click', () => {
-      const open = g.classList.contains('folded');
-      set(open); folded[key] = !open;
-      try { localStorage.setItem('tsw-dtf-folded', JSON.stringify(folded)); } catch(e){}
-      if (open) drawHisto();
-    });
+    set(false); folds.push({g, set});
+    b.addEventListener('click', () => { const open = g.classList.contains('folded'); set(open); syncFoldAll(); if (open) drawHisto(); });
   }
+  const anyFolded = () => folds.some(f => !f.g.hidden && f.g.classList.contains('folded'));
+  function syncFoldAll(){ $('foldAll').textContent = anyFolded() ? 'Expand all' : 'Collapse all'; }
+  $('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); syncFoldAll(); if (open) drawHisto(); });
+  syncFoldAll();
 }
+
+/* ---------- rollover help: a short tip on hover, or on keyboard focus ---------- */
+const TIPS = [
+  ['#undoBtn', 'Undo the last change (Cmd/Ctrl+Z).'], ['#redoBtn', 'Redo (Cmd/Ctrl+Shift+Z).'],
+  ['#themeBtn', 'Switch between dark and light panels.'],
+  ['#openBtn', 'Open a PNG, JPG, WebP or SVG. You can also drop art on the window or paste it.'],
+  ['#saveBtn', 'Save a transparent PNG at 300 dpi with no see-through pixels, ready for the film.'],
+  ['#foldAll', 'Open or close every section.'],
+  ['[data-view="shirt"]', 'The print on the shirt colour.'],
+  ['[data-view="clear"]', 'The print on transparent checks: the checks are clear film. Press T to flick to it.'],
+  ['[data-view="base"]', 'White shows where ink (with its white base) prints. Black is clear film.'],
+  ['[data-view="map"]', 'White prints solid, pink turns into dots, grey is removed.'],
+  ['[data-view="sel"]', 'The active colour range’s selection: white is selected, grey is partly selected.'],
+  ['[data-view="split"]', 'Two views side by side. They zoom and move together. Hold T for both on transparent checks.'],
+  ['[data-zoom="fit"]', 'Fit the whole print on screen (0 key).'],
+  ['[data-zoom="life"]', 'The print at its real size on this screen, once set up with a bank card.'],
+  ['[data-zoom="1"]', 'One file pixel per screen pixel: the true dot shapes.'],
+  ['[data-zoom="2"]', 'Twice 1:1.'], ['[data-zoom="4"]', 'Four times 1:1.'],
+  ['#zoomRange', 'Zoom from Fit up to 800%. Pinch, Ctrl/Cmd + scroll, or the + and − keys also zoom.'],
+  ['[data-finish="dots"]', 'Soft and partly removed areas become halftone dots.'],
+  ['[data-finish="cut"]', 'No dots: every pixel is either solid or removed, at the threshold below.'],
+  ['[data-angle="22.5"]', '22.5° is the usual angle for single-colour halftones.'],
+  ['#lvAuto', 'Set the black and white points from the art, like Photoshop’s Auto.'], ['#lvReset', 'Undo all Levels changes.'],
+  ['#pickBtn', 'Click a colour in the art to knock it out.'], ['#knockReset', 'Knock out the shirt colour again.'],
+  ['#addRule', 'Add another selection. Each one applies after the ones above it.'],
+  ['#presetNew', 'Save the current set-up under a new name.'], ['#presetUpdate', 'Save the current settings over the chosen preset.'],
+  ['#presetDelete', 'Delete the chosen preset.'], ['#presetShare', 'Copy this computer’s preset to the shared list.'],
+  ['#histUndo', 'Go back one step.'], ['#histRedo', 'Go forward one step.'],
+  ['#sizeChips [data-w="max"]', 'The largest size that fits within 40 × 50 cm.']
+];
+for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el.dataset.tip = t;
+{
+  const tip = document.createElement('div'); tip.className = 'tip'; tip.setAttribute('role', 'tooltip'); tip.hidden = true; document.body.appendChild(tip);
+  let timer = 0, over = null;
+  const hide = () => { clearTimeout(timer); tip.hidden = true; over = null; };
+  const show = el => {
+    if (!el.isConnected || !el.dataset.tip) return;
+    tip.textContent = el.dataset.tip; tip.hidden = false;
+    const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    let y = r.bottom + 8; if (y + h > innerHeight - 8) y = r.top - h - 8;
+    tip.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width/2 - w/2))}px`; tip.style.top = `${Math.max(8, y)}px`;
+  };
+  const target = node => { const el = node.closest && node.closest('[data-tip], [title]'); if (el && el.title){ el.dataset.tip = el.dataset.tip || el.title; el.removeAttribute('title'); } return el; };
+  document.addEventListener('pointerover', e => { if (e.pointerType === 'touch') return; const el = target(e.target); if (el === over) return; hide(); if (el){ over = el; timer = setTimeout(() => show(el), 450); } });
+  document.addEventListener('focusin', e => { const el = target(e.target); hide(); if (el && el.matches(':focus-visible')){ over = el; timer = setTimeout(() => show(el), 250); } });
+  document.addEventListener('focusout', hide); document.addEventListener('pointerdown', hide);
+  window.addEventListener('scroll', hide, true); window.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
+}
+
+// open in Split when the screen has room for two views side by side
+if (stage.clientWidth >= 960 && stage.clientWidth >= stage.clientHeight*1.1) setView('split');
 syncFinish();
 sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); });
 })();
