@@ -2723,6 +2723,24 @@ function savePresets(){ if (!writeJSON('tsw-dtf-presets', presets)) toast('This 
 function putLocal(p){ const i = presets.findIndex(x => sameName(x.name, p.name)); if (i >= 0) presets[i] = p; else presets.push(p); savePresets(); return i >= 0; }
 function dropLocal(name){ const i = presets.findIndex(x => sameName(x.name, name)); if (i >= 0){ presets.splice(i, 1); savePresets(); } }
 function useShared(list){ shared = [].concat(list || []).filter(isPreset); sharedAt = Date.now(); writeJSON('tsw-dtf-shared', shared); writeJSON('tsw-dtf-shared-at', sharedAt); }
+/* Starters: four built-in set-ups at 30 lpi (go to 35 by hand), on every computer, read-only. They set the halftone
+   style only: the file's own fixes (Levels, colour ranges, background, sharpen, edge, touch-ups, crop, size) stay. */
+const STARTERS = [
+  {name: 'Black tee · halftone fade', desc: 'Black and near-black drop out to the shirt, shading turns into dots, solid colours stay solid, with a crisp outline.',
+   s: {look: 'knock', shirt: '#111111', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92, hard: 50}},
+  {name: 'Glows & soft shadows · any tee', desc: 'Only the soft parts (glows, drop shadows, fades) turn into dots; solid parts stay solid. Keeps the shirt colour you have.',
+   s: {look: 'edges', k0: 0, k1: 100, mid: 0, con: 0, drop: 15, solid: 90, hard: 0}},
+  {name: 'White tee · halftone fade', desc: 'White and near-white drop out to the shirt, shading turns into dots, solid colours stay solid, with a crisp outline.',
+   s: {look: 'knock', shirt: '#ffffff', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92, hard: 50}},
+  {name: 'Vintage full halftone · dark tee', desc: 'The whole design becomes dots by brightness for a worn, vintage feel on dark tees.',
+   s: {look: 'full', shirt: '#111111', k0: 0, k1: 100, mid: 0, con: 10, drop: 18, solid: 96, hard: 50}}
+];
+function starterPreset(b){ // a starter as a full preset: today's settings, with the starter's halftone style on top
+  const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
+  Object.assign(s, {finish: 'dots', lpi: 30, angle: 22.5, shape: 'round', ink: 'art', cut: 50, ktol: 8}, b.s);
+  s.knock = null; s.knockFrom = 'shirt'; // the knock-out follows the shirt
+  return {name: b.name, desc: b.desc, v: 1, s, levels: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]}))};
+}
 function capturePreset(name, withSize){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   s.knock = st.knock; s.knockFrom = knockFrom;
@@ -2742,26 +2760,26 @@ function applyPreset(p){
   if (p.size && art){ setWidth(Math.min(p.size.w, p.size.h*art.w/art.h), true); buildSrcSoon(); } // fits inside the saved width and height
   remember(); schedule(); updateChecks();
   noteChange(`Preset “${p.name}”`);
-  toast(`Applied “${p.name}”.`);
+  toast(p.desc ? `${p.name}: ${p.desc}` : `Applied “${p.name}”.`);
 }
-function chosen(){ const v = $('presetSel').value; if (!v) return null; const where = v[0], list = where === 's' ? shared : presets, p = list[+v.slice(1)]; return p ? {p, where} : null; }
+function chosen(){ const v = $('presetSel').value; if (!v) return null; const where = v[0], list = where === 's' ? shared : where === 'b' ? STARTERS : presets, p = list[+v.slice(1)]; return p ? {p, where} : null; }
 function syncPresets(selName, where){
   const opt = (p, key) => `<option value="${key}">${esc(p.name)}</option>`;
-  let html = `<option value="">${shared.length || presets.length ? 'Choose a preset…' : 'No presets saved yet'}</option>`;
+  let html = '<option value="">Choose a preset…</option>' + `<optgroup label="Starters · 30 lpi">${STARTERS.map((p, i) => opt(p, 'b' + i)).join('')}</optgroup>`;
   if (SYNC_URL){
     if (shared.length) html += `<optgroup label="Shared with all computers">${shared.map((p, i) => opt(p, 's' + i)).join('')}</optgroup>`;
     if (presets.length) html += `<optgroup label="This computer only">${presets.map((p, i) => opt(p, 'l' + i)).join('')}</optgroup>`;
-  } else html += presets.map((p, i) => opt(p, 'l' + i)).join('');
+  } else if (presets.length) html += `<optgroup label="Saved on this computer">${presets.map((p, i) => opt(p, 'l' + i)).join('')}</optgroup>`;
   $('presetSel').innerHTML = html;
   let key = '';
-  if (selName != null){ const list = where === 's' ? shared : presets, i = list.findIndex(p => sameName(p.name, selName)); if (i >= 0) key = where + i; }
+  if (selName != null){ const list = where === 's' ? shared : where === 'b' ? STARTERS : presets, i = list.findIndex(p => sameName(p.name, selName)); if (i >= 0) key = where + i; }
   $('presetSel').value = key;
   $('presetConfirm').hidden = true;
   syncPresetButtons(); syncSyncNote();
 }
 function syncPresetButtons(){
   const c = chosen();
-  $('presetUpdate').disabled = $('presetDelete').disabled = !c || syncBusy;
+  $('presetUpdate').disabled = $('presetDelete').disabled = !c || c.where === 'b' || syncBusy; // starters are built in
   $('presetNew').disabled = syncBusy;
   $('presetShare').hidden = !(SYNC_URL && c && c.where === 'l'); $('presetShare').disabled = syncBusy;
 }
@@ -2817,7 +2835,7 @@ function remoteProblem(d){
                big: 'That preset is too big to share.', code: 'That team code isn’t right.'};
   return say[d.error] || 'The shared presets didn’t take that. Try again.';
 }
-$('presetSel').addEventListener('change', () => { const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); if (c) applyPreset(c.p); });
+$('presetSel').addEventListener('change', () => { const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); if (c) applyPreset(c.where === 'b' ? starterPreset(c.p) : c.p); });
 $('presetNew').addEventListener('click', () => {
   const look = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
   const shirt = (SHIRTS.find(([, hex]) => hex.toLowerCase() === st.shirt.toLowerCase()) || ['custom shirt'])[0];
