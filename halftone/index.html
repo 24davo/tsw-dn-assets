@@ -192,6 +192,7 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .f-head output{font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .f-note{margin:0;font-size:12px;color:var(--muted)}
 .name-field{margin-top:14px}
+.eswatch{display:inline-block;width:12px;height:12px;border:1px solid var(--line-strong);border-radius:var(--r);vertical-align:-1px}
 .name-field .opt{font-weight:500;color:var(--muted)}
 .name-field input{height:38px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:600}
 .name-field input:focus{border-color:var(--ink);outline:none}
@@ -530,6 +531,35 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
+      <section class="group step" id="edgeGroup">
+        <h2>Edge</h2>
+        <p class="f-note">Tidy the outline for the film. Clean the edge and Contract work in from the outside edge only, so colours inside the design keep their ink.</p>
+        <div class="field" id="hardField">
+          <label class="check-row"><input type="checkbox" id="hardOn"> Hard edge</label>
+          <div class="field" id="hardT" hidden>
+            <div class="f-head"><label for="hard">Threshold</label><output id="hardOut" for="hard">50%</output></div>
+            <input type="range" id="hard" min="1" max="99" step="1" value="50">
+          </div>
+          <p class="f-note">Like a Threshold action on the transparency. The film never has half see-through pixels (they’d print as a white haze), but with dots, soft edges and glows turn into dots. Hard edge makes them fully solid or removes them instead, for a crisp outline. Pixels at least this solid stay.</p>
+        </div>
+        <p class="f-note" id="hardCut" hidden>Hard edge: Clean cut already makes every edge hard. Set how solid a pixel must be with the Threshold in Print style.</p>
+        <div class="field">
+          <div class="f-head"><label for="edge">Clean the edge</label><output id="edgeOut" for="edge">Off</output></div>
+          <input type="range" id="edge" min="0" max="24" step="1" value="0">
+          <p class="f-note">Removes colours close to <span class="eswatch" id="edgeSwatch" aria-hidden="true"></span> <b id="edgeHex">#111111</b> (the knock-out colour) where they touch the outside, up to this far in. Further in, the same colour stays: black tyres keep their ink, and only their outer rim and the dark fringe go. If Knock out is taking the tyres too, choose Quick start “Fix soft edges” (no knock-out) and use this instead.</p>
+        </div>
+        <div class="field" id="etolField" hidden>
+          <div class="f-head"><label for="etol">Edge colour tolerance</label><output id="etolOut" for="etol">30%</output></div>
+          <input type="range" id="etol" min="2" max="60" step="1" value="30">
+          <p class="f-note">How close to that colour a pixel must be to go. Higher takes more of a soft, dark fringe.</p>
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="contract">Contract edge</label><output id="contractOut" for="contract">Off</output></div>
+          <input type="range" id="contract" min="0" max="12" step="1" value="0">
+          <p class="f-note">Shrinks the whole outline inwards by this much, like Photoshop’s Select › Modify › Contract. Trims a rough or haloed edge. 1 px is 0.08 mm.</p>
+        </div>
+      </section>
+
       <section class="group step" id="checkGroup">
         <h2>Check &amp; save</h2>
         <div class="checks" id="checks"></div>
@@ -553,6 +583,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
+            <li>For a crisp outline on a dark tee, tick Hard edge and add a little Clean the edge in the Edge step. Contract edge trims a rough or haloed outline.</li>
             <li>For a quick black-shirt clean-up with no halftone, use Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
             <li>Work down the numbered steps. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
@@ -669,6 +700,7 @@ function engine(){
     const far = lum ? Math.max(kl, 255 - kl) : Math.max(kr, 255 - kr, kg, 255 - kg, kb, 255 - kb);
     const one = p.one, ir = p.ink[0], ig = p.ink[1], ib = p.ink[2];
     const cut = p.cut || 0; // clean cut: no screen, pixels at least this solid print solid, the rest is removed
+    const hard = p.hard || 0; // hard edge (dots only): see-through pixels at least this solid become solid, the rest go, before any dots
     let lv = null; // Levels (like Photoshop's), applied to the colours before anything else
     if (p.levels){
       const {b: lb, g: lg, w: lw, ob, ow} = p.levels;
@@ -685,6 +717,7 @@ function engine(){
         const a = d[i+3];
         if (a === 0) continue;
         let c = a/255;
+        if (hard){ if (c < hard){ cls[i >> 2] = 1; continue; } c = 1; }
         let r = d[i], g = d[i+1], b = d[i+2];
         if (lv){ r = lv[r]; g = lv[g]; b = lv[b]; }
         if (tone){
@@ -724,7 +757,56 @@ function engine(){
         out[i+3] = 255; on++;
       }
     }
+    // Edge clean-up works from the outside of the design only: "outside" is every pixel with no ink in the design's shape
+    // (clear, knocked out or dropped) and the edge of the image. Gaps between dots count as inside.
+    if (p.edge > 0 || p.contract > 0){
+      const n = w*h, outside = new Uint8Array(n), gone = new Uint8Array(n);
+      for (let k = 0; k < n; k++) if (cls[k] <= 1) outside[k] = 1;
+      if (p.edge > 0){ // 1. clean the edge: colours close to the knock-out colour, reached from the outside through such colours
+        const efar = Math.max(kr, 255 - kr, kg, 255 - kg, kb, 255 - kb), etol = p.etol;
+        const near = k => {
+          const j = k*4; let r = d[j], g = d[j+1], b = d[j+2];
+          if (lv){ r = lv[r]; g = lv[g]; b = lv[b]; }
+          let m = r > kr ? r - kr : kr - r; const dg = g > kg ? g - kg : kg - g; if (dg > m) m = dg; const db = b > kb ? b - kb : kb - b; if (db > m) m = db;
+          return m/efar <= etol;
+        };
+        grow(w, h, outside, near, p.edge, gone);
+        for (let k = 0; k < n; k++) if (gone[k]) outside[k] = 1;
+      }
+      if (p.contract > 0) grow(w, h, outside, null, p.contract, gone); // 2. contract: everything this close to the (cleaned) outside
+      for (let k = 0; k < n; k++) if (gone[k]){ if (cls[k] >= 3) on--; cls[k] = 1; const j = k*4; out[j] = out[j+1] = out[j+2] = out[j+3] = 0; }
+    }
     return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on};
+  }
+  // Marks in gone the pixels up to D steps in from the outside, moving only through pixels accept() allows (all when null).
+  // Steps alternate 4 and 8 neighbours, so the band is an octagon: close to an even width all round.
+  function grow(w, h, outside, accept, D, gone){
+    let front = [];
+    for (let y = 0; y < h; y++){
+      const row = y*w;
+      for (let x = 0; x < w; x++){
+        const k = row + x;
+        if (outside[k] || gone[k]) continue;
+        if (!(x === 0 || y === 0 || x === w - 1 || y === h - 1 || outside[k-1] || outside[k+1] || outside[k-w] || outside[k+w])) continue;
+        if (accept && !accept(k)) continue;
+        gone[k] = 1; front.push(k);
+      }
+    }
+    for (let step = 2; step <= D && front.length; step++){
+      const next = [], diag = (step & 1) === 1;
+      for (const k of front){
+        const x = k % w, y = (k - x)/w;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){
+          if ((!dx && !dy) || (dx && dy && !diag)) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const nk = ny*w + nx;
+          if (outside[nk] || gone[nk] || (accept && !accept(nk))) continue;
+          gone[nk] = 1; next.push(nk);
+        }
+      }
+      front = next;
+    }
   }
   function handle(m){
     if (m.type === 'src') return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
@@ -749,8 +831,9 @@ const LOOKS = {
 };
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
-            ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50};
-const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut'];
+            ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
+            edge: 0, etol: 30, contract: 0, hard: 0}; // edge settings start off on each visit (not in KEEP), so a contract is never left on by surprise
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut','hard'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
@@ -765,6 +848,7 @@ let steps = [], stepPos = -1, stepTimer = 0, stepLabel = null, restoring = false
 let cropping = null; // while drawing a crop: {prev, F, rect: [x0, y0, x1, y1] in file pixels, drag, geo}
 let folds = [];      // the panel's sections, filled once their titles become fold buttons
 let showEdge = true; // the dashed print-area edge on the shirt views
+let resetsReady = false; // each step's Reset link, set up near the end
 try { showEdge = localStorage.getItem('tsw-dtf-edge') !== 'off'; } catch(e){}
 // colour ranges; not saved between visits, because sampled colours belong to one piece of art
 let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt', viewBeforeClear = 'shirt';
@@ -805,9 +889,10 @@ function params(){
           gamma: Math.pow(2, -st.mid/50), contrast: Math.pow(2, st.con/50),
           drop: st.drop/100, solid: st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
-          levels: lvIdentity() ? null : {...lv}};
+          levels: lvIdentity() ? null : {...lv}, edge: st.edge, etol: st.etol/100, contract: st.contract, hard: st.finish === 'cut' ? 0 : st.hard/100};
 }
 function schedule(){
+  if (resetsReady) syncResets();
   noteChange();
   if (!srcV) return;
   if (running){ pending = true; return; }
@@ -830,6 +915,7 @@ function setWidth(cm, quiet, typing){
   $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px, saved at 300 dpi. Largest print is 400 × 500 mm either way round.`;
   $('sizeRead').textContent = `${toMm(w)} × ${toMm(h)} mm · ${outW()} × ${outH()} px`;
   syncQuality();
+  if (resetsReady) syncResets();
 }
 
 /* Draw big images down in halves first so the result stays clean in every browser. */
@@ -1402,6 +1488,7 @@ function syncKnock(){
   if (document.activeElement !== $('knockHex')) $('knockHex').value = c.toUpperCase();
   $('knockTxt').textContent = !st.knock ? 'Following the shirt colour.' : knockFrom === 'art' ? 'Picked from the art.' : 'Set by hand.';
   $('knockReset').hidden = !st.knock;
+  $('edgeSwatch').style.background = c; $('edgeHex').textContent = c.toUpperCase();
 }
 function setKnock(hex){ st.knock = hex.toLowerCase(); knockFrom = 'hand'; syncKnock(); schedule(); }
 $('knockPick').addEventListener('input', e => setKnock(e.target.value));
@@ -1437,9 +1524,14 @@ function syncShirt(){
 shirtTray.addEventListener('click', e => { const b = e.target.closest('button.sw'); if (!b) return; st.shirt = b.dataset.hex; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
 $('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
 
-const SLIDERS = [['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
+const pxMm = v => v ? `${(v*25.4/DPI).toFixed(2)} mm · ${v} px` : 'Off'; // edge widths: print pixels at 300 dpi
+const EDGE_KEYS = {hard: 0, edge: 0, etol: 30, contract: 0};
+let hardWas = 50; // the hard edge threshold to go back to when it's ticked again
+const SLIDERS = [['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['contract', pxMm], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
                  ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`]];
-function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi); }
+function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi); $('etolField').hidden = !st.edge;
+  $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
+$('hardOn').addEventListener('change', e => { st.hard = e.target.checked ? hardWas : 0; syncSliders(); remember(); schedule(); });
 $('lpiChips').addEventListener('click', e => { const b = e.target.closest('[data-lpi]'); if (!b) return; st.lpi = +b.dataset.lpi; syncSliders(); updateNotes(); remember(); schedule(); });
 for (const [id, fmt] of SLIDERS){
   $(id).addEventListener('input', e => {
@@ -1469,6 +1561,7 @@ function syncFinish(){
   const cut = st.finish === 'cut';
   for (const el of document.querySelectorAll('.dotf, .dotk')) el.hidden = cut;
   $('cutField').hidden = !cut; $('ktolField').hidden = !cut;
+  $('hardField').hidden = cut; $('hardCut').hidden = !cut;
   updateChecks();
 }
 
@@ -1678,6 +1771,8 @@ function updateChecks(){
                        : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
+  const hardOn = st.hard && st.finish !== 'cut';
+  if (hardOn || st.edge || st.contract) rows.push(['info', '→', 'Edge tidied', [hardOn ? `Hard edge at ${st.hard}%` : '', st.edge ? `cleaned ${pxMm(st.edge)} in from the outside` : '', st.contract ? `contracted ${pxMm(st.contract)}` : ''].filter(Boolean).join(', ').replace(/^./, ch => ch.toUpperCase()) + '.']);
   if (s && outReady && s.total){
     const before = s.vis/s.total*100, after = lastOn/s.total*100, cut = s.vis ? Math.round((1 - lastOn/s.vis)*100) : 0;
     rows.push(cut > 0 ? ['info', '↘', `Ink area down ${cut}%`, `Ink covered ${before.toFixed(0)}% of the print box, now ${after.toFixed(0)}%. Less ink feels softer and breathes.`]
@@ -1913,6 +2008,7 @@ function settingsText(){
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
+         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.edge ? `; edge cleaned ${st.edge} px within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : '') + (st.contract ? `; contracted ${st.contract} px` : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
 let saving = false;
@@ -2000,7 +2096,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'contract'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -2022,7 +2118,7 @@ function capturePreset(name, withSize){
   return p;
 }
 function applyPreset(p){
-  for (const k of PRESET_KEYS) if (k in p.s) st[k] = p.s[k];
+  for (const k of PRESET_KEYS) if (k in p.s) st[k] = p.s[k]; else if (k in EDGE_KEYS) st[k] = EDGE_KEYS[k]; // presets from before the Edge step: edges off
   st.knock = p.s.knock || null; knockFrom = st.knock ? (p.s.knockFrom || 'hand') : 'shirt';
   Object.assign(lv, LV0, p.levels || {});
   rules = [].concat(p.rules || []).slice(0, MAX_RULES).map(R => ({...newRule(R.type || 'shadows', R.action || 'remove'), ...R, samples: [...(R.samples || [])]}));
@@ -2218,7 +2314,8 @@ const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v =
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, ktol: v => `Knock-out tolerance ${v}%`,
   mid: v => `Ink amount ${sign(v)}`, con: v => `Contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
-  knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt'};
+  knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt',
+  hard: v => v ? `Hard edge ${v}%` : 'Hard edge off', edge: v => v ? `Clean the edge ${pxMm(v)}` : 'Clean the edge off', etol: v => `Edge colour tolerance ${v}%`, contract: v => v ? `Contract edge ${pxMm(v)}` : 'Contract edge off'};
 function snapshot(){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   s.knock = st.knock; s.knockFrom = knockFrom;
@@ -2319,10 +2416,17 @@ const SECTION_TIPS = {
   rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
   toneGroup: 'How much ink goes down: lighten or darken it, add contrast, drop dots too small to hold, and join nearly solid dots.',
   inkGroup: 'Full colour prints the art’s own colours. Mono prints every dot in one colour.',
+  edgeGroup: 'Tidy the outline: take a dark fringe off the outside edge without losing the same colour inside, or shrink the whole outline a little.',
   finishGroup: 'The key decision: halftone dots (pick the lpi), or a clean cut with no dots where every pixel is solid or removed. Set it first so every other step shows in this style.',
   checkGroup: 'A last check that the film will print and wash well, then save the PNG.'
 };
 try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
+// a Reset link in the title of each step that has settings (Levels and Crop have their own)
+for (const id of ['finishGroup', 'sizeGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'toneGroup', 'inkGroup']){
+  const g = $(id), h = g.querySelector(':scope > h2'), head = document.createElement('div');
+  head.className = 'g-head'; g.insertBefore(head, h); head.appendChild(h);
+  head.insertAdjacentHTML('beforeend', `<div class="g-actions"><button class="link step-reset" type="button" data-reset="${id}" hidden>Reset</button></div>`);
+}
 for (const g of document.querySelectorAll('.panel > .group')){
   const h = g.querySelector(':scope > h2, :scope > .g-head > h2');
   if (!h) continue;
@@ -2364,7 +2468,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, contract: 0};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -2381,6 +2485,36 @@ function resetToDefaults(){ // every setting back to the start, the crop and siz
   toast('Back to the default settings. Undo (Cmd/Ctrl+Z) brings yours back.');
 }
 $('resetAll').addEventListener('click', resetToDefaults);
+/* Each step's Reset puts back just that step: to the Quick start's own values where it sets them, otherwise the defaults. */
+const lookVal = k => (LOOKS[st.look] && k in LOOKS[st.look] ? LOOKS[st.look] : DEFAULTS)[k];
+const openedWidth = () => Math.max(0.5, Math.min(art.isSample ? 25*art.w/art.fullW : art.w/(art.dpi || DPI)*2.54, maxWidthCm())); // as opened, for the current crop
+const sameRules = () => st.look === 'shadows' ? rules.length === 1 && JSON.stringify(rules[0]) === JSON.stringify(newRule('shadows', 'remove')) : !rules.length;
+const STEP_RESETS = {
+  finishGroup: {name: 'Print style', vals: () => ({finish: st.look === 'shadows' ? 'cut' : 'dots', cut: DEFAULTS.cut, lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape})},
+  sizeGroup: {name: 'Print size', same: () => !art || (Math.abs(st.widthCm - openedWidth()) < 0.005 && !art.smooth),
+              reset: () => { art.smooth = false; setWidth(openedWidth(), true); buildSrcSoon(); }},
+  knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null})},
+  rangeGroup: {name: 'Select', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
+  edgeGroup: {name: 'Edge', vals: () => ({...EDGE_KEYS})},
+  toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), drop: lookVal('drop'), solid: lookVal('solid')})},
+  inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex})}
+};
+function stepIsReset(id){ const r = STEP_RESETS[id]; if (r.same) return r.same(); const v = r.vals(); return Object.keys(v).every(k => st[k] === v[k]); }
+function syncResets(){ for (const b of document.querySelectorAll('.step-reset')) b.hidden = stepIsReset(b.dataset.reset); }
+document.querySelector('.panel').addEventListener('click', e => {
+  const b = e.target.closest('.step-reset'); if (!b) return;
+  const r = STEP_RESETS[b.dataset.reset];
+  if (cropping) endCrop(false);
+  if (picking) endPick();
+  noteChange(`Reset ${r.name}`);
+  if (r.reset){ if (art || !r.same) r.reset(); }
+  else { const v = r.vals(); if ('knock' in v){ knockFrom = 'shirt'; } Object.assign(st, v); }
+  syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape); syncKnock(); syncInk(); updateNotes();
+  b.closest('.group').classList.remove('done');
+  remember(); schedule(); updateChecks(); syncResets();
+  toast(`${r.name} is back to its defaults. Undo (Cmd/Ctrl+Z) brings yours back.`);
+});
+resetsReady = true; syncResets();
 function clearDoneMarks(){ for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
 $('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); syncFoldAll(); if (open) drawHisto(); });
 syncFoldAll(); syncStepButtons();
@@ -2394,6 +2528,10 @@ const TIPS = [
   ['#nameSuffix', 'Added to the end of the saved name, e.g. an order number or the print area.'],
   ['#foldAll', 'Open or close every section.'],
   ['#resetAll', 'Put every setting back to the tool’s defaults and remove the crop. Undo brings them back.'],
+  ['.step-reset', 'Put just this step back to its defaults. Undo brings yours back.'],
+  ['#edge', 'How far in from the outside edge the knock-out colour is removed. Off leaves the edge as it is.'],
+  ['#contract', 'Shrink the whole outline inwards by this much.'],
+  ['#hardOn', 'Make soft, see-through pixels solid or removed before the dots are made, like a Threshold action.'],
   ['[data-view="shirt"]', 'The print on the shirt colour.'],
   ['[data-view="clear"]', 'The print on transparent checks: the checks are clear film. Press T to flick to it.'],
   ['[data-view="base"]', 'White shows where ink (with its white base) prints. Black is clear film.'],
