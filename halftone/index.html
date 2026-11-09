@@ -87,6 +87,17 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .sample:hover::after,.sample:focus-visible::after{opacity:1}
 .check-row{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;width:max-content}
 .check-row input{width:16px;height:16px;margin:0;accent-color:var(--ink)}
+.panel{counter-reset:step}
+.group{scroll-margin-top:52px}
+.group.step{counter-increment:step}
+.step-n{flex:none;display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border:1.5px solid var(--line-strong);border-radius:var(--r);color:var(--ink);font-size:11px;font-weight:800;letter-spacing:0}
+.step-n::before{content:counter(step)}
+.group.done .step-n{border-color:var(--good);background:var(--good-bg);color:var(--good)}
+.group.done .step-n::before{content:"✓"}
+.step-foot{display:flex;padding-top:4px}
+.crop-bar{position:absolute;left:50%;top:70px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100% - 24px);padding:6px 6px 6px 12px;font-size:13px;font-weight:600}
+.stage.cropping #view{cursor:crosshair}
+.stage.cropping .pane-pick,.stage.cropping #legend{display:none!important}
 .g-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .g-head h2{flex:1}
 .sec-toggle{display:flex;align-items:center;gap:8px;width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;text-align:left;cursor:pointer}
@@ -259,12 +270,14 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <div class="tray pane-pick" id="paneA" hidden><select id="paneASel" aria-label="Left side shows"></select></div>
       <div class="tray pane-pick" id="paneB" hidden><select id="paneBSel" aria-label="Right side shows"></select></div>
       <div class="busy" id="busy" hidden>Updating…</div>
+      <div class="tray crop-bar" id="cropBar" hidden><span id="cropTxt"></span><button class="btn small" type="button" id="cropCancel">Cancel</button><button class="btn small primary" type="button" id="cropApply">Apply crop</button></div>
       <div class="hint" id="pickHint" hidden>Click the colour to knock out · Esc to cancel</div>
       <div class="drop" id="drop" hidden>Drop the art to open it</div>
     </section>
 
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><button class="link" type="button" id="foldAll">Expand all</button></div>
+
       <section class="group" id="presetGroup">
         <h2>Presets</h2>
         <select class="preset-sel" id="presetSel" aria-label="Choose a preset"><option value="">Choose a preset…</option></select>
@@ -298,8 +311,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <p class="f-note">The last 40 changes to this design. Click a step to go back to it. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes. History starts again when you open new art.</p>
       </section>
 
-      <section class="group">
-        <h2>Look</h2>
+      <section class="group" id="lookGroup">
+        <h2>Quick start</h2>
         <div class="looks" id="looks">
           <label class="look"><input type="radio" name="look" id="lookShadows" value="shadows"><span class="look-t">Remove shadows</span><span class="look-d">Quick clean-up for dark shirts. Shadows drop out and the rest prints solid, with no dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookEdges" value="edges"><span class="look-t">Fix soft edges</span><span class="look-d">Shadows, glows and fades become solid dots. Solid parts stay solid.</span></label>
@@ -308,7 +321,17 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group" id="sizeGroup">
+      <section class="group step" id="cropGroup">
+        <h2>Crop</h2>
+        <div class="preset-actions">
+          <button class="chip" type="button" id="cropTrim">Trim to the art</button>
+          <button class="chip" type="button" id="cropDraw" aria-pressed="false">Draw a crop</button>
+          <button class="chip" type="button" id="cropReset" hidden>Reset crop</button>
+        </div>
+        <p class="f-note" id="cropNote">No crop: the whole file is used.</p>
+      </section>
+
+      <section class="group step" id="sizeGroup">
         <h2>Print size</h2>
         <div class="size">
           <div class="num"><input type="number" id="wcm" min="0.5" max="50" step="0.1" value="25" aria-label="Print width in centimetres"><span>cm wide</span></div>
@@ -326,7 +349,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <p class="f-note" id="lifeNote"></p>
       </section>
 
-      <section class="group" id="levelsGroup">
+      <section class="group step" id="levelsGroup">
         <div class="g-head"><h2>Levels</h2><div class="g-actions"><button class="link" type="button" id="lvAuto">Auto</button><button class="link" type="button" id="lvReset" hidden>Reset</button></div></div>
         <p class="f-note">Like Photoshop’s Levels, and it runs first. Drag the black point right to turn more dark detail into shadow, or the white point left for more highlights. The adjusted colours are what prints.</p>
         <div class="levels">
@@ -354,43 +377,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group">
-        <h2>Finish</h2>
-        <div class="chips" id="finishChips" role="group" aria-label="Finish">
-          <button class="chip" type="button" data-finish="dots">Halftone dots</button>
-          <button class="chip" type="button" data-finish="cut">Clean cut, no dots</button>
-        </div>
-        <div class="field" id="cutField" hidden>
-          <div class="f-head"><label for="cut">Threshold</label><output id="cutOut" for="cut">50%</output></div>
-          <input type="range" id="cut" min="5" max="95" step="1" value="50">
-          <p class="f-note">Pixels less solid than this are removed. Everything left prints fully solid, so the film has no see-through areas.</p>
-        </div>
-        <div class="field dotf">
-          <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">35 lpi</output></div>
-          <input type="range" id="lpi" min="15" max="65" step="1" value="35">
-          <p class="f-note" id="lpiNote">Dots every 0.73 mm.</p>
-        </div>
-        <div class="field dotf">
-          <div class="f-head"><span>Angle</span></div>
-          <div class="chips" id="angleChips">
-            <button class="chip" type="button" data-angle="0">0°</button>
-            <button class="chip" type="button" data-angle="15">15°</button>
-            <button class="chip" type="button" data-angle="22.5">22.5°</button>
-            <button class="chip" type="button" data-angle="45">45°</button>
-          </div>
-        </div>
-        <div class="field dotf">
-          <div class="f-head"><span>Dot shape</span></div>
-          <div class="chips" id="shapeChips">
-            <button class="chip" type="button" data-shape="round">Round</button>
-            <button class="chip" type="button" data-shape="ellipse">Ellipse</button>
-            <button class="chip" type="button" data-shape="square">Square</button>
-            <button class="chip" type="button" data-shape="line">Line</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="group" id="knockGroup">
+      <section class="group step" id="knockGroup">
         <h2>Knock out</h2>
         <div class="knock">
           <span class="colorbox" title="Choose the knock-out colour"><input type="color" id="knockPick" value="#111111" aria-label="Knock-out colour"></span>
@@ -413,15 +400,16 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group" id="rangeGroup">
-        <h2>Colour range</h2>
+      <section class="group step" id="rangeGroup">
+        <h2>Select (colour range)</h2>
         <p class="f-note">Like Photoshop’s Select › Colour Range. Select shadows, midtones, highlights or colours picked from the art, then choose what happens to them. Show displays the selection: white is selected.</p>
         <div class="rules" id="rules"></div>
         <button class="btn small" type="button" id="addRule">Add a colour range</button>
       </section>
 
-      <section class="group">
-        <h2>Tone</h2>
+      <section class="group step" id="toneGroup">
+        <h2>Ink density</h2>
+        <p class="f-note">How much ink goes down: lighten or darken it, add contrast, drop dots too small to hold, and join nearly solid dots.</p>
         <div class="field">
           <div class="f-head"><label for="mid">Ink amount</label><output id="midOut" for="mid">0</output></div>
           <input type="range" id="mid" min="-50" max="50" step="1" value="0">
@@ -442,11 +430,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group">
+      <section class="group step" id="inkGroup">
         <h2>Ink colour</h2>
         <div class="chips" id="inkChips">
-          <button class="chip" type="button" data-ink="art">Artwork colours</button>
-          <button class="chip" type="button" data-ink="one">One colour</button>
+          <button class="chip" type="button" data-ink="art">Full colour</button>
+          <button class="chip" type="button" data-ink="one">Mono</button>
         </div>
         <div class="inkrow" id="inkRow" hidden>
           <span class="colorbox"><input type="color" id="inkPick" value="#ffffff" aria-label="Ink colour"></span>
@@ -454,8 +442,45 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group">
-        <h2>Film check</h2>
+      <section class="group step" id="finishGroup">
+        <h2>Finish</h2>
+        <div class="chips" id="finishChips" role="group" aria-label="Finish">
+          <button class="chip" type="button" data-finish="dots">Halftone dots</button>
+          <button class="chip" type="button" data-finish="cut">Clean cut, no dots</button>
+        </div>
+        <div class="field" id="cutField" hidden>
+          <div class="f-head"><label for="cut">Threshold</label><output id="cutOut" for="cut">50%</output></div>
+          <input type="range" id="cut" min="5" max="95" step="1" value="50">
+          <p class="f-note">Pixels less solid than this are removed. Everything left prints fully solid, so the film has no see-through areas.</p>
+        </div>
+        <div class="field dotf">
+          <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">35 lpi</output></div>
+          <input type="range" id="lpi" min="15" max="65" step="1" value="35">
+          <div class="chips" id="lpiChips" role="group" aria-label="Common lines per inch"><button class="chip" type="button" data-lpi="30">30 lpi</button><button class="chip" type="button" data-lpi="35">35 lpi</button></div>
+          <p class="f-note" id="lpiNote">Dots every 0.73 mm.</p>
+        </div>
+        <div class="field dotf">
+          <div class="f-head"><span>Angle</span></div>
+          <div class="chips" id="angleChips">
+            <button class="chip" type="button" data-angle="0">0°</button>
+            <button class="chip" type="button" data-angle="15">15°</button>
+            <button class="chip" type="button" data-angle="22.5">22.5°</button>
+            <button class="chip" type="button" data-angle="45">45°</button>
+          </div>
+        </div>
+        <div class="field dotf">
+          <div class="f-head"><span>Dot shape</span></div>
+          <div class="chips" id="shapeChips">
+            <button class="chip" type="button" data-shape="round">Round</button>
+            <button class="chip" type="button" data-shape="ellipse">Ellipse</button>
+            <button class="chip" type="button" data-shape="square">Square</button>
+            <button class="chip" type="button" data-shape="line">Line</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="group step" id="checkGroup">
+        <h2>Check &amp; save</h2>
         <div class="checks" id="checks"></div>
       </section>
 
@@ -474,6 +499,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
             <li>For a quick black-shirt clean-up with no halftone, use Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
+            <li>Work down the numbered steps. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
             <li>Sections start folded: click a title to open it, or Expand all. Hover over anything for a short tip.</li>
             <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
@@ -675,6 +701,8 @@ const origCanvas = document.createElement('canvas'), origCtx = origCanvas.getCon
 let lastCls = null, paintN = 0, origFor = 0, origMips = null;
 // history: the last 40 changes to this design (see the History section)
 let steps = [], stepPos = -1, stepTimer = 0, stepLabel = null, restoring = false, unsaved = false;
+let cropping = null; // while drawing a crop: {prev, F, rect: [x0, y0, x1, y1] in file pixels, drag, geo}
+let folds = [];      // the panel's sections, filled once their titles become fold buttons
 // colour ranges; not saved between visits, because sampled colours belong to one piece of art
 let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt', viewBeforeClear = 'shirt';
 const selCanvas = document.createElement('canvas');
@@ -740,16 +768,16 @@ function setWidth(cm, quiet, typing){
 }
 
 /* Draw big images down in halves first so the result stays clean in every browser. */
-function drawScaled(ctx, img, sw, sh, W, H){
-  let src = img, cw = sw, ch = sh;
+function drawScaled(ctx, img, sx, sy, sw, sh, W, H){ // the part of img at (sx, sy, sw, sh), drawn at W × H
+  let src = img, rx = sx, ry = sy, cw = sw, ch = sh;
   while (cw/2 >= W && ch/2 >= H){
     const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(cw/2)); c.height = Math.max(1, Math.round(ch/2));
     const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
-    x.drawImage(src, 0, 0, c.width, c.height); src = c; cw = c.width; ch = c.height;
+    x.drawImage(src, rx, ry, cw, ch, 0, 0, c.width, c.height); src = c; rx = 0; ry = 0; cw = c.width; ch = c.height;
   }
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.clearRect(0, 0, W, H);
-  ctx.drawImage(src, 0, 0, W, H);
+  ctx.drawImage(src, rx, ry, cw, ch, 0, 0, W, H);
 }
 function buildMips(cv){
   const levels = [cv]; let c = cv;
@@ -825,7 +853,7 @@ function buildSrc(){
   if (!art) return;
   const W = outW(), H = outH();
   srcCanvas.width = W; srcCanvas.height = H;
-  drawScaled(srcCtx, art.el, art.w, art.h, W, H);
+  drawScaled(srcCtx, art.el, art.crop.x, art.crop.y, art.crop.w, art.crop.h, W, H);
   const data = srcCtx.getImageData(0, 0, W, H);
   srcV++; srcStats = null;
   bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer}, [data.data.buffer]);
@@ -852,6 +880,7 @@ function render(){
   const r = stage.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
   const cw = Math.max(1, Math.round(r.width*dpr)), ch = Math.max(1, Math.round(r.height*dpr));
   if (view.width !== cw || view.height !== ch){ view.width = cw; view.height = ch; }
+  if (cropping){ drawCropView(r, dpr, cw, ch); return; }
   const topH = $('oTop').offsetHeight + 12, botH = $('oBottom').offsetHeight + 12;
   let panes;
   if (st.view !== 'split'){
@@ -1049,21 +1078,153 @@ window.addEventListener('keydown', e => {
   }
 });
 
+/* ---------- Crop: trim to the art or draw a crop; the print keeps its scale, so cutting margins doesn't enlarge the art ---------- */
+function syncCrop(){
+  if (!art) return;
+  const c = art.crop, whole = c.x === 0 && c.y === 0 && c.w === art.fullW && c.h === art.fullH;
+  $('cropReset').hidden = whole;
+  $('cropNote').textContent = whole ? 'No crop: the whole file is used.'
+    : `Cropped to ${c.w.toLocaleString()} × ${c.h.toLocaleString()} px of ${art.fullW.toLocaleString()} × ${art.fullH.toLocaleString()}. The print keeps its scale.`;
+}
+function setCrop(c){ // c in file pixels; keeps the cm-per-pixel scale
+  const before = art.w;
+  art.crop = {x: Math.max(0, Math.round(c.x)), y: Math.max(0, Math.round(c.y)), w: Math.max(1, Math.round(c.w)), h: Math.max(1, Math.round(c.h))};
+  art.crop.w = Math.min(art.crop.w, art.fullW - art.crop.x); art.crop.h = Math.min(art.crop.h, art.fullH - art.crop.y);
+  art.w = art.crop.w; art.h = art.crop.h;
+  setWidth(st.widthCm*art.w/before, false);
+  syncCrop(); buildSrc(); setZoom('fit'); updateChecks();
+}
+function findTrim(){ // the art's own edges: clear margins, or margins the colour of the top-left corner (a JPG's background)
+  const F = Math.min(1, 2000/Math.max(art.fullW, art.fullH)), w = Math.max(1, Math.round(art.fullW*F)), h = Math.max(1, Math.round(art.fullH*F));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(art.el, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data;
+  let clear = false; for (let i = 3; i < d.length; i += 4) if (d[i] < 8){ clear = true; break; }
+  const bg = [d[0], d[1], d[2]], keep = i => clear ? d[i+3] >= 8 : Math.abs(d[i] - bg[0]) > 14 || Math.abs(d[i+1] - bg[1]) > 14 || Math.abs(d[i+2] - bg[2]) > 14;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (keep((yy*w + xx)*4)){ if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+  if (x1 < 0) return null;
+  const X0 = Math.max(0, Math.floor((x0 - 1)/F)), Y0 = Math.max(0, Math.floor((y0 - 1)/F)); // one preview pixel spare all round, so no art is lost
+  const X1 = Math.min(art.fullW, Math.ceil((x1 + 2)/F)), Y1 = Math.min(art.fullH, Math.ceil((y1 + 2)/F));
+  return {x: X0, y: Y0, w: X1 - X0, h: Y1 - Y0, byColour: !clear};
+}
+$('cropTrim').addEventListener('click', () => {
+  if (!art) return;
+  const t = findTrim();
+  if (!t){ toast('There’s no art to trim to.'); return; }
+  if (t.x === 0 && t.y === 0 && t.w >= art.fullW && t.h >= art.fullH){ toast('Nothing to trim: the art already reaches the edges.'); return; }
+  if (cropping) endCrop(false);
+  noteChange('Trim to the art'); setCrop(t);
+  toast(t.byColour ? 'Trimmed the plain background around the art.' : 'Trimmed the clear margin around the art.');
+});
+$('cropReset').addEventListener('click', () => { if (!art) return; if (cropping) endCrop(false); noteChange('Reset crop'); setCrop({x: 0, y: 0, w: art.fullW, h: art.fullH}); });
+$('cropDraw').addEventListener('click', () => cropping ? endCrop(false) : startCrop());
+$('cropApply').addEventListener('click', () => endCrop(true));
+$('cropCancel').addEventListener('click', () => endCrop(false));
+function startCrop(){
+  if (!art) return;
+  if (picking) endPick();
+  const F = Math.min(1, 2400/Math.max(art.fullW, art.fullH)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(art.fullW*F)); c.height = Math.max(1, Math.round(art.fullH*F));
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(art.el, 0, 0, c.width, c.height);
+  const k = art.crop;
+  cropping = {prev: c, F, rect: [k.x, k.y, k.x + k.w, k.y + k.h], drag: null, geo: null};
+  $('cropDraw').setAttribute('aria-pressed', 'true'); $('cropBar').style.top = `${$('oTop').offsetHeight + 20}px`; $('cropBar').hidden = false;
+  stage.classList.add('cropping'); syncCropTxt(); render();
+}
+function endCrop(apply){
+  if (!cropping) return;
+  const [x0, y0, x1, y1] = cropping.rect;
+  cropping = null;
+  $('cropDraw').setAttribute('aria-pressed', 'false'); $('cropBar').hidden = true; stage.classList.remove('cropping'); view.style.cursor = '';
+  if (apply && art){ noteChange(`Crop ${Math.round(x1 - x0)} × ${Math.round(y1 - y0)} px`); setCrop({x: x0, y: y0, w: x1 - x0, h: y1 - y0}); }
+  else render();
+}
+function syncCropTxt(){
+  const [x0, y0, x1, y1] = cropping.rect, cmPerPx = st.widthCm/art.w;
+  $('cropTxt').textContent = `${Math.round(x1 - x0)} × ${Math.round(y1 - y0)} px · ${((x1 - x0)*cmPerPx).toFixed(1)} × ${((y1 - y0)*cmPerPx).toFixed(1)} cm. Drag the corners or edges, or inside to move.`;
+}
+const cropHandles = (X0, Y0, X1, Y1) => { const mx = (X0 + X1)/2, my = (Y0 + Y1)/2; return [[X0, Y0, 'nw'], [mx, Y0, 'n'], [X1, Y0, 'ne'], [X1, my, 'e'], [X1, Y1, 'se'], [mx, Y1, 's'], [X0, Y1, 'sw'], [X0, my, 'w']]; };
+function drawCropView(r, dpr, cw, ch){
+  const P = cropping.prev, top = $('oTop').offsetHeight + $('cropBar').offsetHeight + 36, bottom = $('oBottom').offsetHeight + 24, side = 24;
+  vctx.fillStyle = '#1a1a1a'; vctx.fillRect(0, 0, cw, ch);
+  const bw = Math.max(40, r.width - side*2), bh = Math.max(40, r.height - top - bottom), s = Math.min(bw/P.width, bh/P.height);
+  const k = s*dpr, dx = (side + (bw - P.width*s)/2)*dpr, dy = (top + (bh - P.height*s)/2)*dpr, W = P.width*k, H = P.height*k;
+  vctx.fillStyle = checker(dpr); vctx.fillRect(dx, dy, W, H);
+  vctx.imageSmoothingEnabled = true; vctx.imageSmoothingQuality = 'high'; vctx.drawImage(P, dx, dy, W, H);
+  const f = cropping.F*k, [x0, y0, x1, y1] = cropping.rect, X0 = dx + x0*f, Y0 = dy + y0*f, X1 = dx + x1*f, Y1 = dy + y1*f;
+  vctx.fillStyle = 'rgba(0,0,0,0.62)'; // everything outside the crop is dimmed
+  vctx.fillRect(dx, dy, W, Y0 - dy); vctx.fillRect(dx, Y1, W, dy + H - Y1); vctx.fillRect(dx, Y0, X0 - dx, Y1 - Y0); vctx.fillRect(X1, Y0, dx + W - X1, Y1 - Y0);
+  const lw = Math.max(1, Math.round(dpr));
+  vctx.strokeStyle = 'rgba(255,255,255,0.35)'; vctx.lineWidth = lw; vctx.beginPath();
+  for (const t of [1/3, 2/3]){ vctx.moveTo(X0 + (X1 - X0)*t, Y0); vctx.lineTo(X0 + (X1 - X0)*t, Y1); vctx.moveTo(X0, Y0 + (Y1 - Y0)*t); vctx.lineTo(X1, Y0 + (Y1 - Y0)*t); }
+  vctx.stroke();
+  vctx.strokeStyle = '#ffffff'; vctx.lineWidth = lw*2; vctx.strokeRect(X0, Y0, X1 - X0, Y1 - Y0);
+  const hs = 9*dpr; vctx.lineWidth = lw;
+  for (const [hx, hy] of cropHandles(X0, Y0, X1, Y1)){ vctx.fillStyle = '#ffffff'; vctx.fillRect(hx - hs/2, hy - hs/2, hs, hs); vctx.strokeStyle = '#111111'; vctx.strokeRect(hx - hs/2, hy - hs/2, hs, hs); }
+  cropping.geo = {dx, dy, f, dpr};
+}
+function cropAt(e){
+  const r = view.getBoundingClientRect(), g = cropping.geo, px = (e.clientX - r.left)*g.dpr, py = (e.clientY - r.top)*g.dpr;
+  return {px, py, fx: (px - g.dx)/g.f, fy: (py - g.dy)/g.f};
+}
+function cropHit(p){ // which handle, edge or area is under the pointer
+  const g = cropping.geo, [x0, y0, x1, y1] = cropping.rect, tol = 12*g.dpr;
+  const X0 = g.dx + x0*g.f, Y0 = g.dy + y0*g.f, X1 = g.dx + x1*g.f, Y1 = g.dy + y1*g.f;
+  for (const [hx, hy, m] of cropHandles(X0, Y0, X1, Y1)) if (Math.abs(p.px - hx) <= tol && Math.abs(p.py - hy) <= tol) return m;
+  const inX = p.px > X0 && p.px < X1, inY = p.py > Y0 && p.py < Y1;
+  if (inY && Math.abs(p.px - X0) <= tol) return 'w';
+  if (inY && Math.abs(p.px - X1) <= tol) return 'e';
+  if (inX && Math.abs(p.py - Y0) <= tol) return 'n';
+  if (inX && Math.abs(p.py - Y1) <= tol) return 's';
+  return inX && inY ? 'move' : 'new';
+}
+const CROP_CURSORS = {nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', move: 'move', new: 'crosshair'};
+function cropDown(e){
+  if (!cropping.geo) return;
+  const p = cropAt(e);
+  cropping.drag = {mode: cropHit(p), start: p, rect: [...cropping.rect]};
+  view.setPointerCapture(e.pointerId);
+}
+function cropMove(e){
+  if (!cropping.geo) return;
+  const p = cropAt(e), d = cropping.drag;
+  if (!d){ view.style.cursor = CROP_CURSORS[cropHit(p)]; return; }
+  const W = art.fullW, H = art.fullH, MIN = 8, mx = p.fx - d.start.fx, my = p.fy - d.start.fy;
+  let [x0, y0, x1, y1] = d.rect;
+  if (d.mode === 'new'){
+    const sx = clampN(d.start.fx, 0, W), sy = clampN(d.start.fy, 0, H), cx = clampN(p.fx, 0, W), cy = clampN(p.fy, 0, H);
+    x0 = Math.min(sx, cx); x1 = Math.max(sx, cx); y0 = Math.min(sy, cy); y1 = Math.max(sy, cy);
+    if (x1 - x0 < MIN || y1 - y0 < MIN) return;
+  } else if (d.mode === 'move'){
+    const w = x1 - x0, h = y1 - y0;
+    x0 = clampN(x0 + mx, 0, W - w); y0 = clampN(y0 + my, 0, H - h); x1 = x0 + w; y1 = y0 + h;
+  } else {
+    if (d.mode.includes('w')) x0 = clampN(x0 + mx, 0, x1 - MIN);
+    if (d.mode.includes('e')) x1 = clampN(x1 + mx, x0 + MIN, W);
+    if (d.mode.includes('n')) y0 = clampN(y0 + my, 0, y1 - MIN);
+    if (d.mode.includes('s')) y1 = clampN(y1 + my, y0 + MIN, H);
+  }
+  cropping.rect = [x0, y0, x1, y1]; syncCropTxt(); render();
+}
+
 let drag = null;
 view.addEventListener('pointerdown', e => {
+  if (cropping){ cropDown(e); return; }
   if (picking){ pickAt(e); return; }
   if (st.zoom === 'fit') return;
   drag = {x: e.clientX, y: e.clientY, cx: st.cx, cy: st.cy};
   view.setPointerCapture(e.pointerId); stage.classList.add('panning');
 });
 view.addEventListener('pointermove', e => {
+  if (cropping){ cropMove(e); return; }
   if (!drag || !geo) return;
   st.cx = drag.cx - (e.clientX - drag.x)*geo.dpr/geo.k; st.cy = drag.cy - (e.clientY - drag.y)*geo.dpr/geo.k; render();
 });
-const endDrag = () => { drag = null; stage.classList.remove('panning'); };
+const endDrag = () => { drag = null; stage.classList.remove('panning'); if (cropping) cropping.drag = null; };
 view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag);
 view.addEventListener('wheel', e => {
-  if (!geo) return;
+  if (!geo || cropping) return;
   if (e.ctrlKey || e.metaKey){ // a trackpad pinch arrives as Ctrl + scroll: zoom at the pointer
     e.preventDefault();
     const r = view.getBoundingClientRect(), k = st.zoom === 'fit' ? geo.k : st.zoom;
@@ -1074,7 +1235,7 @@ view.addEventListener('wheel', e => {
   e.preventDefault(); st.cx += e.deltaX*geo.dpr/geo.k; st.cy += e.deltaY*geo.dpr/geo.k; render();
 }, {passive: false});
 view.addEventListener('dblclick', e => {
-  if (picking) return;
+  if (picking || cropping) return;
   const r = view.getBoundingClientRect();
   if (st.zoom === 'fit') setZoom(1, e.clientX - r.left, e.clientY - r.top); else setZoom('fit');
 });
@@ -1113,7 +1274,10 @@ function pickAt(e){
 }
 $('pickBtn').addEventListener('click', () => picking ? endPick() : startPick('knock'));
 $('knockReset').addEventListener('click', () => { st.knock = null; syncKnock(); schedule(); });
-window.addEventListener('keydown', e => { if (e.key === 'Escape' && picking) endPick(); });
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && picking) endPick();
+  if (cropping && (e.key === 'Escape' || e.key === 'Enter')){ e.preventDefault(); endCrop(e.key === 'Enter'); }
+});
 let knockFrom = 'shirt'; // where the knock-out colour came from: the shirt, the art, or typed / chosen by hand
 function syncKnock(){
   const c = st.knock || st.shirt;
@@ -1158,7 +1322,8 @@ $('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncS
 
 const SLIDERS = [['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
                  ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`]];
-function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } }
+function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi); }
+$('lpiChips').addEventListener('click', e => { const b = e.target.closest('[data-lpi]'); if (!b) return; st.lpi = +b.dataset.lpi; syncSliders(); updateNotes(); remember(); schedule(); });
 for (const [id, fmt] of SLIDERS){
   $(id).addEventListener('input', e => {
     let v = +e.target.value;
@@ -1180,7 +1345,7 @@ $('looks').addEventListener('change', e => {
   if (st.look === 'shadows') ensureShadowRule();
   syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
-function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look !== 'knock' && st.look !== 'full'; }
+function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look !== 'knock' && st.look !== 'full'; syncStepButtons(); }
 $('finishChips').addEventListener('click', e => { const b = e.target.closest('[data-finish]'); if (!b) return; st.finish = b.dataset.finish; syncFinish(); remember(); schedule(); });
 function syncFinish(){
   syncChips('finishChips', 'finish', st.finish);
@@ -1409,7 +1574,9 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '
 
 /* ---------- opening art ---------- */
 function setArt(el, w, h, name, isSample, dpi){
-  art = {el, w, h, name, isSample};
+  if (cropping) endCrop(false);
+  art = {el, w, h, name, isSample, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}}; // w and h follow the crop
+  syncCrop(); clearDoneMarks();
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
   const fi = $('fileInfo');
   fi.innerHTML = (isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(name)}</b><span>${w.toLocaleString()} × ${h.toLocaleString()} px</span>`;
@@ -1643,7 +1810,7 @@ function syncSyncNote(){
       : syncState === 'ok' ? `Shared presets are up to date${at ? ` (checked ${at})` : ''}. <button class="link" type="button" data-act="refresh">Refresh</button>${mine}`
       : `Couldn’t reach the shared presets${at ? `, so these are from ${at}` : ''}. <button class="link" type="button" data-act="refresh">Try again</button>${mine}`;
   }
-  $('presetHelp').innerHTML = 'A preset keeps the look, finish, dots, knock-out, Levels, colour ranges, tone, ink and shirt colour. Open the art first, then choose the preset. ' +
+  $('presetHelp').innerHTML = 'A preset keeps the quick start, Levels, knock-out, selections, ink density, ink colour, finish and dots, and the shirt colour. Open the art first, then choose the preset. ' +
     (SYNC_URL ? 'Shared presets are the same on every workshop computer. <button class="link" type="button" data-act="export">Export</button> saves a backup file, and <button class="link" type="button" data-act="import">Import</button> shares the presets in one.'
               : (IN_CLAUDE && SYNC_ADDRESS ? 'Shared presets work on the staff web address; here they stay in this browser. ' : 'Presets live in this browser: ') +
                 '<button class="link" type="button" data-act="export">Export</button> them to a file and <button class="link" type="button" data-act="import">Import</button> it on the other computers.');
@@ -1792,17 +1959,18 @@ $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentEleme
 const HIST_MAX = 40;
 const LOOK_NAMES = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'};
 const sign = v => (v > 0 ? '+' : '') + v;
-const STEP_NAMES = {look: v => `Look: ${LOOK_NAMES[v]}`, finish: v => v === 'cut' ? 'Finish: clean cut' : 'Finish: halftone dots', cut: v => `Threshold ${v}%`,
+const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v === 'cut' ? 'Finish: clean cut' : 'Finish: halftone dots', cut: v => `Threshold ${v}%`,
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`,
   mid: v => `Ink amount ${sign(v)}`, con: v => `Contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
-  ink: v => v === 'one' ? 'One ink colour' : 'Artwork colours', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
+  ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
   knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt'};
 function snapshot(){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   s.knock = st.knock; s.knockFrom = knockFrom;
-  return {s, lv: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]})), w: st.widthCm};
+  return {s, lv: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]})), w: st.widthCm, crop: art ? {...art.crop} : null};
 }
 function describeStep(a, b){ // a short name for what changed from a to b
+  if (JSON.stringify(a.crop) !== JSON.stringify(b.crop)) return b.crop ? `Crop ${b.crop.w} × ${b.crop.h} px` : 'Crop';
   if (Math.abs(a.w - b.w) > 1e-6) return `Print size ${b.w.toFixed(1)} cm wide`;
   for (const k of Object.keys(STEP_NAMES)) if (a.s[k] !== b.s[k]) return STEP_NAMES[k](b.s[k]);
   if (JSON.stringify(a.lv) !== JSON.stringify(b.lv)) return `Levels ${b.lv.b} · ${b.lv.g.toFixed(2)} · ${b.lv.w}`;
@@ -1833,7 +2001,8 @@ function applySnap(snap){
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1));
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
   syncInk(); syncLevels(); updateNotes(); syncRules();
-  if (art && Math.abs(snap.w - st.widthCm) > 1e-6){ setWidth(snap.w, true); buildSrcSoon(); }
+  if (art && snap.crop && JSON.stringify(snap.crop) !== JSON.stringify(art.crop)){ art.crop = {...snap.crop}; art.w = art.crop.w; art.h = art.crop.h; syncCrop(); setWidth(snap.w, true); buildSrcSoon(); }
+  else if (art && Math.abs(snap.w - st.widthCm) > 1e-6){ setWidth(snap.w, true); buildSrcSoon(); }
   remember(); schedule(); updateChecks();
   restoring = false;
 }
@@ -1885,37 +2054,63 @@ window.addEventListener('beforeunload', e => { commitStep(); if (hasUnsaved()){ 
 
 /* ---------- sections start folded; Expand all opens every one ---------- */
 const SECTION_TIPS = {
-  'presets': 'Save the whole set-up under a name and use it again. Shared presets are the same on every workshop computer.',
-  'history': 'Every change to this design. Click a step to go back to it.',
-  'look': 'Starting points. Remove shadows is the quick black-tee clean-up; the others turn the art into dots in different ways.',
-  'print-size': 'Set the size first. The art is resized to this at 300 dpi before anything else, so dots are true to the print.',
-  'levels': 'Like Photoshop’s Levels, applied first. Move the black point right so more of the art counts as shadow.',
-  'finish': 'Halftone dots, or a clean cut with no dots where every pixel is solid or removed.',
-  'knock-out': 'Colours close to this one drop out so the shirt shows through. Shading in between turns into dots.',
-  'colour-range': 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
-  'tone': 'Fine-tune the amount of ink and the contrast, and clean up tiny or nearly solid dots.',
-  'ink-colour': 'Print in the art’s own colours, or every dot in one colour.',
-  'film-check': 'A quick check that the film will print and wash well.'
+  presetGroup: 'Save the whole set-up under a name and use it again. Shared presets are the same on every workshop computer.',
+  historyGroup: 'Every change to this design. Click a step to go back to it.',
+  lookGroup: 'A starting point that sets several steps at once. Remove shadows is the quick black-tee clean-up.',
+  cropGroup: 'Trim empty margins or draw a crop. Do it first, so the print size measures the real art.',
+  sizeGroup: 'The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
+  levelsGroup: 'Like Photoshop’s Levels. Move the black point right so more of the art counts as shadow.',
+  knockGroup: 'Colours close to the shirt (or the colour you set) drop out so the shirt shows through.',
+  rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
+  toneGroup: 'How much ink goes down: lighten or darken it, add contrast, drop dots too small to hold, and join nearly solid dots.',
+  inkGroup: 'Full colour prints the art’s own colours. Mono prints every dot in one colour.',
+  finishGroup: 'Halftone dots (pick the lpi), or a clean cut with no dots where every pixel is solid or removed.',
+  checkGroup: 'A last check that the film will print and wash well, then save the PNG.'
 };
 try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
-{
-  const folds = [];
-  for (const g of document.querySelectorAll('.panel > .group')){
-    const h = g.querySelector(':scope > h2, :scope > .g-head > h2');
-    if (!h) continue;
-    const key = h.textContent.trim().toLowerCase().replace(/\s+/g, '-'), b = document.createElement('button');
-    b.type = 'button'; b.className = 'sec-toggle'; b.textContent = h.textContent;
-    if (SECTION_TIPS[key]) b.dataset.tip = SECTION_TIPS[key];
-    h.textContent = ''; h.appendChild(b);
-    const set = open => { g.classList.toggle('folded', !open); b.setAttribute('aria-expanded', String(open)); };
-    set(false); folds.push({g, set});
-    b.addEventListener('click', () => { const open = g.classList.contains('folded'); set(open); syncFoldAll(); if (open) drawHisto(); });
+for (const g of document.querySelectorAll('.panel > .group')){
+  const h = g.querySelector(':scope > h2, :scope > .g-head > h2');
+  if (!h) continue;
+  const b = document.createElement('button');
+  g.dataset.name = h.textContent.trim();
+  b.type = 'button'; b.className = 'sec-toggle';
+  if (g.classList.contains('step')){ const n = document.createElement('span'); n.className = 'step-n'; n.setAttribute('aria-hidden', 'true'); b.appendChild(n); }
+  b.appendChild(document.createTextNode(h.textContent));
+  if (SECTION_TIPS[g.id]) b.dataset.tip = SECTION_TIPS[g.id];
+  h.textContent = ''; h.appendChild(b);
+  const set = open => { g.classList.toggle('folded', !open); b.setAttribute('aria-expanded', String(open)); };
+  set(false); folds.push({g, set});
+  b.addEventListener('click', () => { const open = g.classList.contains('folded'); set(open); syncFoldAll(); if (open) drawHisto(); });
+  if (g.classList.contains('step')){
+    const foot = document.createElement('div'); foot.className = 'step-foot';
+    foot.innerHTML = '<button class="btn small step-next" type="button" data-tip="Tick this step and open the next one."></button>';
+    g.appendChild(foot);
+    foot.firstChild.addEventListener('click', () => stepDone(g));
   }
-  const anyFolded = () => folds.some(f => !f.g.hidden && f.g.classList.contains('folded'));
-  function syncFoldAll(){ $('foldAll').textContent = anyFolded() ? 'Expand all' : 'Collapse all'; }
-  $('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); syncFoldAll(); if (open) drawHisto(); });
+}
+function visibleSteps(){ return folds.filter(f => f.g.classList.contains('step') && !f.g.hidden); } // a declaration, so syncLook can call it at start-up
+function anyFolded(){ return folds.some(f => !f.g.hidden && f.g.classList.contains('folded')); }
+function syncFoldAll(){ $('foldAll').textContent = anyFolded() ? 'Expand all' : 'Collapse all'; }
+function syncStepButtons(){ // each step's button names the next step; the last one saves
+  const vs = visibleSteps();
+  vs.forEach((f, i) => {
+    const b = f.g.querySelector('.step-next'), next = vs[i + 1];
+    if (!b) return;
+    b.textContent = next ? `Done · next: ${next.g.dataset.name}` : 'Done · Save PNG';
+    b.classList.toggle('primary', !next);
+  });
+}
+function stepDone(g){
+  const vs = visibleSteps(), i = vs.findIndex(f => f.g === g), next = vs[i + 1];
+  g.classList.add('done');
+  if (i >= 0) vs[i].set(false);
+  if (next){ next.set(true); next.g.scrollIntoView({block: 'start', behavior: 'smooth'}); if (next.g.id === 'levelsGroup') drawHisto(); }
+  else savePng();
   syncFoldAll();
 }
+function clearDoneMarks(){ for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
+$('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); syncFoldAll(); if (open) drawHisto(); });
+syncFoldAll(); syncStepButtons();
 
 /* ---------- rollover help: a short tip on hover, or on keyboard focus ---------- */
 const TIPS = [
@@ -1944,6 +2139,10 @@ const TIPS = [
   ['#presetNew', 'Save the current set-up under a new name.'], ['#presetUpdate', 'Save the current settings over the chosen preset.'],
   ['#presetDelete', 'Delete the chosen preset.'], ['#presetShare', 'Copy this computer’s preset to the shared list.'],
   ['#histUndo', 'Go back one step.'], ['#histRedo', 'Go forward one step.'],
+  ['[data-lpi="30"]', '30 lpi: slightly bigger dots, a common choice for tees.'], ['[data-lpi="35"]', '35 lpi: our usual dot size.'],
+  ['#cropTrim', 'Cut away the empty margin around the art: clear pixels, or a plain background such as a JPG’s white.'],
+  ['#cropDraw', 'Drag a crop on the preview. Enter applies it, Esc cancels.'], ['#cropReset', 'Use the whole file again.'],
+  ['[data-ink="art"]', 'Print each dot in the art’s own colour.'], ['[data-ink="one"]', 'Print every dot in one ink colour.'],
   ['#sizeChips [data-w="max"]', 'The largest size that fits within 40 × 50 cm.']
 ];
 for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el.dataset.tip = t;
