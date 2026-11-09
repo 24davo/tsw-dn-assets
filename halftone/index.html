@@ -480,8 +480,18 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       </section>
 
       <section class="group step" id="levelsGroup">
-        <div class="g-head"><h2>Levels</h2><div class="g-actions"><button class="link" type="button" id="lvAuto">Auto</button><button class="link" type="button" id="lvReset" hidden>Reset</button></div></div>
-        <p class="f-note">Like Photoshop’s Levels, and it runs first. Drag the black point right to turn more dark detail into shadow, or the white point left for more highlights. The adjusted colours are what prints.</p>
+        <div class="g-head"><h2>Brightness &amp; levels</h2><div class="g-actions"><button class="link" type="button" id="lvAuto">Auto</button><button class="link" type="button" id="lvReset" hidden>Reset</button></div></div>
+        <div class="field">
+          <div class="f-head"><label for="bri">Brightness</label><output id="briOut" for="bri">0</output></div>
+          <input type="range" id="bri" min="-100" max="100" step="1" value="0">
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="bcon">Contrast</label><output id="bconOut" for="bcon">0</output></div>
+          <input type="range" id="bcon" min="-100" max="100" step="1" value="0">
+        </div>
+        <p class="f-note">Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes colours away from the middle (or towards it). Double-click a slider to put it back to 0.</p>
+        <div class="lv-sub">Levels</div>
+        <p class="f-note">Like Photoshop’s Levels. Drag the black point right to turn more dark detail into shadow, or the white point left for more highlights. All of this runs first, on the art’s colours, and the adjusted colours are what prints.</p>
         <div class="levels">
           <canvas id="histo" role="img" aria-label="Brightness histogram of the art"></canvas>
           <div class="lv-track" id="lvTrack">
@@ -550,7 +560,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <input type="range" id="mid" min="-50" max="50" step="1" value="0">
         </div>
         <div class="field">
-          <div class="f-head"><label for="con">Contrast</label><output id="conOut" for="con">0</output></div>
+          <div class="f-head"><label for="con">Ink contrast</label><output id="conOut" for="con">0</output></div>
           <input type="range" id="con" min="-50" max="50" step="1" value="0">
         </div>
         <div class="field dotf">
@@ -817,9 +827,15 @@ function engine(){
     const hard = p.hard || 0; // hard edge (dots only): see-through pixels at least this solid become solid, the rest go, before any dots
     let lv = null; // Levels (like Photoshop's), applied to the colours before anything else
     if (p.levels){
-      const {b: lb, g: lg, w: lw, ob, ow} = p.levels;
+      const {b: lb, g: lg, w: lw, ob, ow} = p.levels, bri = p.levels.bri || 0, bc = p.levels.bc || 0, bg = Math.pow(2, -bri/100), bf = Math.pow(2, bc/100);
       lv = new Uint8Array(256);
-      for (let v = 0; v < 256; v++){ let x = (v - lb)/Math.max(1, lw - lb); x = x < 0 ? 0 : x > 1 ? 1 : x; lv[v] = Math.round(ob + Math.pow(x, 1/lg)*(ow - ob)); }
+      for (let v = 0; v < 256; v++){
+        let u = v; // Brightness (a midtone curve that keeps black and white) and Contrast (around the middle), like Photoshop's
+        if (bri) u = 255*Math.pow(u/255, bg);
+        if (bc) u = (u - 127.5)*bf + 127.5;
+        u = u < 0 ? 0 : u > 255 ? 255 : u;
+        let x = (u - lb)/Math.max(1, lw - lb); x = x < 0 ? 0 : x > 1 ? 1 : x; lv[v] = Math.round(ob + Math.pow(x, 1/lg)*(ow - ob));
+      }
     }
     // colour ranges, applied in order to each pixel's ink amount; sel keeps one range's selection for the Selection view
     const rules = p.rules || [], nr = rules.length, selOut = p.selOut;
@@ -1958,14 +1974,19 @@ rulesBox.addEventListener('click', e => {
 });
 
 /* ---------- Levels: like Photoshop's, applied to the art's colours before everything else ---------- */
-const LV0 = {b: 0, g: 1, w: 255, ob: 0, ow: 255};
+const LV0 = {b: 0, g: 1, w: 255, ob: 0, ow: 255, bri: 0, bc: 0}; // bri, bc: Brightness and Contrast, in the same curve
 const lv = {...LV0};
 let hist = null;
-const lvIdentity = () => lv.b === 0 && lv.g === 1 && lv.w === 255 && lv.ob === 0 && lv.ow === 255;
+const levelsOnlyIdentity = () => lv.b === 0 && lv.g === 1 && lv.w === 255 && lv.ob === 0 && lv.ow === 255;
+const lvIdentity = () => levelsOnlyIdentity() && !lv.bri && !lv.bc;
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 function levelsLut(){ // the same curve the engine uses
   const t = new Uint8Array(256);
-  for (let v = 0; v < 256; v++){ const x = clampN((v - lv.b)/Math.max(1, lv.w - lv.b), 0, 1); t[v] = Math.round(lv.ob + Math.pow(x, 1/lv.g)*(lv.ow - lv.ob)); }
+  const bg = Math.pow(2, -(lv.bri || 0)/100), bf = Math.pow(2, (lv.bc || 0)/100);
+  for (let v = 0; v < 256; v++){
+    let u = v; if (lv.bri) u = 255*Math.pow(u/255, bg); if (lv.bc) u = (u - 127.5)*bf + 127.5; u = clampN(u, 0, 255);
+    const x = clampN((u - lv.b)/Math.max(1, lv.w - lv.b), 0, 1); t[v] = Math.round(lv.ob + Math.pow(x, 1/lv.g)*(lv.ow - lv.ob));
+  }
   return t;
 }
 function setLevel(k, v){
@@ -1982,6 +2003,13 @@ function syncLevels(){
   for (const h of document.querySelectorAll('.lv-h')){ const k = h.dataset.h; h.style.left = `${pos[k]/255*100}%`; h.setAttribute('aria-valuenow', k === 'g' ? lv.g.toFixed(2) : String(lv[k])); }
   $('lvB').value = lv.b; $('lvG').value = lv.g.toFixed(2); $('lvW').value = lv.w; $('lvOB').value = lv.ob; $('lvOW').value = lv.ow;
   $('lvReset').hidden = lvIdentity();
+  const sgn = v => (v > 0 ? '+' : '') + v;
+  $('bri').value = lv.bri || 0; $('briOut').textContent = sgn(lv.bri || 0);
+  $('bcon').value = lv.bc || 0; $('bconOut').textContent = sgn(lv.bc || 0);
+}
+for (const [id, k] of [['bri', 'bri'], ['bcon', 'bc']]){
+  $(id).addEventListener('input', e => { lv[k] = +e.target.value; syncLevels(); schedule(); });
+  $(id).addEventListener('dblclick', () => { lv[k] = 0; syncLevels(); schedule(); }); // double-click: back to 0
 }
 for (const [id, k] of [['lvB', 'b'], ['lvG', 'g'], ['lvW', 'w'], ['lvOB', 'ob'], ['lvOW', 'ow']]) $(id).addEventListener('change', e => setLevel(k, parseFloat(e.target.value)));
 for (const track of [$('lvTrack'), $('lvOutTrack')]){
@@ -2239,7 +2267,7 @@ function loadDoc(d){ // puts a tab's design on screen: its art, settings, histor
   const snap = d.snap;
   for (const k of PRESET_KEYS) st[k] = snap.s[k];
   st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
-  Object.assign(lv, snap.lv);
+  Object.assign(lv, LV0, snap.lv);
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(d.activeRule || 0, Math.max(0, rules.length - 1));
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; lastSel = null; selKey = -1;
   hist = null; srcStats = null; $('saveBtn').disabled = true;
@@ -2408,7 +2436,8 @@ function settingsText(){
   const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
   const ruleText = (R, i) => `range ${i + 1}: ${R.type === 'sample' ? 'colours ' + R.samples.join(' ').toUpperCase() : R.type + ' ' + R.range + '%'}` +
     ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}`;
-  const levels = lvIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`;
+  const levels = (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') +
+    (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
@@ -2717,7 +2746,7 @@ const LOOK_NAMES = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: '
 const sign = v => (v > 0 ? '+' : '') + v;
 const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v === 'cut' ? 'Print style: clean cut' : 'Print style: halftone dots', cut: v => `Threshold ${v}%`,
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, ktol: v => `Knock-out tolerance ${v}%`,
-  mid: v => `Ink amount ${sign(v)}`, con: v => `Contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
+  mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
   knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt',
   sharp: v => v ? `Sharpen ${v}%` : 'Sharpen off', sradius: v => `Sharpen radius ${(+v).toFixed(1)} px`,
@@ -2732,7 +2761,11 @@ function describeStep(a, b){ // a short name for what changed from a to b
   if (JSON.stringify(a.crop) !== JSON.stringify(b.crop)) return b.crop ? `Crop ${b.crop.w} × ${b.crop.h} px` : 'Crop';
   if (Math.abs(a.w - b.w) > 1e-6) return `Print size ${toMm(b.w)} mm wide`;
   for (const k of Object.keys(STEP_NAMES)) if (a.s[k] !== b.s[k]) return STEP_NAMES[k](b.s[k]);
-  if (JSON.stringify(a.lv) !== JSON.stringify(b.lv)) return `Levels ${b.lv.b} · ${b.lv.g.toFixed(2)} · ${b.lv.w}`;
+  if (JSON.stringify(a.lv) !== JSON.stringify(b.lv)){
+    if ((a.lv.bri || 0) !== (b.lv.bri || 0)) return `Brightness ${sign(b.lv.bri || 0)}`;
+    if ((a.lv.bc || 0) !== (b.lv.bc || 0)) return `Contrast ${sign(b.lv.bc || 0)}`;
+    return `Levels ${b.lv.b} · ${b.lv.g.toFixed(2)} · ${b.lv.w}`;
+  }
   if (a.rules.length !== b.rules.length) return b.rules.length > a.rules.length ? 'Added a colour range' : 'Deleted a colour range';
   return 'Colour range';
 }
@@ -2756,7 +2789,7 @@ function applySnap(snap){
   restoring = true;
   for (const k of PRESET_KEYS) st[k] = snap.s[k];
   st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
-  Object.assign(lv, snap.lv);
+  Object.assign(lv, LV0, snap.lv);
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1));
   if (art && (snap.n || 0) !== art.strokesN){ art.strokesN = Math.min(snap.n || 0, art.strokes.length); rebuildEdits(art); buildSrcSoon(); }
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
@@ -2823,7 +2856,7 @@ const SECTION_TIPS = {
   cropGroup: 'Trim empty margins or draw a crop. Do it first, so the print size measures the real art.',
   sizeGroup: 'The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
   sharpGroup: 'Unsharp mask on the art at print size: crisper edges and detail before the dots. Light or Medium suits most soft files.',
-  levelsGroup: 'Like Photoshop’s Levels. Move the black point right so more of the art counts as shadow.',
+  levelsGroup: 'Brightness/Contrast and Levels, like Photoshop’s, on the art’s colours before anything else. Move the black point right so more of the art counts as shadow.',
   knockGroup: 'Colours close to the shirt (or the colour you set) drop out so the shirt shows through.',
   rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
   toneGroup: 'How much ink goes down: lighten or darken it, add contrast, drop dots too small to hold, and join nearly solid dots.',
@@ -2973,7 +3006,7 @@ const TIPS = [
   ['[data-finish="dots"]', 'Shading, fades and soft or partly removed areas become halftone dots.'],
   ['[data-finish="cut"]', 'No dots: every pixel is either solid or removed, at the threshold. The quick black-tee clean-up.'],
   ['[data-angle="22.5"]', '22.5° is the usual angle for single-colour halftones.'],
-  ['#lvAuto', 'Set the black and white points from the art, like Photoshop’s Auto.'], ['#lvReset', 'Undo all Levels changes.'],
+  ['#lvAuto', 'Set the black and white points from the art, like Photoshop’s Auto.'], ['#lvReset', 'Put Brightness, Contrast and Levels back to normal.'], ['#bri', 'Lighten or darken the art’s midtones. Double-click for 0.'], ['#bcon', 'More or less contrast in the art’s colours. Double-click for 0.'],
   ['#pickBtn', 'Click a colour in the art to knock it out.'], ['#knockReset', 'Knock out the shirt colour again.'],
   ['#addRule', 'Add another selection. Each one applies after the ones above it.'],
   ['#presetNew', 'Save the current set-up under a new name.'], ['#presetUpdate', 'Save the current settings over the chosen preset.'],
