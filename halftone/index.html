@@ -191,6 +191,11 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .f-head label,.f-head span{font-weight:600;font-size:13px}
 .f-head output{font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .f-note{margin:0;font-size:12px;color:var(--muted)}
+.name-field{margin-top:14px}
+.name-field .opt{font-weight:500;color:var(--muted)}
+.name-field input{height:38px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:600}
+.name-field input:focus{border-color:var(--ink);outline:none}
+#nameNote b{color:var(--ink);font-weight:600;word-break:break-all}
 input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{height:34px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:13px;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums}
@@ -227,7 +232,12 @@ input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .mark.bad{background:var(--bad-bg);color:var(--bad)}
 .mark.info{background:var(--soft);color:var(--muted)}
 .check b{display:block;font-size:13px}
-.check span{display:block;font-size:12px;color:var(--muted)}
+.check > div > span{display:block;font-size:12px;color:var(--muted)}
+.q-note{padding:10px;border:1px solid var(--line);border-radius:var(--r)}
+.qpill{flex:none;height:24px;padding:0 8px;border:1px solid currentColor;border-radius:var(--r);font:inherit;font-size:12px;font-weight:700;line-height:1;white-space:nowrap;cursor:pointer}
+.qpill.good{color:var(--good);background:var(--good-bg)}
+.qpill.warn{color:var(--warn);background:var(--warn-bg)}
+.qpill.bad{color:var(--bad);background:var(--bad-bg)}
 details summary{cursor:pointer;font-weight:600;font-size:13px}
 details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:calc(100% - 32px);padding:10px 16px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;z-index:20}
@@ -405,17 +415,19 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <section class="group step" id="sizeGroup">
         <h2>Print size</h2>
         <div class="size">
-          <div class="num"><input type="number" id="wcm" min="0.5" max="50" step="0.1" value="25" aria-label="Print width in centimetres"><span>cm wide</span></div>
+          <div class="num"><input type="number" id="wcm" min="5" max="500" step="1" value="250" aria-label="Print width in millimetres"><span>mm wide</span></div>
           <span class="by">×</span>
-          <div class="num"><input type="number" id="hcm" min="0.5" max="50" step="0.1" value="25" aria-label="Print height in centimetres"><span>cm high</span></div>
+          <div class="num"><input type="number" id="hcm" min="5" max="500" step="1" value="250" aria-label="Print height in millimetres"><span>mm high</span></div>
         </div>
         <div class="chips" id="sizeChips">
-          <button class="chip" type="button" data-w="9">Chest 9 cm</button>
-          <button class="chip" type="button" data-w="28">Front 28 cm</button>
-          <button class="chip" type="button" data-w="33">Back 33 cm</button>
+          <button class="chip" type="button" data-w="90">Chest 90 mm</button>
+          <button class="chip" type="button" data-w="280">Front 280 mm</button>
+          <button class="chip" type="button" data-w="330">Back 330 mm</button>
           <button class="chip" type="button" data-w="max">Largest</button>
         </div>
-        <p class="f-note" id="sizeNote">Saved at 300 dpi. Largest print is 40 × 50 cm either way round.</p>
+        <div class="check q-note" id="qualityNote" hidden></div>
+        <label class="check-row" id="smoothRow" hidden data-tip="Redraws the art from its real pixels with smooth edges, so the blocks don’t print as steps. Leave it off for pixel-art designs."><input type="checkbox" id="smoothBtn"> Smooth the enlarged pixels</label>
+        <p class="f-note" id="sizeNote">Saved at 300 dpi. Largest print is 400 × 500 mm either way round.</p>
         <p class="f-note">Type either side and the other follows. The original art is resized to this first, then Levels, colour ranges and dots are worked out at this size, so the dots are true to the print.</p>
         <p class="f-note" id="lifeNote"></p>
       </section>
@@ -521,6 +533,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <section class="group step" id="checkGroup">
         <h2>Check &amp; save</h2>
         <div class="checks" id="checks"></div>
+        <div class="field name-field">
+          <div class="f-head"><label for="nameSuffix">Add to the file name</label><span class="opt">Optional</span></div>
+          <input type="text" id="nameSuffix" maxlength="40" placeholder="e.g. order 57615, front" aria-describedby="nameNote" autocomplete="off" spellcheck="false">
+          <p class="f-note" id="nameNote">Saves as –</p>
+        </div>
       </section>
 
       <section class="group">
@@ -551,11 +568,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 <div class="cal" id="cal" role="dialog" aria-modal="true" aria-labelledby="calTitle" hidden>
   <div class="cal-box">
     <h2 class="cal-title" id="calTitle">Set up life size for this screen</h2>
-    <p class="cal-text">Hold a bank card flat against the screen over the box, and drag the slider until the box is exactly as wide as the card. Bank, ID and loyalty cards are all 85.6 mm wide. Or hold a ruler to the 10 cm line.</p>
+    <p class="cal-text">Hold a bank card flat against the screen over the box, and drag the slider until the box is exactly as wide as the card. Bank, ID and loyalty cards are all 85.6 mm wide. Or hold a ruler to the 100 mm line.</p>
     <div class="cal-stage">
       <div class="cal-card" id="calCard"><span>85.6 mm</span></div>
       <div class="cal-ruler" id="calRuler"></div>
-      <div class="cal-ends"><span>0</span><span>10 cm</span></div>
+      <div class="cal-ends"><span>0</span><span>100 mm</span></div>
     </div>
     <input type="range" id="calRange" min="200" max="900" step="1" value="378" aria-label="Box size">
     <p class="cal-text">Set it up again on each screen you use, and after changing the display's scaling setting.</p>
@@ -802,15 +819,17 @@ function schedule(){
 /* ---------- sizes ---------- */
 function maxWidthCm(){ if (!art) return MAX_SHORT; const a = art.h/art.w; return art.w >= art.h ? Math.min(MAX_LONG, MAX_SHORT/a) : Math.min(MAX_SHORT, MAX_LONG/a); }
 function outW(){ return Math.max(1, Math.round(st.widthCm/2.54*DPI)); }
+const toMm = cm => Math.round(cm*10); // sizes are kept in cm, and shown and typed in mm
 function outH(){ return Math.max(1, Math.round(outW()*art.h/art.w)); }
 function setWidth(cm, quiet, typing){
   const max = maxWidthCm(), w = Math.max(0.5, Math.min(cm || 1, max)), h = w*art.h/art.w;
-  if (!quiet && cm > max + 0.001) toast(`Largest print is 40 × 50 cm, so it’s set to ${w.toFixed(1)} × ${h.toFixed(1)} cm.`);
+  if (!quiet && cm > max + 0.001) toast(`Largest print is 400 × 500 mm, so it’s set to ${toMm(w)} × ${toMm(h)} mm.`);
   st.widthCm = w;
-  if (typing !== $('wcm')) $('wcm').value = w.toFixed(1);
-  if (typing !== $('hcm')) $('hcm').value = h.toFixed(1);
-  $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px, saved at 300 dpi. Largest print is 40 × 50 cm either way round.`;
-  $('sizeRead').textContent = `${w.toFixed(1)} × ${(w*art.h/art.w).toFixed(1)} cm · ${outW()} × ${outH()} px`;
+  if (typing !== $('wcm')) $('wcm').value = toMm(w);
+  if (typing !== $('hcm')) $('hcm').value = toMm(h);
+  $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px, saved at 300 dpi. Largest print is 400 × 500 mm either way round.`;
+  $('sizeRead').textContent = `${toMm(w)} × ${toMm(h)} mm · ${outW()} × ${outH()} px`;
+  syncQuality();
 }
 
 /* Draw big images down in halves first so the result stays clean in every browser. */
@@ -824,6 +843,14 @@ function drawScaled(ctx, img, sx, sy, sw, sh, W, H){ // the part of img at (sx, 
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.clearRect(0, 0, W, H);
   ctx.drawImage(src, rx, ry, cw, ch, 0, 0, W, H);
+}
+function drawArt(ctx, W, H){ // the cropped art at W × H
+  const c = art.crop, s = art.q ? art.q.scale : 1;
+  if (art.smooth && s > 1 && art.q.kind === 'blocky'){ // back to one pixel per block, then enlarged smoothly
+    const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(c.w/s)); t.height = Math.max(1, Math.round(c.h/s));
+    const x = t.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(art.el, c.x, c.y, c.w, c.h, 0, 0, t.width, t.height);
+    drawScaled(ctx, t, 0, 0, t.width, t.height, W, H);
+  } else drawScaled(ctx, art.el, c.x, c.y, c.w, c.h, W, H);
 }
 function buildMips(cv){
   const levels = [cv]; let c = cv;
@@ -909,7 +936,7 @@ function buildSrc(){
   if (!art) return;
   const W = outW(), H = outH();
   srcCanvas.width = W; srcCanvas.height = H;
-  drawScaled(srcCtx, art.el, art.crop.x, art.crop.y, art.crop.w, art.crop.h, W, H);
+  drawArt(srcCtx, W, H);
   const data = srcCtx.getImageData(0, 0, W, H);
   srcV++; srcStats = null;
   bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer}, [data.data.buffer]);
@@ -1232,7 +1259,7 @@ function endCrop(apply){
 }
 function syncCropTxt(){
   const [x0, y0, x1, y1] = cropping.rect, cmPerPx = st.widthCm/art.w;
-  $('cropTxt').textContent = `${Math.round(x1 - x0)} × ${Math.round(y1 - y0)} px · ${((x1 - x0)*cmPerPx).toFixed(1)} × ${((y1 - y0)*cmPerPx).toFixed(1)} cm. Drag the corners or edges, or inside to move.`;
+  $('cropTxt').textContent = `${Math.round(x1 - x0)} × ${Math.round(y1 - y0)} px · ${toMm((x1 - x0)*cmPerPx)} × ${toMm((y1 - y0)*cmPerPx)} mm. Drag the corners or edges, or inside to move.`;
 }
 const cropHandles = (X0, Y0, X1, Y1) => { const mx = (X0 + X1)/2, my = (Y0 + Y1)/2; return [[X0, Y0, 'nw'], [mx, Y0, 'n'], [X1, Y0, 'ne'], [X1, my, 'e'], [X1, Y1, 'se'], [mx, Y1, 's'], [X0, Y1, 'sw'], [X0, my, 'w']]; };
 function drawCropView(r, dpr, cw, ch){
@@ -1624,12 +1651,12 @@ try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw
 
 let wTimer = 0;
 // width or height: type either one, the other follows the art's shape
-const fromBox = (id, v) => id === 'hcm' ? v*art.w/art.h : v;
+const fromBox = (id, mm) => (id === 'hcm' ? mm*art.w/art.h : mm)/10; // a typed mm box, as the print width in cm
 for (const id of ['wcm', 'hcm']){
   $(id).addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0) || !art) return; clearTimeout(wTimer); wTimer = setTimeout(() => { setWidth(fromBox(id, v), false, e.target); buildSrcSoon(); updateChecks(); }, 450); });
   $(id).addEventListener('change', e => { const v = parseFloat(e.target.value); clearTimeout(wTimer); if (!art) return; setWidth(v > 0 ? fromBox(id, v) : st.widthCm); buildSrcSoon(); updateChecks(); });
 }
-$('sizeChips').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b || !art) return; setWidth(b.dataset.w === 'max' ? maxWidthCm() : +b.dataset.w, b.dataset.w === 'max'); buildSrcSoon(); updateChecks(); });
+$('sizeChips').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b || !art) return; setWidth(b.dataset.w === 'max' ? maxWidthCm() : +b.dataset.w/10, b.dataset.w === 'max'); buildSrcSoon(); updateChecks(); });
 
 /* ---------- notes and the film check ---------- */
 function updateNotes(){
@@ -1649,33 +1676,162 @@ function updateChecks(){
   if (st.finish === 'cut') rows.push(['good', '✓', 'Clean cut, no dots', `Pixels at least ${st.cut}% solid print fully solid. The rest is removed.`]);
   else rows.push(md >= 0.3 ? ['good', '✓', `Smallest dot about ${md.toFixed(2)} mm`, 'A good size for DTF film.']
                        : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
-  const dpi = Math.round(art.w/(st.widthCm/2.54));
-  rows.push(dpi >= 240 ? ['good', '✓', `Art is ${dpi} dpi at this size`, 'Sharp.']
-          : dpi >= 150 ? ['warn', '!', `Art is ${dpi} dpi at this size`, 'Dots print crisp, but fine lines may look soft.']
-                       : ['bad', '!', `Art is only ${dpi} dpi at this size`, `Dots print crisp, but detail will look soft. Sharp up to ${(art.w/240*2.54).toFixed(1)} cm wide, or ask for a bigger file.`]);
+  const q = qualityInfo();
+  rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (s && outReady && s.total){
     const before = s.vis/s.total*100, after = lastOn/s.total*100, cut = s.vis ? Math.round((1 - lastOn/s.vis)*100) : 0;
     rows.push(cut > 0 ? ['info', '↘', `Ink area down ${cut}%`, `Ink covered ${before.toFixed(0)}% of the print box, now ${after.toFixed(0)}%. Less ink feels softer and breathes.`]
                       : ['info', '→', 'Ink area about the same', `Ink covers ${after.toFixed(0)}% of the print box.`]);
   }
+  syncFileName();
   $('checks').innerHTML = rows.map(([c, m, t, d]) => `<div class="check"><span class="mark ${c}" aria-hidden="true">${m}</span><div><b>${esc(t)}</b><span>${esc(d)}</span></div></div>`).join('');
 }
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
 
+/* ---------- art quality ---------- */
+/* How sharp the art will print: its pixels per inch at the print size, counting only the detail it really has.
+   A file that was already enlarged has fewer real pixels than its size says: hard enlargements show as blocks of
+   equal pixels, smooth ones as edges spread over several pixels. Heavy JPEG compression shows as 8 px squares.
+   Worked out once per file from a sample of up to 2400 × 2400 px at the centre. */
+function analyseArt(a){
+  a.q = {scale: 1, kind: '', edge: 0, done: false};
+  if (!a.isSample && !a.isVector) try {
+    const W = Math.min(a.fullW, 2400), H = Math.min(a.fullH, 2400);
+    const x0 = Math.floor((a.fullW - W)/16)*8, y0 = Math.floor((a.fullH - H)/16)*8; // on JPEG's 8 px grid
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d', {willReadFrequently: true}); x.imageSmoothingEnabled = false;
+    x.drawImage(a.el, x0, y0, W, H, 0, 0, W, H);
+    const d = x.getImageData(0, 0, W, H).data;
+    const b = blockScale(d, W, H), e = edgeWidth(d, W, H);
+    a.q.edge = e;
+    if (b > 1){ a.q.scale = b; a.q.kind = 'blocky'; }
+    else if (e >= 4.8){ a.q.scale = Math.round(e/1.4*10)/10; a.q.kind = 'soft'; } // soft photos reach 3 to 4.5 on their own
+  } catch(err){}
+  a.q.done = true;
+  if (art !== a) return;
+  syncQuality(); updateChecks();
+  if (a.q.kind) toast(`This file looks already enlarged ${a.q.scale}×: its real detail is about ${Math.round(a.w/a.q.scale).toLocaleString()} px wide. Details in Print size.`);
+  else if (a.jpegQ && a.jpegQ < 60) toast(`This JPEG was saved at low quality (${a.jpegQ} of 100). Details in Print size.`);
+}
+// Pixels equal to the one before (each channel within 6) form runs along a row. In a file enlarged with hard pixels,
+// nearly all the short runs are a multiple of the enlargement. Answers that enlargement (2 to 8), or 1.
+function blockScale(d, W, H){
+  const runs = new Uint32Array(64); let total = 0;
+  for (let y = 0; y < H; y += 3){
+    const row = y*W*4; let start = 0;
+    for (let x = 1; x <= W; x++){
+      const i = row + x*4;
+      if (x < W && Math.abs(d[i] - d[i-4]) <= 6 && Math.abs(d[i+1] - d[i-3]) <= 6 && Math.abs(d[i+2] - d[i-2]) <= 6 && Math.abs(d[i+3] - d[i-1]) <= 6) continue;
+      const len = x - start;
+      if (start > 0 && x < W && len < 64){ runs[len]++; total++; } // runs touching the sample's sides are cut short
+      start = x;
+    }
+  }
+  if (total < 300) return 1;
+  for (let s = 8; s >= 2; s--){ let m = 0; for (let k = s; k < 64; k += s) m += runs[k]; if (m >= total*0.75) return s; }
+  if (runs[1] < total*0.06){ let k = 2, below = runs[1]; while (k < 8 && below + runs[k] < total*0.1) below += runs[k++]; return k; } // an odd enlargement like ×2.5
+  return 1;
+}
+// Strong edges in a sharp file change within a pixel or two. Enlarging smoothly spreads every edge over about as many
+// pixels as it was enlarged by. Answers the typical width of the strong edges, in pixels (1 to 2 when sharp).
+function edgeWidth(d, W, H){
+  const widths = [], v = new Float32Array(W);
+  for (let y = 0; y < H && widths.length < 40000; y += 4){
+    for (let x = 0; x < W; x++){ const i = (y*W + x)*4, a = d[i+3]; v[x] = ((0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2])*a + 128*(255 - a))/255; } // on mid grey, so clear edges count
+    let x = 1;
+    while (x < W){
+      const step = v[x] - v[x-1];
+      if (Math.abs(step) < 1){ x++; continue; }
+      const up = step > 0, from = x - 1; let most = 0;
+      while (x < W && (v[x] - v[x-1] > 0) === up && Math.abs(v[x] - v[x-1]) >= 1){ most = Math.max(most, Math.abs(v[x] - v[x-1])); x++; }
+      const rise = Math.abs(v[x-1] - v[from]);
+      if (rise >= 30 && x - 1 - from <= 16) widths.push(rise/most); // longer ramps are gradients, not edges
+    }
+  }
+  if (widths.length < 150) return 1;
+  widths.sort((p, q) => p - q);
+  return widths[widths.length >> 1];
+}
+// A JPEG's quality (1 to 100), worked out from its brightness table the way most apps make it, or null.
+// Under about 60 the 8 × 8 squares and the fuzz around edges start to show.
+const JPEG_STD = [16,11,10,16,24,40,51,61,12,12,14,19,26,58,60,55,14,13,16,24,40,57,69,56,14,17,22,29,51,87,80,62,
+                  18,22,37,56,68,109,103,77,24,35,55,64,81,104,113,92,49,64,78,87,103,121,120,101,72,92,95,98,112,100,103,99];
+async function readJpegQuality(file){
+  try {
+    const b = new Uint8Array(await file.slice(0, 262144).arrayBuffer());
+    if (b[0] !== 0xFF || b[1] !== 0xD8) return null;
+    let p = 2;
+    while (p + 4 <= b.length && b[p] === 0xFF){
+      const m = b[p+1], len = (b[p+2] << 8) | b[p+3];
+      if (m === 0xDB){
+        let t = p + 4;
+        while (t < p + 2 + len){
+          const wide = b[t] >> 4, id = b[t] & 15; t++;
+          let sum = 0; for (let k = 0; k < 64; k++) sum += wide ? (b[t + 2*k] << 8) | b[t + 2*k + 1] : b[t + k];
+          if (id === 0){ const scale = sum*100/JPEG_STD.reduce((a, v) => a + v, 0); return Math.max(1, Math.min(100, Math.round(scale <= 100 ? (200 - scale)/2 : 5000/scale))); }
+          t += wide ? 128 : 64;
+        }
+      }
+      if (m === 0xDA || m === 0xD9) break;
+      p += 2 + len;
+    }
+  } catch(e){}
+  return null;
+}
+function qualityInfo(){
+  const q = art.q || {scale: 1, kind: ''}, wMm = toMm(st.widthCm);
+  if (art.isVector) return {c: 'good', pill: 'Vector · sharp', t: 'Vector art: sharp at any size', d: 'SVG files are drawn fresh at the print size.'};
+  const real = Math.round(art.w/q.scale), dpi = Math.max(1, Math.round(real/(st.widthCm/2.54))), sharpMm = Math.floor(real/240*25.4);
+  const need = Math.ceil(st.widthCm/2.54*DPI), times = Math.ceil(DPI/dpi*10)/10;
+  let c = dpi >= 240 ? 'good' : dpi >= 150 ? 'warn' : 'bad', t, d = '', pill;
+  if (q.kind === 'blocky') d = `This file was already enlarged ${q.scale}× with hard pixels (they come in ${q.scale} × ${q.scale} blocks), so its real detail is ${real.toLocaleString()} px wide. `;
+  if (q.kind === 'soft') d = `This file looks already enlarged about ${q.scale}× (its edges are soft, spread over ${q.edge.toFixed(1)} px), so its real detail is about ${real.toLocaleString()} px wide. `;
+  const fix = times > 8 ? '' : q.kind ? `shrink it back to ${real.toLocaleString()} px wide and upscale that ${times}× with an AI upscaler` : `upscale it ${times}× (to ${need.toLocaleString()} px wide)`;
+  if (c === 'good'){ t = `Sharp: ${dpi} dpi at ${wMm} mm wide`; d += q.kind ? 'Still plenty of detail at this size.' : 'Plenty of detail for a crisp print.'; pill = `${dpi} dpi`; }
+  else if (c === 'warn'){ t = `${dpi} dpi at ${wMm} mm wide`; d += `Dots print crisp, but fine lines may look soft. Sharp up to ${sharpMm} mm wide${fix ? `, or ${fix} first` : ''}.`; pill = `${dpi} dpi · check`; }
+  else { t = `Upscale needed: only ${dpi} dpi at ${wMm} mm wide`; d += `Detail will look soft${q.kind === 'blocky' && !art.smooth ? ' and blocky' : ''}. ` + (fix ? `Before printing, ${fix}, ask the customer for a bigger file, or print it up to ${sharpMm} mm wide.`
+         : `It’s too small to upscale well: ask the customer for a bigger file or vector art (AI, EPS, PDF or SVG), or print it up to ${sharpMm} mm wide.`); pill = 'Upscale needed'; }
+  if (art.jpegQ && art.jpegQ < 60){
+    d += ` ${c === 'good' ? 'But it was' : 'It was also'} saved as a low-quality JPEG (${art.jpegQ} of 100): its blocky squares and the fuzz around edges can print as speckles. A PNG or the original file is better.`;
+    if (c === 'good'){ c = 'warn'; t = `Low-quality JPEG (${art.jpegQ} of 100), ${dpi} dpi`; pill = 'JPEG · check'; }
+  }
+  return {c, pill, t, d};
+}
+function syncQuality(){
+  const pill = $('qualityPill'), note = $('qualityNote');
+  if (!art || !pill) return;
+  const q = qualityInfo();
+  pill.className = 'qpill ' + q.c; pill.textContent = q.pill; pill.hidden = false;
+  pill.dataset.tip = `${q.t}. Click for details.`;
+  note.innerHTML = `<span class="mark ${q.c}" aria-hidden="true">${q.c === 'good' ? '✓' : '!'}</span><div><b>${esc(q.t)}</b><span>${esc(q.d)}</span></div>`;
+  note.hidden = false;
+  $('smoothRow').hidden = !(art.q && art.q.kind === 'blocky');
+  $('smoothBtn').checked = !!art.smooth;
+}
+$('fileInfo').addEventListener('click', e => {
+  if (!e.target.closest('#qualityPill')) return;
+  const f = folds.find(f => f.g.id === 'sizeGroup'); if (f){ f.set(true); syncFoldAll(); }
+  $('sizeGroup').scrollIntoView({block: 'start', behavior: 'smooth'});
+});
+$('smoothBtn').addEventListener('change', e => { if (!art) return; art.smooth = e.target.checked; buildSrcSoon(); syncQuality(); updateChecks(); });
+
 /* ---------- opening art ---------- */
-function setArt(el, w, h, name, isSample, dpi){
+function setArt(el, w, h, name, isSample, dpi, kind){
   if (cropping) endCrop(false);
-  art = {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}}; // w and h follow the crop
+  art = {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}, // w and h follow the crop
+         isVector: !!(kind && kind.vector), jpegQ: kind && kind.jpegQ || null, smooth: false, q: null};
   syncCrop(); clearDoneMarks();
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
-  const fi = $('fileInfo');
-  fi.innerHTML = (isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(name)}</b><span>${w.toLocaleString()} × ${h.toLocaleString()} px</span>`;
+  const fi = $('fileInfo'); $('nameSuffix').value = ''; // a suffix belongs to one piece of art
+  fi.innerHTML = (isSample ? '<span class="tag">Sample</span>' : '') + `<b>${esc(name)}</b><span>${w.toLocaleString()} × ${h.toLocaleString()} px</span>` +
+    '<button class="qpill" type="button" id="qualityPill" hidden></button>';
   st.knock = null; syncKnock();
   Object.assign(lv, LV0); hist = null; syncLevels(); drawHisto(); // Levels belong to one piece of art
   setWidth(isSample ? 25 : w/(dpi || DPI)*2.54, true);
   setZoom('fit');
   buildSrc(); render(); updateChecks();
   resetSteps(isSample ? 'Sample art' : `Opened ${name}`);
+  const a = art; setTimeout(() => analyseArt(a), 30); // after the first paint
 }
 async function readPngDpi(file){
   try {
@@ -1699,8 +1855,10 @@ async function openFile(f){
   try { await im.decode(); } catch(e){ toast('That file wouldn’t open. Try saving it as a PNG.'); return; }
   if (!im.naturalWidth || !im.naturalHeight){ toast('That file has no size set. Save it as a PNG and try again.'); return; }
   const dpi = /png/i.test(f.type) || /\.png$/i.test(f.name || '') ? await readPngDpi(f) : null;
+  const jpegQ = /jpe?g/i.test(f.type) || /\.jpe?g$/i.test(f.name || '') ? await readJpegQuality(f) : null;
   endPick();
-  setArt(im, im.naturalWidth, im.naturalHeight, f.name || 'Pasted art', false, dpi);
+  setArt(im, im.naturalWidth, im.naturalHeight, f.name || 'Pasted art', false, dpi,
+         {vector: /svg/i.test(f.type) || /\.svg$/i.test(f.name || ''), jpegQ});
 }
 $('fileIn').addEventListener('change', e => { openFile(e.target.files[0]); e.target.value = ''; });
 $('openBtn').addEventListener('click', () => guardThen(() => $('fileIn').click(), true));
@@ -1735,10 +1893,17 @@ async function withDpi(blob, dpi, texts){
   }
   return new Blob(parts, {type: 'image/png'});
 }
+/* name_twedit_280w_30lpi.png: the art's name, our mark, the print width in mm, the lines per inch for halftones
+   (Clean cut leaves it out), then anything typed in "Add to the file name". Opening a saved edit again starts
+   from its first name, so the marks don't pile up. */
 function fileName(){
-  const base = art.isSample ? 'sample-art' : (art.name || 'art').replace(/\.[a-z0-9]+$/i, '').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'art';
-  return `${base}-halftone-${st.lpi}lpi.png`;
+  const clean = t => t.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
+  const base = art.isSample ? 'sample-art' : clean((art.name || 'art').replace(/\.[a-z0-9]+$/i, '').replace(/_twedit(_.*)?$/i, '')) || 'art';
+  const extra = clean($('nameSuffix').value);
+  return `${base}_twedit_${toMm(st.widthCm)}w` + (st.finish === 'cut' ? '' : `_${st.lpi}lpi`) + (extra ? `_${extra}` : '') + '.png';
 }
+function syncFileName(){ if (art) $('nameNote').innerHTML = `Saves as <b>${esc(fileName())}</b>`; }
+$('nameSuffix').addEventListener('input', syncFileName);
 function settingsText(){
   const look = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
   const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
@@ -1748,7 +1913,7 @@ function settingsText(){
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
-         `; ${st.widthCm.toFixed(1)} x ${(st.widthCm*art.h/art.w).toFixed(1)} cm at 300 dpi`;
+         `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
 let saving = false;
 async function savePng(){ // answers true once the PNG is saved
@@ -1948,7 +2113,7 @@ $('presetNew').addEventListener('click', () => {
   const shirt = (SHIRTS.find(([, hex]) => hex.toLowerCase() === st.shirt.toLowerCase()) || ['custom shirt'])[0];
   $('presetName').value = `${look}, ${shirt.toLowerCase()} tee`;
   $('presetSize').checked = false;
-  $('presetSizeTxt').textContent = art ? `Include the print size (${st.widthCm.toFixed(1)} × ${(st.widthCm*art.h/art.w).toFixed(1)} cm)` : 'Include the print size';
+  $('presetSizeTxt').textContent = art ? `Include the print size (${toMm(st.widthCm)} × ${toMm(st.widthCm*art.h/art.w)} mm)` : 'Include the print size';
   $('presetConfirm').hidden = true; $('codeForm').hidden = true; $('presetForm').hidden = false; $('presetName').focus(); $('presetName').select();
 });
 $('presetCancel').addEventListener('click', () => { $('presetForm').hidden = true; });
@@ -2061,7 +2226,7 @@ function snapshot(){
 }
 function describeStep(a, b){ // a short name for what changed from a to b
   if (JSON.stringify(a.crop) !== JSON.stringify(b.crop)) return b.crop ? `Crop ${b.crop.w} × ${b.crop.h} px` : 'Crop';
-  if (Math.abs(a.w - b.w) > 1e-6) return `Print size ${b.w.toFixed(1)} cm wide`;
+  if (Math.abs(a.w - b.w) > 1e-6) return `Print size ${toMm(b.w)} mm wide`;
   for (const k of Object.keys(STEP_NAMES)) if (a.s[k] !== b.s[k]) return STEP_NAMES[k](b.s[k]);
   if (JSON.stringify(a.lv) !== JSON.stringify(b.lv)) return `Levels ${b.lv.b} · ${b.lv.g.toFixed(2)} · ${b.lv.w}`;
   if (a.rules.length !== b.rules.length) return b.rules.length > a.rules.length ? 'Added a colour range' : 'Deleted a colour range';
@@ -2226,6 +2391,7 @@ const TIPS = [
   ['#themeBtn', 'Switch between dark and light panels.'],
   ['#openBtn', 'Open a PNG, JPG, WebP or SVG. You can also drop art on the window or paste it.'],
   ['#saveBtn', 'Save a transparent PNG at 300 dpi with no see-through pixels, ready for the film.'],
+  ['#nameSuffix', 'Added to the end of the saved name, e.g. an order number or the print area.'],
   ['#foldAll', 'Open or close every section.'],
   ['#resetAll', 'Put every setting back to the tool’s defaults and remove the crop. Undo brings them back.'],
   ['[data-view="shirt"]', 'The print on the shirt colour.'],
@@ -2253,7 +2419,7 @@ const TIPS = [
   ['#cropTrim', 'Cut away the empty margin around the art: clear pixels, or a plain background such as a JPG’s white.'],
   ['#cropDraw', 'Drag a crop on the preview. Enter applies it, Esc cancels.'], ['#cropReset', 'Use the whole file again.'],
   ['[data-ink="art"]', 'Print each dot in the art’s own colour.'], ['[data-ink="one"]', 'Print every dot in one ink colour.'],
-  ['#sizeChips [data-w="max"]', 'The largest size that fits within 40 × 50 cm.']
+  ['#sizeChips [data-w="max"]', 'The largest size that fits within 400 × 500 mm.']
 ];
 for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el.dataset.tip = t;
 {
