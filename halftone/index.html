@@ -72,8 +72,26 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .legend{gap:4px 14px;padding:6px 10px;font-size:12px;font-weight:500;max-width:560px}
 .legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .legend i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(128,128,128,.6);flex:none}
-.pane-pick{position:absolute;padding:3px}
-.pane-pick select{height:32px;padding:0 8px;border:0;border-radius:3px;background:var(--panel);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer}
+.pane-pick{position:absolute;z-index:4}
+.pp-btn{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px 0 6px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer}
+.pp-btn:hover,.pp-btn[aria-expanded="true"]{border-color:var(--ink)}
+.pp-tag{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border:1px solid var(--line-strong);border-radius:3px;color:var(--muted)}
+.pp-tag.after{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.pp-chev{width:7px;height:7px;margin:0 2px 4px 4px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
+.pp-btn[aria-expanded="true"] .pp-chev{transform:rotate(-135deg);margin-bottom:-2px}
+.pp-menu{position:absolute;top:calc(100% + 6px);left:0;width:min(300px,calc(100vw - 32px));max-height:min(70vh,540px);overflow:auto;display:grid;gap:2px;padding:6px;background:var(--panel);border:1px solid var(--line-strong);border-radius:var(--r)}
+.pp-group{padding:8px 8px 4px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pp-opt{display:grid;grid-template-columns:30px 1fr;gap:1px 10px;align-items:center;padding:7px 8px;border:0;border-radius:3px;background:none;color:var(--ink);text-align:left;cursor:pointer}
+.pp-opt:hover,.pp-opt:focus-visible{background:var(--soft);outline:none}
+.pp-opt[aria-selected="true"]{background:var(--soft);box-shadow:inset 0 0 0 1.5px var(--ink)}
+.pp-icon{grid-row:1/3;width:30px;height:30px;border:1px solid var(--line-strong);border-radius:3px}
+.pp-n{font-size:13px;font-weight:700}
+.pp-d{font-size:12px;line-height:1.3;color:var(--muted)}
+.i-checks{background:repeating-conic-gradient(#cccccc 0 25%,#ffffff 0 50%) 0 0/8px 8px}
+.i-alpha{background:linear-gradient(90deg,#000000,#ffffff)}
+.i-base{background:linear-gradient(90deg,#000000 50%,#ffffff 50%)}
+.i-map{background:linear-gradient(90deg,#f2f2f2 34%,#ff2e93 34% 67%,#5a5a5a 67%)}
+.i-sel{background:radial-gradient(circle,#ffffff 0 28%,#808080 46%,#000000 66%)}
 .rules{display:grid;gap:10px}
 .rules:empty{display:none}
 .rule{display:grid;gap:12px;padding:12px;border:1.5px solid var(--line);border-radius:var(--r)}
@@ -251,7 +269,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
           <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
-          <button class="chip" type="button" data-view="map" aria-pressed="false">Halftone map</button>
+          <button class="chip" type="button" data-view="map" aria-pressed="false">Ink map</button>
           <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
         </div>
@@ -277,8 +295,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <button class="btn small" type="button" id="compareBtn">Hold for original</button>
         </div>
       </div>
-      <div class="tray pane-pick" id="paneA" hidden><select id="paneASel" aria-label="Left side shows"></select></div>
-      <div class="tray pane-pick" id="paneB" hidden><select id="paneBSel" aria-label="Right side shows"></select></div>
+      <div class="pane-pick" id="paneA" hidden><button class="pp-btn" type="button" id="paneABtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Left side shows" data-tip="Choose what this side shows."></button><div class="pp-menu" id="paneAMenu" role="listbox" hidden></div></div>
+      <div class="pane-pick" id="paneB" hidden><button class="pp-btn" type="button" id="paneBBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Right side shows" data-tip="Choose what this side shows."></button><div class="pp-menu" id="paneBMenu" role="listbox" hidden></div></div>
       <div class="busy" id="busy" hidden>Updating…</div>
       <div class="tray crop-bar" id="cropBar" hidden><span id="cropTxt"></span><button class="btn small" type="button" id="cropCancel">Cancel</button><button class="btn small primary" type="button" id="cropApply">Apply crop</button></div>
       <div class="hint" id="pickHint" hidden>Click the colour to knock out · Esc to cancel</div>
@@ -800,7 +818,7 @@ function buildMips(cv){
   }
   return levels;
 }
-/* White base and halftone map views, drawn from what the engine did to each pixel. */
+/* White base and ink map views, drawn from what the engine did to each pixel. */
 const abgr = h => { const [r, g, b] = hexRgb(h); return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0; };
 const VIEWS = {
   base: {pal: ['#000000', '#000000', '#000000', '#ffffff', '#ffffff'],
@@ -809,7 +827,17 @@ const VIEWS = {
          legend: [['#f2f2f2', 'Solid ink'], ['#ff2e93', 'Turned into dots'], ['#5a5a5a', 'Removed']]}
 };
 const ORIG_LEGEND = [['#ffffff', 'Original: solid'], ['#808080', 'Original: see-through, prints as haze'], ['#000000', 'Clear film']];
-const PANES = [['orig', 'Original on shirt'], ['origclear', 'Original on transparent'], ['origbase', 'Original alpha'], ['shirt', 'Halftone on shirt'], ['clear', 'Halftone on transparent'], ['base', 'White base'], ['map', 'Halftone map'], ['sel', 'Selection']];
+const PANES = [ // [kind, group, name, what it shows, picture]
+  ['orig', 'before', 'On shirt', 'The original art on the shirt colour.', 'shirt'],
+  ['origclear', 'before', 'On transparent', 'The original on checks: see-through parts show the checks.', 'checks'],
+  ['origbase', 'before', 'Alpha', 'The original’s transparency: white is solid, grey is see-through.', 'alpha'],
+  ['shirt', 'after', 'On shirt', 'The print on the shirt colour.', 'shirt'],
+  ['clear', 'after', 'On transparent', 'The print on checks: the checks are clear film.', 'checks'],
+  ['base', 'after', 'White base', 'White shows where ink and its white base print.', 'base'],
+  ['map', 'after', 'Ink map', 'White prints solid, pink turns into dots, grey is removed.', 'map'],
+  ['sel', 'after', 'Selection', 'The active colour range: white is selected.', 'sel']
+];
+const PANE_GROUPS = {before: 'Before · the original art', after: 'After · the print'};
 const CHECKS = 'repeating-conic-gradient(#cccccc 0 25%, #ffffff 0 50%) 0 0/8px 8px';
 const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? Math.round((1 - lastOn/s.vis)*100) : 0; return [[CHECKS, cut > 0 ? `Clear film: ink area down ${cut}%` : 'Clear film, no ink']]; };
 const ORIGCLEAR_LEGEND = [[CHECKS, 'Original: the checks show where it was clear or see-through']];
@@ -1042,6 +1070,7 @@ function setView(v){
   for (const b of $('viewTray').querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === v));
   const split = v === 'split';
   $('paneA').hidden = $('paneB').hidden = !split;
+  if (!split) closePaneMenu();
   $('compareBtn').textContent = split ? 'Hold for transparent' : 'Hold for original';
   $('compareBtn').dataset.tip = split ? 'Press and hold, or hold T, to see both sides on transparent checks. The checks are clear film.' : 'Press and hold to compare with the art before halftoning.';
   stage.classList.toggle('is-split', split);
@@ -1061,18 +1090,42 @@ function syncLegend(){
   lg.hidden = !items.length;
   lg.innerHTML = items.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join('');
 }
-function syncPaneOptions(){
+function syncPaneOptions(){ // each side's button and menu
+  const list = PANES.filter(([v]) => v !== 'sel' || rules.length);
   for (const id of ['paneA', 'paneB']){
-    const sel = $(id + 'Sel'), list = PANES.filter(([v]) => v !== 'sel' || rules.length);
     if (!list.some(([v]) => v === st[id])) st[id] = 'shirt';
-    sel.innerHTML = list.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
-    sel.value = st[id];
+    const [, group, name] = PANES.find(([v]) => v === st[id]);
+    $(id + 'Btn').innerHTML = `<span class="pp-tag ${group}">${group === 'before' ? 'Before' : 'After'}</span><span>${name}</span><span class="pp-chev" aria-hidden="true"></span>`;
+    let html = '', last = '';
+    for (const [v, g, n, d, pic] of list){
+      if (g !== last){ last = g; html += `<div class="pp-group" role="presentation">${PANE_GROUPS[g]}</div>`; }
+      const shirtPic = pic === 'shirt' ? ` style="background:radial-gradient(circle,#f7b500 0 30%,transparent 32%),${st.shirt}"` : '';
+      html += `<button class="pp-opt" type="button" role="option" data-kind="${v}" aria-selected="${v === st[id]}"><span class="pp-icon i-${pic}"${shirtPic}></span><span class="pp-n">${n}</span><span class="pp-d">${d}</span></button>`;
+    }
+    $(id + 'Menu').innerHTML = html;
   }
 }
-for (const id of ['paneA', 'paneB']){
-  const sel = $(id + 'Sel');
-  sel.addEventListener('change', () => { st[id] = sel.value; remember(); prepareViews(); syncLegend(); render(); });
+let paneOpen = null;
+function closePaneMenu(){ if (!paneOpen) return; $(paneOpen + 'Menu').hidden = true; $(paneOpen + 'Btn').setAttribute('aria-expanded', 'false'); paneOpen = null; }
+function openPaneMenu(id){
+  closePaneMenu(); syncPaneOptions();
+  paneOpen = id; $(id + 'Menu').hidden = false; $(id + 'Btn').setAttribute('aria-expanded', 'true');
+  ($(id + 'Menu').querySelector('[aria-selected="true"]') || $(id + 'Menu').querySelector('.pp-opt')).focus();
 }
+for (const id of ['paneA', 'paneB']){
+  $(id + 'Btn').addEventListener('click', () => paneOpen === id ? closePaneMenu() : openPaneMenu(id));
+  $(id + 'Menu').addEventListener('click', e => {
+    const o = e.target.closest('[data-kind]'); if (!o) return;
+    st[id] = o.dataset.kind; closePaneMenu(); remember(); syncPaneOptions(); prepareViews(); syncLegend(); render(); $(id + 'Btn').focus();
+  });
+  $(id + 'Menu').addEventListener('keydown', e => {
+    const opts = [...$(id + 'Menu').querySelectorAll('.pp-opt')], i = opts.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); opts[(i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length].focus(); }
+    else if (e.key === 'Escape'){ e.preventDefault(); closePaneMenu(); $(id + 'Btn').focus(); }
+    else if (e.key === 'Tab') closePaneMenu();
+  });
+}
+document.addEventListener('pointerdown', e => { if (paneOpen && !e.target.closest('.pane-pick')) closePaneMenu(); });
 $('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
 window.addEventListener('keydown', e => {
   const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
