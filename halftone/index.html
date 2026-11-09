@@ -364,7 +364,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <div class="field" id="cutField" hidden>
           <div class="f-head"><label for="cut">Threshold</label><output id="cutOut" for="cut">50%</output></div>
           <input type="range" id="cut" min="5" max="95" step="1" value="50">
-          <p class="f-note">Pixels less solid than this are removed. Everything left prints fully solid, so the film has no see-through areas.</p>
+          <p class="f-note">Cleans up see-through pixels: soft edges, glows and fades less solid than this are removed, everything else prints fully solid. Colours themselves are kept. The knock-out has its own tolerance.</p>
         </div>
         <div class="field dotf">
           <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">30 lpi</output></div>
@@ -459,12 +459,17 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <span id="knockTxt">Following the shirt colour.</span>
           <button class="link" type="button" id="knockReset" hidden>Use shirt colour</button>
         </div>
-        <div class="field">
+        <div class="field" id="ktolField" hidden>
+          <div class="f-head"><label for="ktol">Knock-out tolerance</label><output id="ktolOut" for="ktol">8%</output></div>
+          <input type="range" id="ktol" min="0" max="40" step="1" value="8">
+          <p class="f-note">Clean cut removes only the knock-out colour and colours this close to it. Every other colour stays fully solid. Keep it small so nearby colours aren’t lost.</p>
+        </div>
+        <div class="field dotk">
           <div class="f-head"><label for="k0">Shirt shows through up to</label><output id="k0Out" for="k0">10%</output></div>
           <input type="range" id="k0" min="0" max="60" step="1" value="10">
           <p class="f-note">Colours this close to the shirt disappear.</p>
         </div>
-        <div class="field">
+        <div class="field dotk">
           <div class="f-head"><label for="k1">Full ink from</label><output id="k1Out" for="k1">70%</output></div>
           <input type="range" id="k1" min="20" max="100" step="1" value="70">
           <p class="f-note">Colours this different from the shirt print solid. Between the two, dots.</p>
@@ -641,7 +646,7 @@ function engine(){
     }
     lut[0] = 0;
     const cell = p.dpi/p.lpi, th = p.angle*Math.PI/180, cs = Math.cos(th)/cell, sn = Math.sin(th)/cell;
-    const tone = p.tone, lum = p.metric === 'lum', k0 = p.k0, ks = Math.max(0.001, p.k1 - p.k0);
+    const tone = p.tone, lum = p.metric === 'lum', k0 = p.k0, ks = Math.max(0.001, p.k1 - p.k0), ktol = p.ktol || 0;
     const kr = p.knock[0], kg = p.knock[1], kb = p.knock[2], kl = (0.299*kr + 0.587*kg + 0.114*kb);
     // 100% = as different from the knock-out colour as a colour can be (white on a black shirt, black on a white one)
     const far = lum ? Math.max(kl, 255 - kl) : Math.max(kr, 255 - kr, kg, 255 - kg, kb, 255 - kb);
@@ -669,9 +674,14 @@ function engine(){
           let m;
           if (lum){ m = 0.299*r + 0.587*g + 0.114*b - kl; if (m < 0) m = -m; }
           else { m = r > kr ? r - kr : kr - r; const dg = g > kg ? g - kg : kg - g; if (dg > m) m = dg; const db = b > kb ? b - kb : kb - b; if (db > m) m = db; }
-          const q = (m/far - k0)/ks;
-          if (q <= 0){ if (!nr){ cls[i >> 2] = 1; continue; } c = 0; }
-          else if (q < 1) c *= q;
+          const dn = m/far;
+          if (cut){ // clean cut: a hard knock-out of the knock-out colour only, so nearby colours keep full ink
+            if (dn <= ktol){ if (!nr){ cls[i >> 2] = 1; continue; } c = 0; }
+          } else {
+            const q = (dn - k0)/ks;
+            if (q <= 0){ if (!nr){ cls[i >> 2] = 1; continue; } c = 0; }
+            else if (q < 1) c *= q;
+          }
         }
         if (nr){
           const L = (0.299*r + 0.587*g + 0.114*b)/255;
@@ -721,9 +731,9 @@ const LOOKS = {
   full:  {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 96}
 };
 const $ = id => document.getElementById(id);
-const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
+const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50};
-const KEEP = ['look','lpi','angle','shape','k0','k1','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut'];
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','paneA','paneB','finish','cut'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
@@ -774,7 +784,7 @@ function rgbHex(r, g, b){ return '#' + [r, g, b].map(v => v.toString(16).padStar
 function params(){
   return {lpi: st.lpi, angle: st.angle, shape: st.shape, dpi: DPI,
           tone: st.look === 'knock' || st.look === 'full', metric: st.look === 'full' ? 'lum' : 'max',
-          k0: st.k0/100, k1: st.k1/100, knock: hexRgb(st.knock || st.shirt),
+          k0: st.k0/100, k1: st.k1/100, ktol: st.ktol/100, knock: hexRgb(st.knock || st.shirt),
           gamma: Math.pow(2, -st.mid/50), contrast: Math.pow(2, st.con/50),
           drop: st.drop/100, solid: st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
@@ -1400,7 +1410,7 @@ function syncShirt(){
 shirtTray.addEventListener('click', e => { const b = e.target.closest('button.sw'); if (!b) return; st.shirt = b.dataset.hex; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
 $('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
 
-const SLIDERS = [['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
+const SLIDERS = [['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
                  ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`]];
 function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi); }
 $('lpiChips').addEventListener('click', e => { const b = e.target.closest('[data-lpi]'); if (!b) return; st.lpi = +b.dataset.lpi; syncSliders(); updateNotes(); remember(); schedule(); });
@@ -1430,8 +1440,8 @@ $('finishChips').addEventListener('click', e => { const b = e.target.closest('[d
 function syncFinish(){
   syncChips('finishChips', 'finish', st.finish);
   const cut = st.finish === 'cut';
-  for (const el of document.querySelectorAll('.dotf')) el.hidden = cut;
-  $('cutField').hidden = !cut;
+  for (const el of document.querySelectorAll('.dotf, .dotk')) el.hidden = cut;
+  $('cutField').hidden = !cut; $('ktolField').hidden = !cut;
   updateChecks();
 }
 
@@ -1736,7 +1746,7 @@ function settingsText(){
     ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}`;
   const levels = lvIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`;
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
-         (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ${st.k0}-${st.k1}%` : '') +
+         (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
          `; ${st.widthCm.toFixed(1)} x ${(st.widthCm*art.h/art.w).toFixed(1)} cm at 300 dpi`;
 }
@@ -1825,7 +1835,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -2040,7 +2050,7 @@ const HIST_MAX = 40;
 const LOOK_NAMES = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'};
 const sign = v => (v > 0 ? '+' : '') + v;
 const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v === 'cut' ? 'Print style: clean cut' : 'Print style: halftone dots', cut: v => `Threshold ${v}%`,
-  lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`,
+  lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, ktol: v => `Knock-out tolerance ${v}%`,
   mid: v => `Ink amount ${sign(v)}`, con: v => `Contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
   knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt'};
@@ -2188,7 +2198,7 @@ function stepDone(g){
   else savePng();
   syncFoldAll();
 }
-const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92,
+const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
                   ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
@@ -2239,6 +2249,7 @@ const TIPS = [
   ['#presetDelete', 'Delete the chosen preset.'], ['#presetShare', 'Copy this computer’s preset to the shared list.'],
   ['#histUndo', 'Go back one step.'], ['#histRedo', 'Go forward one step.'],
   ['[data-lpi="30"]', '30 lpi: our standard. Prints without issue on most tees.'], ['[data-lpi="35"]', '35 lpi: finer dots. Check them closely at 1:1 before saving.'],
+  ['#ktol', 'How close a colour must be to the knock-out colour to drop out in Clean cut. Small keeps nearby colours.'],
   ['#cropTrim', 'Cut away the empty margin around the art: clear pixels, or a plain background such as a JPG’s white.'],
   ['#cropDraw', 'Drag a crop on the preview. Enter applies it, Esc cancels.'], ['#cropReset', 'Use the whole file again.'],
   ['[data-ink="art"]', 'Print each dot in the art’s own colour.'], ['[data-ink="one"]', 'Print every dot in one ink colour.'],
