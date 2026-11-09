@@ -161,6 +161,12 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .look input{grid-row:1/3;margin:2px 0 0;accent-color:var(--ink);width:16px;height:16px}
 .look-t{font-weight:700}
 .look-d{font-size:13px;color:var(--muted)}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice{display:grid;align-content:start;gap:4px;padding:12px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);text-align:left;cursor:pointer}
+.choice:hover{border-color:var(--line-strong)}
+.choice[aria-pressed="true"]{border-color:var(--ink);background:var(--soft);box-shadow:inset 0 0 0 1px var(--ink)}
+.choice-t{font-size:15px;font-weight:800;letter-spacing:-.01em}
+.choice-d{font-size:12px;color:var(--muted);line-height:1.4}
 .field{display:grid;gap:6px}
 .f-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .f-head label,.f-head span{font-weight:600;font-size:13px}
@@ -326,6 +332,44 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
+      <section class="group step" id="finishGroup">
+        <h2>Print style</h2>
+        <p class="f-note">Decide this first: everything after it is shown in this style.</p>
+        <div class="choices" id="finishChips" role="group" aria-label="Print style">
+          <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone dots</span><span class="choice-d">Shading, fades and soft edges turn into dots. Set the dot size, angle and shape below.</span></button>
+          <button class="choice" type="button" data-finish="cut"><span class="choice-t">Clean cut</span><span class="choice-d">No dots. Every pixel prints solid or is removed at the threshold below.</span></button>
+        </div>
+        <div class="field" id="cutField" hidden>
+          <div class="f-head"><label for="cut">Threshold</label><output id="cutOut" for="cut">50%</output></div>
+          <input type="range" id="cut" min="5" max="95" step="1" value="50">
+          <p class="f-note">Pixels less solid than this are removed. Everything left prints fully solid, so the film has no see-through areas.</p>
+        </div>
+        <div class="field dotf">
+          <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">35 lpi</output></div>
+          <input type="range" id="lpi" min="15" max="65" step="1" value="35">
+          <div class="chips" id="lpiChips" role="group" aria-label="Common lines per inch"><button class="chip" type="button" data-lpi="30">30 lpi</button><button class="chip" type="button" data-lpi="35">35 lpi</button></div>
+          <p class="f-note" id="lpiNote">Dots every 0.73 mm.</p>
+        </div>
+        <div class="field dotf">
+          <div class="f-head"><span>Angle</span></div>
+          <div class="chips" id="angleChips">
+            <button class="chip" type="button" data-angle="0">0°</button>
+            <button class="chip" type="button" data-angle="15">15°</button>
+            <button class="chip" type="button" data-angle="22.5">22.5°</button>
+            <button class="chip" type="button" data-angle="45">45°</button>
+          </div>
+        </div>
+        <div class="field dotf">
+          <div class="f-head"><span>Dot shape</span></div>
+          <div class="chips" id="shapeChips">
+            <button class="chip" type="button" data-shape="round">Round</button>
+            <button class="chip" type="button" data-shape="ellipse">Ellipse</button>
+            <button class="chip" type="button" data-shape="square">Square</button>
+            <button class="chip" type="button" data-shape="line">Line</button>
+          </div>
+        </div>
+      </section>
+
       <section class="group step" id="cropGroup">
         <h2>Crop</h2>
         <div class="preset-actions">
@@ -444,43 +488,6 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <div class="inkrow" id="inkRow" hidden>
           <span class="colorbox"><input type="color" id="inkPick" value="#ffffff" aria-label="Ink colour"></span>
           <span id="inkTxt">Every dot prints in this colour.</span>
-        </div>
-      </section>
-
-      <section class="group step" id="finishGroup">
-        <h2>Finish</h2>
-        <div class="chips" id="finishChips" role="group" aria-label="Finish">
-          <button class="chip" type="button" data-finish="dots">Halftone dots</button>
-          <button class="chip" type="button" data-finish="cut">Clean cut, no dots</button>
-        </div>
-        <div class="field" id="cutField" hidden>
-          <div class="f-head"><label for="cut">Threshold</label><output id="cutOut" for="cut">50%</output></div>
-          <input type="range" id="cut" min="5" max="95" step="1" value="50">
-          <p class="f-note">Pixels less solid than this are removed. Everything left prints fully solid, so the film has no see-through areas.</p>
-        </div>
-        <div class="field dotf">
-          <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">35 lpi</output></div>
-          <input type="range" id="lpi" min="15" max="65" step="1" value="35">
-          <div class="chips" id="lpiChips" role="group" aria-label="Common lines per inch"><button class="chip" type="button" data-lpi="30">30 lpi</button><button class="chip" type="button" data-lpi="35">35 lpi</button></div>
-          <p class="f-note" id="lpiNote">Dots every 0.73 mm.</p>
-        </div>
-        <div class="field dotf">
-          <div class="f-head"><span>Angle</span></div>
-          <div class="chips" id="angleChips">
-            <button class="chip" type="button" data-angle="0">0°</button>
-            <button class="chip" type="button" data-angle="15">15°</button>
-            <button class="chip" type="button" data-angle="22.5">22.5°</button>
-            <button class="chip" type="button" data-angle="45">45°</button>
-          </div>
-        </div>
-        <div class="field dotf">
-          <div class="f-head"><span>Dot shape</span></div>
-          <div class="chips" id="shapeChips">
-            <button class="chip" type="button" data-shape="round">Round</button>
-            <button class="chip" type="button" data-shape="ellipse">Ellipse</button>
-            <button class="chip" type="button" data-shape="square">Square</button>
-            <button class="chip" type="button" data-shape="line">Line</button>
-          </div>
         </div>
       </section>
 
@@ -1815,7 +1822,7 @@ function syncSyncNote(){
       : syncState === 'ok' ? `Shared presets are up to date${at ? ` (checked ${at})` : ''}. <button class="link" type="button" data-act="refresh">Refresh</button>${mine}`
       : `Couldn’t reach the shared presets${at ? `, so these are from ${at}` : ''}. <button class="link" type="button" data-act="refresh">Try again</button>${mine}`;
   }
-  $('presetHelp').innerHTML = 'A preset keeps the quick start, Levels, knock-out, selections, ink density, ink colour, finish and dots, and the shirt colour. Open the art first, then choose the preset. ' +
+  $('presetHelp').innerHTML = 'A preset keeps the print style and dots, the quick start, Levels, knock-out, selections, ink density, ink colour and the shirt colour. Open the art first, then choose the preset. ' +
     (SYNC_URL ? 'Shared presets are the same on every workshop computer. <button class="link" type="button" data-act="export">Export</button> saves a backup file, and <button class="link" type="button" data-act="import">Import</button> shares the presets in one.'
               : (IN_CLAUDE && SYNC_ADDRESS ? 'Shared presets work on the staff web address; here they stay in this browser. ' : 'Presets live in this browser: ') +
                 '<button class="link" type="button" data-act="export">Export</button> them to a file and <button class="link" type="button" data-act="import">Import</button> it on the other computers.');
@@ -1964,7 +1971,7 @@ $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentEleme
 const HIST_MAX = 40;
 const LOOK_NAMES = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'};
 const sign = v => (v > 0 ? '+' : '') + v;
-const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v === 'cut' ? 'Finish: clean cut' : 'Finish: halftone dots', cut: v => `Threshold ${v}%`,
+const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v === 'cut' ? 'Print style: clean cut' : 'Print style: halftone dots', cut: v => `Threshold ${v}%`,
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`,
   mid: v => `Ink amount ${sign(v)}`, con: v => `Contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
@@ -2069,7 +2076,7 @@ const SECTION_TIPS = {
   rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
   toneGroup: 'How much ink goes down: lighten or darken it, add contrast, drop dots too small to hold, and join nearly solid dots.',
   inkGroup: 'Full colour prints the art’s own colours. Mono prints every dot in one colour.',
-  finishGroup: 'Halftone dots (pick the lpi), or a clean cut with no dots where every pixel is solid or removed.',
+  finishGroup: 'The key decision: halftone dots (pick the lpi), or a clean cut with no dots where every pixel is solid or removed. Set it first so every other step shows in this style.',
   checkGroup: 'A last check that the film will print and wash well, then save the PNG.'
 };
 try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
@@ -2154,8 +2161,8 @@ const TIPS = [
   ['[data-zoom="1"]', 'One file pixel per screen pixel: the true dot shapes.'],
   ['[data-zoom="2"]', 'Twice 1:1.'], ['[data-zoom="4"]', 'Four times 1:1.'],
   ['#zoomRange', 'Zoom from Fit up to 800%. Pinch, Ctrl/Cmd + scroll, or the + and − keys also zoom.'],
-  ['[data-finish="dots"]', 'Soft and partly removed areas become halftone dots.'],
-  ['[data-finish="cut"]', 'No dots: every pixel is either solid or removed, at the threshold below.'],
+  ['[data-finish="dots"]', 'Shading, fades and soft or partly removed areas become halftone dots.'],
+  ['[data-finish="cut"]', 'No dots: every pixel is either solid or removed, at the threshold. The quick black-tee clean-up.'],
   ['[data-angle="22.5"]', '22.5° is the usual angle for single-colour halftones.'],
   ['#lvAuto', 'Set the black and white points from the art, like Photoshop’s Auto.'], ['#lvReset', 'Undo all Levels changes.'],
   ['#pickBtn', 'Click a colour in the art to knock it out.'], ['#knockReset', 'Knock out the shirt colour again.'],
