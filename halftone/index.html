@@ -522,7 +522,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <div class="f-head"><label for="bcon">Contrast</label><output id="bconOut" for="bcon">0</output></div>
           <input type="range" id="bcon" min="-100" max="100" step="1" value="0">
         </div>
-        <p class="f-note">Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes colours away from the middle (or towards it). Double-click a slider to put it back to 0.</p>
+        <label class="check-row" data-tip="Like using Brightness/Contrast in Luminosity blend mode in Photoshop: lighter or darker, with colours as strong as before."><input type="checkbox" id="bcLum" checked> Keep colour strength</label>
+        <p class="f-note">Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes them apart (or together). With Keep colour strength on, only lightness changes, so colours don’t turn grey or pastel. Untick it to work on each colour channel, as Photoshop does. Double-click a slider to put it back to 0.</p>
         <div class="lv-sub">Levels</div>
         <p class="f-note">Like Photoshop’s Levels. Drag the black point right to turn more dark detail into shadow, or the white point left for more highlights. All of this runs first, on the art’s colours, and the adjusted colours are what prints.</p>
         <div class="levels">
@@ -978,18 +979,32 @@ function engine(){
     if (L2) for (let v = 0; v < 256; v++){ const u = v/255; L2[v] = u <= 0.04045 ? u/12.92 : Math.pow((u + 0.055)/1.055, 2.4); }
     const cut = p.cut || 0; // clean cut: no screen, pixels at least this solid print solid, the rest is removed
     const hard = p.hard || 0; // hard edge (dots only): see-through pixels at least this solid become solid, the rest go, before any dots
-    let lv = null; // Levels (like Photoshop's), applied to the colours before anything else
+    let lv = null, bcY = null; // Levels (like Photoshop's), applied to the colours before anything else; bcY: Brightness/Contrast on lightness only
     if (p.levels){
       const {b: lb, g: lg, w: lw, ob, ow} = p.levels, bri = p.levels.bri || 0, bc = p.levels.bc || 0, bg = Math.pow(2, -bri/100), bf = Math.pow(2, bc/100);
+      const keep = p.levels.lum !== false && (bri || bc); // keep colour strength: the curve moves lightness, not saturation
+      const curve = v => { let u = v; if (bri) u = 255*Math.pow(u/255, bg); if (bc) u = (u - 127.5)*bf + 127.5; return u < 0 ? 0 : u > 255 ? 255 : u; };
       lv = new Uint8Array(256);
       for (let v = 0; v < 256; v++){
-        let u = v; // Brightness (a midtone curve that keeps black and white) and Contrast (around the middle), like Photoshop's
-        if (bri) u = 255*Math.pow(u/255, bg);
-        if (bc) u = (u - 127.5)*bf + 127.5;
-        u = u < 0 ? 0 : u > 255 ? 255 : u;
+        const u = keep ? v : curve(v); // Brightness (a midtone curve that keeps black and white) and Contrast (around the middle), like Photoshop's
         let x = (u - lb)/Math.max(1, lw - lb); x = x < 0 ? 0 : x > 1 ? 1 : x; lv[v] = Math.round(ob + Math.pow(x, 1/lg)*(ow - ob));
       }
+      if (keep){ bcY = new Float32Array(256); for (let v = 0; v < 256; v++) bcY[v] = curve(v); }
     }
+    // one pixel through Brightness/Contrast (lightness only, as Photoshop's Luminosity blend: shift, then pull back into range
+    // keeping the lightness) and then Levels; the result goes in px3
+    const px3 = new Float32Array(3);
+    const tone3 = (r, g, b) => {
+      if (bcY){
+        const L = 0.3*r + 0.59*g + 0.11*b, L2 = bcY[(L + 0.5) | 0], dl = L2 - L;
+        r += dl; g += dl; b += dl;
+        const n = r < g ? (r < b ? r : b) : (g < b ? g : b), x = r > g ? (r > b ? r : b) : (g > b ? g : b);
+        if (n < 0){ const f = L2/(L2 - n || 1); r = L2 + (r - L2)*f; g = L2 + (g - L2)*f; b = L2 + (b - L2)*f; }
+        if (x > 255){ const f = (255 - L2)/(x - L2 || 1); r = L2 + (r - L2)*f; g = L2 + (g - L2)*f; b = L2 + (b - L2)*f; }
+        r = r < 0 ? 0 : r > 255 ? 255 : r; g = g < 0 ? 0 : g > 255 ? 255 : g; b = b < 0 ? 0 : b > 255 ? 255 : b;
+      }
+      px3[0] = lv[(r + 0.5) | 0]; px3[1] = lv[(g + 0.5) | 0]; px3[2] = lv[(b + 0.5) | 0];
+    };
     let bgm = null;
     if (p.bg){
       const key = (p.bg.rgb ? p.bg.rgb.join() : 'edge') + '|' + p.bg.tol;
@@ -1012,7 +1027,7 @@ function engine(){
         if (bgm){ const v = bgm[i >> 2]; if (v === 255){ cls[i >> 2] = 1; continue; } if (v) c *= v/255; }
         if (hard){ if (c < hard){ cls[i >> 2] = 1; continue; } c = 1; }
         let r = d[i], g = d[i+1], b = d[i+2];
-        if (lv){ r = lv[r]; g = lv[g]; b = lv[b]; }
+        if (lv){ tone3(r, g, b); r = px3[0]; g = px3[1]; b = px3[2]; }
         if (recol.length){
           const L0 = (0.299*r + 0.587*g + 0.114*b)/255;
           for (const k of recol){
@@ -1091,7 +1106,7 @@ function engine(){
         const efar = Math.max(kr, 255 - kr, kg, 255 - kg, kb, 255 - kb), etol = p.etol;
         const near = k => {
           const j = k*4; let r = d[j], g = d[j+1], b = d[j+2];
-          if (lv){ r = lv[r]; g = lv[g]; b = lv[b]; }
+          if (lv){ tone3(r, g, b); r = px3[0]; g = px3[1]; b = px3[2]; }
           let m = r > kr ? r - kr : kr - r; const dg = g > kg ? g - kg : kg - g; if (dg > m) m = dg; const db = b > kb ? b - kb : kb - b; if (db > m) m = db;
           return m/efar <= etol;
         };
@@ -2073,7 +2088,7 @@ function pickAt(e){
   if (x < 0 || y < 0 || x >= srcCanvas.width || y >= srcCanvas.height){ toast('Click on the art to pick a colour.'); return; }
   const p = srcCtx.getImageData(x, y, 1, 1).data;
   if (p[3] < 8){ toast('That spot is clear. Click on a colour in the art.'); return; }
-  const L = lvIdentity() ? null : levelsLut(), c3 = L ? [L[p[0]], L[p[1]], L[p[2]]] : [p[0], p[1], p[2]]; // pick the colour as Levels made it
+  const c3 = lvIdentity() ? [p[0], p[1], p[2]] : levelsColour(p[0], p[1], p[2]); // pick the colour as Brightness/Contrast and Levels made it
   const target = pickFor, hex = rgbHex(c3[0], c3[1], c3[2]);
   endPick();
   if (target === 'knock'){ st.knock = hex; knockFrom = 'art'; syncKnock(); }
@@ -2376,17 +2391,30 @@ rulesBox.addEventListener('click', e => {
 });
 
 /* ---------- Levels: like Photoshop's, applied to the art's colours before everything else ---------- */
-const LV0 = {b: 0, g: 1, w: 255, ob: 0, ow: 255, bri: 0, bc: 0}; // bri, bc: Brightness and Contrast, in the same curve
+const LV0 = {b: 0, g: 1, w: 255, ob: 0, ow: 255, bri: 0, bc: 0, lum: true}; // bri, bc: Brightness and Contrast; lum: they keep colour strength
 const lv = {...LV0};
 let hist = null;
 const levelsOnlyIdentity = () => lv.b === 0 && lv.g === 1 && lv.w === 255 && lv.ob === 0 && lv.ow === 255;
 const lvIdentity = () => levelsOnlyIdentity() && !lv.bri && !lv.bc;
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-function levelsLut(){ // the same curve the engine uses
+function levelsColour(r, g, b){ // one colour as Brightness/Contrast and Levels make it, the same as the engine
+  const keep = lv.lum !== false && (lv.bri || lv.bc), t = levelsLut(!keep);
+  if (keep){
+    const bg = Math.pow(2, -(lv.bri || 0)/100), bf = Math.pow(2, (lv.bc || 0)/100);
+    const curve = v => { let u = v; if (lv.bri) u = 255*Math.pow(u/255, bg); if (lv.bc) u = (u - 127.5)*bf + 127.5; return clampN(u, 0, 255); };
+    const L = 0.3*r + 0.59*g + 0.11*b, L2 = curve(Math.round(L)), dl = L2 - L; let c = [r + dl, g + dl, b + dl];
+    const n = Math.min(...c), x = Math.max(...c);
+    if (n < 0) c = c.map(v => L2 + (v - L2)*L2/(L2 - n || 1));
+    if (x > 255) c = c.map(v => L2 + (v - L2)*(255 - L2)/(x - L2 || 1));
+    [r, g, b] = c.map(v => Math.round(clampN(v, 0, 255)));
+  }
+  return [t[r], t[g], t[b]];
+}
+function levelsLut(withBC = true){ // the same curve the engine uses
   const t = new Uint8Array(256);
   const bg = Math.pow(2, -(lv.bri || 0)/100), bf = Math.pow(2, (lv.bc || 0)/100);
   for (let v = 0; v < 256; v++){
-    let u = v; if (lv.bri) u = 255*Math.pow(u/255, bg); if (lv.bc) u = (u - 127.5)*bf + 127.5; u = clampN(u, 0, 255);
+    let u = v; if (withBC){ if (lv.bri) u = 255*Math.pow(u/255, bg); if (lv.bc) u = (u - 127.5)*bf + 127.5; } u = clampN(u, 0, 255);
     const x = clampN((u - lv.b)/Math.max(1, lv.w - lv.b), 0, 1); t[v] = Math.round(lv.ob + Math.pow(x, 1/lv.g)*(lv.ow - lv.ob));
   }
   return t;
@@ -2408,7 +2436,9 @@ function syncLevels(){
   const sgn = v => (v > 0 ? '+' : '') + v;
   $('bri').value = lv.bri || 0; $('briOut').textContent = sgn(lv.bri || 0);
   $('bcon').value = lv.bc || 0; $('bconOut').textContent = sgn(lv.bc || 0);
+  $('bcLum').checked = lv.lum !== false;
 }
+$('bcLum').addEventListener('change', e => { lv.lum = e.target.checked; syncLevels(); schedule(); });
 for (const [id, k] of [['bri', 'bri'], ['bcon', 'bc']]){
   $(id).addEventListener('input', e => { lv[k] = +e.target.value; syncLevels(); schedule(); });
   $(id).addEventListener('dblclick', () => { lv[k] = 0; syncLevels(); schedule(); }); // double-click: back to 0
@@ -2990,7 +3020,7 @@ function settingsText(){
   const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
   const ruleText = (R, i) => `range ${i + 1}: ${R.type === 'sample' ? 'colours ' + R.samples.join(' ').toUpperCase() : R.type + ' ' + R.range + '%'}` +
     ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}${R.action === 'nodots' ? ' at ' + (R.cut == null ? 50 : R.cut) + '%' : ''}${R.action === 'recolour' ? ' ' + (R.to || '#ffffff').toUpperCase() : ''}`;
-  const levels = (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') +
+  const levels = (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') + ((lv.bri || lv.bc) && lv.lum !== false ? ' (colour strength kept)' : '') +
     (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
@@ -3342,6 +3372,7 @@ function describeStep(a, b){ // a short name for what changed from a to b
   if (JSON.stringify(a.lv) !== JSON.stringify(b.lv)){
     if ((a.lv.bri || 0) !== (b.lv.bri || 0)) return `Brightness ${sign(b.lv.bri || 0)}`;
     if ((a.lv.bc || 0) !== (b.lv.bc || 0)) return `Contrast ${sign(b.lv.bc || 0)}`;
+    if ((a.lv.lum !== false) !== (b.lv.lum !== false)) return b.lv.lum !== false ? 'Keep colour strength on' : 'Keep colour strength off';
     return `Levels ${b.lv.b} · ${b.lv.g.toFixed(2)} · ${b.lv.w}`;
   }
   if (a.rules.length !== b.rules.length) return b.rules.length > a.rules.length ? 'Added a colour range' : 'Deleted a colour range';
