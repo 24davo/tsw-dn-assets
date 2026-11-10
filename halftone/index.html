@@ -166,7 +166,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .lv-sub{margin-top:8px;font-size:13px;font-weight:600}
 .lv-grad{height:10px;border:1px solid var(--line);border-radius:2px;background:linear-gradient(90deg,#000000,#ffffff)}
 .o-right{display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-left:auto}
-#zoomRange{width:130px;margin:0 4px;accent-color:var(--ink)}
+#zoomRange{width:60px;margin:0 4px;accent-color:var(--ink)}
 .life-setup{font-size:12px;padding:0 4px 0 0;white-space:nowrap}
 .cal{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.55)}
 .cal-box{display:grid;gap:14px;width:min(960px,100%);max-height:100%;overflow:auto;padding:24px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
@@ -345,7 +345,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <input type="range" id="zoomRange" min="0" max="1000" step="1" value="0" aria-label="Zoom">
             <output id="zoomOut" for="zoomRange">Fit</output>
           </div>
-          <button class="btn small" type="button" id="compareBtn">Hold for original</button>
+          <div class="tray" role="group" aria-label="Press and hold to compare" id="holdTray">
+            <span class="tray-label">Hold</span>
+            <button class="chip" type="button" id="holdOrig" data-hold="orig" aria-pressed="false">Original</button>
+            <button class="chip" type="button" id="holdClear" data-hold="clear" aria-pressed="false">Transparent</button>
+          </div>
         </div>
       </div>
       <div class="pane-pick" id="paneA" hidden><button class="pp-btn" type="button" id="paneABtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Left side shows" data-tip="Choose what this side shows."></button><div class="pp-menu" id="paneAMenu" role="listbox" hidden></div></div>
@@ -712,7 +716,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>22.5° is the usual angle for single-colour halftones. It hides the rows of dots best.</li>
             <li>On dark tees, “Shirt shows through” lets the shirt be your darkest colour, so the print is lighter and breathes.</li>
             <li>Keep the smallest dots, and the smallest gaps between dots, around 0.3 mm or more: tiny dots can wash off and tiny gaps fill in. The Dot limits buttons in Ink density do this for you: Standard suits most prints, Fine keeps more detail, Extra safe holds best. They follow the lines per inch.</li>
-            <li>Press V to step through the views. Press T to flick between Transparent and the last view: the checks show every bit of ink that was removed.</li>
+            <li>Press V to step through the views. Press T to flick between Transparent and the last view: the checks show every bit of ink that was removed. Bottom right, hold Original or Transparent to flick between them in place (or hold O; in Split, hold T).</li>
             <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
@@ -1356,7 +1360,7 @@ const VIEWS = {
   base: {pal: ['#000000', '#000000', '#000000', '#ffffff', '#ffffff', '#ffffff'],
          legend: [['#ffffff', 'Ink on a white base'], ['#000000', 'Clear film']]},
   map:  {pal: ['#000000', '#5a5a5a', '#ff2e93', '#ff2e93', '#f2f2f2', '#3d9cff'], // dots and the gaps between them share one pink, so the halftoned area reads as one patch
-         legend: [['#f2f2f2', 'Solid ink'], ['#ff2e93', 'Dots'], ['#5a5a5a', 'Removed'], ['#3d9cff', 'Shirt-colour edge']]}
+         legend: [['#f2f2f2', 'Solid'], ['#ff2e93', 'Dots'], ['#5a5a5a', 'Removed'], ['#3d9cff', 'Shirt-colour edge']]}
 };
 const ORIG_LEGEND = [['#ffffff', 'Original: solid'], ['#808080', 'Original: see-through, prints as haze'], ['#000000', 'Clear film']];
 const PANES = [ // [kind, group, name, what it shows, picture]
@@ -1377,7 +1381,9 @@ const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? M
 const ORIGCLEAR_LEGEND = [[CHECKS, 'Clear film']];
 const isClear = kind => kind === 'clear' || kind === 'origclear';
 const isWhite = kind => kind === 'white' || kind === 'origwhite'; // the film over a solid white fill
-const toClear = kind => ({orig: 'origclear', shirt: 'clear', origwhite: 'origclear', white: 'clear'}[kind] || kind); // what Hold for transparent shows in Split
+const toClear = kind => kind.startsWith('orig') ? 'origclear' : 'clear'; // Hold Transparent: the same side on the checks
+const toOrig = kind => kind.startsWith('orig') ? kind : ({shirt: 'orig', clear: 'origclear', white: 'origwhite'}[kind] || 'origbase'); // Hold Original: the art before halftoning
+const shownKind = kind => compare === 'clear' ? toClear(kind) : compare === 'orig' ? toOrig(kind) : kind;
 const WHITE_LEGEND = [['#ffffff', 'White fill behind: what shows is what prints']];
 const ORIGWHITE_LEGEND = [['#ffffff', 'Original over a white fill']];
 const selLegend = () => [['#ffffff', `Selected by colour range ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
@@ -1399,7 +1405,7 @@ function buildSelMask(){ // the active colour range's selection in grey, like Ph
   x.putImageData(im, 0, 0); selMips = buildMips(selCanvas); selKey = paintN;
 }
 // what is on screen now: one view, or the two sides of Split (Hold for original swaps in the original)
-function kindsShown(){ return st.view === 'split' ? [st.paneA, st.paneB].map(k => compare ? toClear(k) : k) : [compare ? ({shirt: 'orig', clear: 'origclear', white: 'origwhite'}[st.view] || 'origbase') : st.view]; }
+function kindsShown(){ return (st.view === 'split' ? [st.paneA, st.paneB] : [st.view]).map(shownKind); }
 function prepareViews(){
   const ks = st.view === 'split' ? [st.paneA, st.paneB] : [st.view];
   for (const k of ks){ if (masks[k]) buildMask(k); else if (k === 'sel') buildSelMask(); }
@@ -1470,7 +1476,7 @@ function render(){
     panes = [{kind: kindsShown()[0], x: 0, y: 0, w: r.width, h: r.height, top: topH + 12, bottom: botH + 12}];
   } else {
     const across = r.width >= r.height*1.1, pa = $('paneA'), pb = $('paneB'), pickH = pa.offsetHeight + 8;
-    const ka = compare ? toClear(st.paneA) : st.paneA, kb = compare ? toClear(st.paneB) : st.paneB;
+    const ka = shownKind(st.paneA), kb = shownKind(st.paneB);
     if (across){ // side by side
       const hw = Math.round(r.width/2);
       panes = [{kind: ka, x: 0, y: 0, w: hw, h: r.height, top: topH + pickH + 8, bottom: botH + 12},
@@ -1631,13 +1637,11 @@ function setView(v){
   const split = v === 'split';
   $('paneA').hidden = $('paneB').hidden = !split;
   if (!split) closePaneMenu();
-  $('compareBtn').textContent = split ? 'Hold for transparent' : 'Hold for original';
-  $('compareBtn').dataset.tip = split ? 'Press and hold, or hold T, to see both sides on transparent checks. The checks are clear film.' : 'Press and hold to compare with the art before halftoning.';
   stage.classList.toggle('is-split', split);
   if (v !== 'sel') viewBeforeSel = v;
   if (v !== 'clear') viewBeforeClear = v;
   syncShowChips();
-  compare = false;
+  compare = false; syncHold();
   prepareViews(); syncLegend(); render();
 }
 function syncLegend(){
@@ -1698,8 +1702,9 @@ window.addEventListener('keydown', e => {
   if ((e.key === 'v' || e.key === 'V') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey)
     { const o = viewOrder(); setView(o[(o.indexOf(st.view) + 1) % o.length]); }
   else if ((e.key === 'e' || e.key === 'E') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) setEdge(!showEdge);
+  else if ((e.key === 'o' || e.key === 'O') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey){ if (!e.repeat) cmpOn('orig'); } // hold O for the original
   else if ((e.key === 't' || e.key === 'T') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey){
-    if (st.view === 'split'){ if (!e.repeat) cmpOn(); } // in Split, hold T to see both sides on the checks
+    if (st.view === 'split'){ if (!e.repeat) cmpOn('clear'); } // in Split, hold T to see both sides on the checks
     else setView(st.view === 'clear' ? viewBeforeClear : 'clear'); // flick to and from the transparent view
   }
   else if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && geo){
@@ -1876,13 +1881,16 @@ view.addEventListener('dblclick', e => {
   if (st.zoom === 'fit') setZoom(1, e.clientX - r.left, e.clientY - r.top); else setZoom('fit');
 });
 
-const cmp = $('compareBtn');
-const cmpOn = () => { if (!compare){ compare = true; syncLegend(); render(); } }, cmpOff = () => { if (compare){ compare = false; syncLegend(); render(); } };
-cmp.addEventListener('pointerdown', e => { e.preventDefault(); try { cmp.setPointerCapture(e.pointerId); } catch(err){} cmpOn(); }); // captured: the hold lasts until the button is let go
-cmp.addEventListener('pointerup', cmpOff); cmp.addEventListener('pointercancel', cmpOff); cmp.addEventListener('lostpointercapture', cmpOff);
-cmp.addEventListener('pointerleave', e => { if (!cmp.hasPointerCapture(e.pointerId)) cmpOff(); });
-cmp.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); cmpOn(); } });
-cmp.addEventListener('keyup', cmpOff); cmp.addEventListener('blur', cmpOff);
+// Hold Original / Hold Transparent: the view swaps while a button (or O / T) is held, in the same place, so you can flick
+const cmpOn = mode => { if (compare !== mode){ compare = mode; syncHold(); syncLegend(); render(); } }, cmpOff = () => { if (compare){ compare = false; syncHold(); syncLegend(); render(); } };
+function syncHold(){ for (const b of $('holdTray').querySelectorAll('[data-hold]')) b.setAttribute('aria-pressed', String(compare === b.dataset.hold)); }
+for (const b of $('holdTray').querySelectorAll('[data-hold]')){
+  b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch(err){} cmpOn(b.dataset.hold); }); // captured: the hold lasts until the button is let go
+  b.addEventListener('pointerup', cmpOff); b.addEventListener('pointercancel', cmpOff); b.addEventListener('lostpointercapture', cmpOff);
+  b.addEventListener('pointerleave', e => { if (!b.hasPointerCapture(e.pointerId)) cmpOff(); });
+  b.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); cmpOn(b.dataset.hold); } });
+  b.addEventListener('keyup', cmpOff); b.addEventListener('blur', cmpOff);
+}
 
 /* ---------- Touch up: eraser, paint and restore brushes ----------
    A stroke is kept in the file's own pixels, so crops and print sizes never move it. Strokes are replayed onto two
@@ -3305,7 +3313,7 @@ window.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'z' && !typing){ e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
   if (e.key === 'Escape' && !$('askSave').hidden){ pendingGo = null; $('askSave').hidden = true; }
 });
-window.addEventListener('keyup', e => { if ((e.key === 't' || e.key === 'T') && st.view === 'split') cmpOff(); });
+window.addEventListener('keyup', e => { if (((e.key === 't' || e.key === 'T') && st.view === 'split') || e.key === 'o' || e.key === 'O') cmpOff(); });
 
 /* ---------- before opening other art or leaving: offer to save unsaved work ---------- */
 let pendingGo = null, pendingGesture = false;
@@ -3500,6 +3508,8 @@ const TIPS = [
   ['#saveBtn', 'Save a transparent PNG at 300 dpi with no see-through pixels, ready for the film.'],
   ['#nameSuffix', 'Added to the end of the saved name, e.g. an order number or the print area.'],
   ['#foldAll', 'Open or close every section.'],
+  ['#holdOrig', 'Press and hold (or hold O) to see the art before halftoning, in the same place. Let go to come back.'],
+  ['#holdClear', 'Press and hold to see the print on transparent checks: the checks are clear film. In Split, holding T does the same.'],
   ['#lifeSetup', 'Measure this screen again with a bank card: on a different monitor, or after changing the display scaling.'],
   ['#resetAll', 'Put every setting back to the tool’s defaults and remove the crop. Undo brings them back.'],
   ['#revertBtn', 'Back to this design as it was opened: its settings, crop, size and touch-ups. Undo brings your changes back.'],
