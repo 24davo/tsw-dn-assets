@@ -88,7 +88,9 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .sw.custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
 .readout{font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink);padding:6px 10px}
 .stack{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
-#legend{position:absolute;left:0;bottom:calc(100% + 6px);width:max-content;max-width:min(560px,calc(100vw - 24px))}
+#legend{position:absolute;left:calc(100% + 8px);bottom:0;width:max-content;max-width:560px}
+#legend.above{left:0;bottom:calc(100% + 6px);max-width:min(560px,calc(100vw - 24px))}
+#legend:not(.above) span{white-space:normal}
 .legend{gap:4px 14px;padding:6px 10px;font-size:12px;font-weight:500;max-width:560px}
 .legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .legend i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(128,128,128,.6);flex:none}
@@ -1285,7 +1287,7 @@ const VIEWS = {
   base: {pal: ['#000000', '#000000', '#000000', '#ffffff', '#ffffff', '#ffffff'],
          legend: [['#ffffff', 'Ink on a white base'], ['#000000', 'Clear film']]},
   map:  {pal: ['#000000', '#5a5a5a', '#ff2e93', '#ff2e93', '#f2f2f2', '#3d9cff'], // dots and the gaps between them share one pink, so the halftoned area reads as one patch
-         legend: [['#f2f2f2', 'Solid ink'], ['#ff2e93', 'Turned into dots'], ['#5a5a5a', 'Removed'], ['#3d9cff', 'Shirt-colour edge']]}
+         legend: [['#f2f2f2', 'Solid ink'], ['#ff2e93', 'Dots'], ['#5a5a5a', 'Removed'], ['#3d9cff', 'Shirt-colour edge']]}
 };
 const ORIG_LEGEND = [['#ffffff', 'Original: solid'], ['#808080', 'Original: see-through, prints as haze'], ['#000000', 'Clear film']];
 const PANES = [ // [kind, group, name, what it shows, picture]
@@ -1302,12 +1304,12 @@ const PANES = [ // [kind, group, name, what it shows, picture]
 ];
 const PANE_GROUPS = {before: 'Before · the original art', after: 'After · the print'};
 const CHECKS = 'repeating-conic-gradient(#cccccc 0 25%, #ffffff 0 50%) 0 0/8px 8px';
-const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? Math.round((1 - lastOn/s.vis)*100) : 0; return [[CHECKS, cut > 0 ? `Clear film: ink area down ${cut}%` : 'Clear film, no ink']]; };
-const ORIGCLEAR_LEGEND = [[CHECKS, 'Original: the checks show where it was clear or see-through']];
+const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? Math.round((1 - lastOn/s.vis)*100) : 0; return [[CHECKS, cut > 0 ? `Clear film · ink area down ${cut}%` : 'Clear film']]; };
+const ORIGCLEAR_LEGEND = [[CHECKS, 'Clear film']];
 const isClear = kind => kind === 'clear' || kind === 'origclear';
 const isWhite = kind => kind === 'white' || kind === 'origwhite'; // the film over a solid white fill
 const toClear = kind => ({orig: 'origclear', shirt: 'clear', origwhite: 'origclear', white: 'clear'}[kind] || kind); // what Hold for transparent shows in Split
-const WHITE_LEGEND = [['#ffffff', 'White fill behind the film: what shows is what prints (white ink blends in)']];
+const WHITE_LEGEND = [['#ffffff', 'White fill behind: what shows is what prints']];
 const ORIGWHITE_LEGEND = [['#ffffff', 'Original over a white fill']];
 const selLegend = () => [['#ffffff', `Selected by colour range ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
 function buildMask(kind){
@@ -1391,7 +1393,7 @@ function render(){
   const cw = Math.max(1, Math.round(r.width*dpr)), ch = Math.max(1, Math.round(r.height*dpr));
   if (view.width !== cw || view.height !== ch){ view.width = cw; view.height = ch; }
   if (cropping){ drawCropView(r, dpr, cw, ch); return; }
-  const topH = 12, botH = $('oBottom').offsetHeight + 12 + 36; // + room for the key, kept when no key shows, so the picture never jumps
+  const topH = 12, botH = $('oBottom').offsetHeight + 12; // the key isn't counted (it sits beside the size), so it never moves the picture
   let panes;
   if (st.view !== 'split'){
     panes = [{kind: kindsShown()[0], x: 0, y: 0, w: r.width, h: r.height, top: topH + 12, bottom: botH + 12}];
@@ -1469,7 +1471,14 @@ function checker(dpr){ // 8 px checks on screen whatever the zoom, white and lig
   return checkPat;
 }
 function geoAt(x, y){ return geos.find(g => x >= g.x && x < g.x + g.w && y >= g.y && y < g.y + g.h) || geo; }
-new ResizeObserver(() => render()).observe(stage);
+new ResizeObserver(() => { render(); placeLegend(); }).observe(stage);
+function placeLegend(){ // beside the size, up to the zoom buttons; above the size when that gap is too small
+  const lg = $('legend'); if (lg.hidden) return;
+  const sr = lg.parentElement.getBoundingClientRect(), or = $('oBottom').querySelector('.o-right').getBoundingClientRect();
+  const sameLine = Math.abs(or.bottom - sr.bottom) < 4, room = (sameLine ? or.left : $('oBottom').getBoundingClientRect().right) - sr.right - 16;
+  const above = room < 120;
+  lg.classList.toggle('above', above); lg.style.maxWidth = above ? '' : `${Math.min(560, Math.floor(room))}px`;
+}
 
 function setZoom(z, atX, atY){
   if (z !== 'fit' && geo){
@@ -1561,11 +1570,14 @@ function syncLegend(){
   const items = [], seen = new Set();
   for (const k of kindsShown()){
     const list = k === 'origbase' ? ORIG_LEGEND : k === 'sel' ? selLegend() : k === 'clear' ? clearLegend() : k === 'origclear' ? ORIGCLEAR_LEGEND : k === 'white' ? WHITE_LEGEND : k === 'origwhite' ? ORIGWHITE_LEGEND : VIEWS[k] ? VIEWS[k].legend : [];
-    for (const it of list) if (!seen.has(it[1]) && (st.back || it[1] !== 'Shirt-colour edge') && (st.finish !== 'cut' || it[1] !== 'Turned into dots')){ seen.add(it[1]); items.push(it); }
+    for (const it of list) if (!seen.has(it[1]) && (st.back || it[1] !== 'Shirt-colour edge') && (st.finish !== 'cut' || it[1] !== 'Dots')){ seen.add(it[1]); items.push(it); }
   }
+  const ck = items.filter(it => it[0] === CHECKS); // both sides on the checks: one entry, the one with the ink figure
+  if (ck.length > 1) for (const it of ck.slice(0, -1)) items.splice(items.indexOf(it), 1);
   const lg = $('legend');
   lg.hidden = !items.length;
   lg.innerHTML = items.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join('');
+  placeLegend();
 }
 function syncPaneOptions(){ // each side's button and menu
   const list = PANES.filter(([v]) => v !== 'sel' || rules.length);
