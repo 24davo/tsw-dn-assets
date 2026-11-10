@@ -599,7 +599,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <div class="field dotf">
           <div class="f-head"><label for="solid">Solid above</label><output id="solidOut" for="solid">92%</output></div>
           <input type="range" id="solid" min="60" max="100" step="1" value="92">
-          <p class="f-note">Dots this big join into solid ink.</p>
+          <p class="f-note" id="solidNote">Dots this big join into solid ink.</p>
         </div>
       </section>
 
@@ -691,7 +691,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>25–35 lpi suits most tees. Go to 45 or more for small or detailed prints.</li>
             <li>22.5° is the usual angle for single-colour halftones. It hides the rows of dots best.</li>
             <li>On dark tees, “Shirt shows through” lets the shirt be your darkest colour, so the print is lighter and breathes.</li>
-            <li>Keep the smallest dots around 0.3 mm or more so they hold in the wash.</li>
+            <li>Keep the smallest dots, and the smallest gaps between dots, around 0.3 mm or more: tiny dots can wash off and tiny gaps fill in. At 30 lpi that’s Drop dots under 12–15% and Solid above 88–90%; at 35 lpi about 18% and 85%.</li>
             <li>Press V to step through the views. Press T to flick between Transparent and the last view: the checks show every bit of ink that was removed.</li>
             <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
@@ -2325,7 +2325,10 @@ function updateNotes(){
   const cellMm = 25.4/st.lpi;
   $('lpiNote').textContent = `Dots every ${cellMm.toFixed(2)} mm. Lower numbers give bigger dots.`;
   $('dropNote').textContent = `Smallest dot about ${minDotMm().toFixed(2)} mm across.`;
+  $('solidNote').textContent = `Dots this big join into solid ink. Smallest gap between dots about ${minGapMm().toFixed(2)} mm.`;
 }
+// the clear gap left in a cell when its dot covers just under "Solid above", as a circle of the same area
+function minGapMm(){ const cellMm = 25.4/st.lpi; return st.solid < 100 ? cellMm*Math.sqrt(4*(1 - st.solid/100)/Math.PI) : 25.4/DPI; }
 function minDotMm(){ const cellMm = 25.4/st.lpi; return st.drop > 0 ? cellMm*Math.sqrt(4*(st.drop/100)/Math.PI) : 25.4/DPI; }
 function updateChecks(){
   if (!art) return;
@@ -2338,6 +2341,12 @@ function updateChecks(){
   if (st.finish === 'cut') rows.push(['good', '✓', 'Clean cut, no dots', `Pixels at least ${st.cut}% solid print fully solid. The rest is removed.`]);
   else rows.push(md >= 0.3 ? ['good', '✓', `Smallest dot about ${md.toFixed(2)} mm`, 'A good size for DTF film.']
                        : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
+  if (st.finish !== 'cut'){ // the gaps between big dots: tiny ones fill in unevenly (sometimes wanted, for a worn look)
+    const mg = minGapMm(), t = `Smallest gap between dots about ${mg.toFixed(2)} mm`;
+    rows.push(mg >= 0.3 ? ['good', '✓', t, 'Big enough to stay open on DTF film.']
+            : mg >= 0.2 ? ['info', '→', t, 'Gaps this small may fill in a little. For clean solids, lower “Solid above” (about 90% at 30 lpi).']
+                        : ['warn', '!', t, 'Gaps this small tend to fill in unevenly. Lower “Solid above” so they print solid, unless you want a worn look.']);
+  }
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (st.bgOn && Array.isArray(bgFound)) rows.push(['info', '✂', `Background removed (${(st.bgHex || rgbHex(bgFound[0], bgFound[1], bgFound[2])).toUpperCase()})`, `Cleared where it joins the outside edge, within ${st.bgTol}%. The same colour inside the design stays.`]);
