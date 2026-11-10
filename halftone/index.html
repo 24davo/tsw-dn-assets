@@ -73,7 +73,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 #view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:default}
 .stage.pannable #view{cursor:grab}
 .stage.panning #view{cursor:grabbing}
-.stage.picking #view{cursor:crosshair}
+.stage.picking #view,.stage.boxing #view{cursor:crosshair}
 .stage.brushing #view{cursor:none}
 .stage.brushing.space #view{cursor:grab}
 .brush-view{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -119,6 +119,8 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .rules:empty{display:none}
 .rule{display:grid;gap:12px;padding:12px;border:1.5px solid var(--line);border-radius:var(--r)}
 .rule.on{border-color:var(--ink)}
+.rule.off>*:not(.rule-head){opacity:.45}
+.f-note a{color:inherit;text-decoration:underline}
 .rule-head{display:flex;align-items:center;gap:8px}
 .rule-n{font-size:12px;font-weight:800;color:var(--muted);min-width:12px}
 .rule-head select{flex:1;min-width:0;height:34px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer}
@@ -204,7 +206,7 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .look input{grid-row:1/3;margin:2px 0 0;accent-color:var(--ink);width:16px;height:16px}
 .look-t{font-weight:700}
 .look-d{font-size:13px;color:var(--muted)}
-.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choices{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 .choice{display:grid;align-content:start;gap:4px;padding:12px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);text-align:left;cursor:pointer}
 .choice:hover{border-color:var(--line-strong)}
 .choice[aria-pressed="true"]{border-color:var(--ink);background:var(--soft);box-shadow:inset 0 0 0 1px var(--ink)}
@@ -445,6 +447,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <div class="choices" id="finishChips" role="group" aria-label="Print style">
           <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone</span><span class="choice-d">Shading becomes dots.</span></button>
           <button class="choice" type="button" data-finish="cut"><span class="choice-t">Clean cut</span><span class="choice-d">Solid ink, no dots.</span></button>
+          <button class="choice" type="button" data-finish="prep"><span class="choice-t">Prep only</span><span class="choice-d">Tidy up and save.</span></button>
         </div>
         <div class="lv-sub">Quick start</div>
         <div class="looks" id="looks">
@@ -605,13 +608,17 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <label class="check-row"><input type="checkbox" id="cleanOn"> Clean colour dots</label>
           <p class="f-note" id="cleanNote"><span>For dark tees: fades print in bright dots, with no muddy dark ink.</span><span class="more-x" hidden> The dots in a fade print in the bright version of their colour, sized so the fade still looks like the art. It gives a bolder, more graphic look, so it is off by default.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
+        <div class="field dotk">
+          <label class="check-row"><input type="checkbox" id="richOn"> Rich fade dots</label>
+          <p class="f-note"><span>For dark tees: fades keep more colour as they thin out, so glows stay bright.</span><span class="more-x" hidden> Small dots in a fade print in a stronger version of their colour, a little larger than the plain maths gives, the way a hand-made halftone glow is built. Subtler than Clean colour dots, so only one of the two is on at a time. To use it on one part only, add a part with Own dots.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        </div>
       </section>
 
       <section class="group tune" id="rangeGroup">
-        <h2>Select (colour range)</h2>
-        <p class="f-note"><span>Select shadows, highlights or picked colours, then choose what happens to them.</span><span class="more-x" hidden> Like Photoshop’s Select › Colour Range. Show displays the selection: white is selected.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        <h2>Parts</h2>
+        <p class="f-note"><span>Give one part of the design its own treatment. Pick it by colour, or paint over it.</span><span class="more-x" hidden> A part is picked by tone or colour (like Photoshop’s Select › Colour Range), by an area you paint or box, or both. Parts apply from the top down, and everything not in a part uses the main settings. Show displays what a part covers: white is selected.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="rules" id="rules"></div>
-        <button class="btn small" type="button" id="addRule">Add a colour range</button>
+        <button class="btn small" type="button" id="addRule">Add a part</button>
       </section>
 
       <section class="group tune" id="toneGroup">
@@ -625,6 +632,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <button class="chip" type="button" data-dens="safe" aria-pressed="false">Extra safe</button>
           </div>
           <p class="f-note" id="densNote"></p>
+          <p class="f-note">New printer, film or powder? <a href="https://24davo.github.io/tsw-dn-assets/halftone/test-chart.png" target="_blank" rel="noopener">Print the test chart</a> at 100% (190 × 270 mm) to see the smallest dot and gap that hold.</p>
         </div>
         <div class="field dotf">
           <div class="f-head"><label for="drop">Drop dots under</label><output id="dropOut" for="drop">14%</output></div>
@@ -707,6 +715,14 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           </div>
           <p class="f-note"><span>Soft edges and glows print fully solid or are removed, for a crisp outline.</span><span class="more-x" hidden> Like a Threshold action on the transparency. The film never has half see-through pixels (they’d print as a white haze), but with dots, soft edges and glows turn into dots. Pixels at least this solid stay.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
+        <div class="field dotf">
+          <label class="check-row"><input type="checkbox" id="crispOn"> Crisp outlines</label>
+          <p class="f-note"><span>Sharp edges inside the design stay clean lines, not broken up by dots.</span><span class="more-x" hidden> Where the ink jumps from a lot to a little within a quarter of a millimetre (lettering, outlines, hard shapes), the edge prints solid right up to the line. Fades and soft shading are left alone.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        </div>
+        <div class="field">
+          <label class="check-row"><input type="checkbox" id="speckOn"> Speck clean-up</label>
+          <p class="f-note"><span id="speckNote">Removes specks of ink and fills pinholes too small to print.</span><span class="more-x" hidden> Anything smaller than the smallest dot in Dot limits is a speck: on the film it would lift off or fill in. Proper dots are never touched.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        </div>
         <div class="field dotf" id="fadeField">
           <div class="f-head"><label for="fade">Fade the edge</label><output id="fadeOut" for="fade">Off</output></div>
           <input type="range" id="fade" min="0" max="20" step="0.5" value="0">
@@ -788,14 +804,14 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Press V to step through the views. Press T to flick between Transparent and the last view: the checks show every bit of ink that was removed. Bottom right, hold Original or Transparent to flick between them in place (or hold O; in Split, hold T).</li>
             <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
-            <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
+            <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or a part takes it out.</li>
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
-            <li>JPG on a white background: tick Remove the background (in Background, under Fine-tune). To change a colour, e.g. black text to white for a dark tee, add a colour range, pick the colour and choose Recolour.</li>
+            <li>JPG on a white background: tick Remove the background (in Background, under Fine-tune). To change a colour, e.g. black text to white for a dark tee, add a part, pick the colour and choose Recolour.</li>
             <li>Open several designs at once: each opens in its own tab (+ or Open art, or drop several files) with its own settings, touch-ups and history. A dot on a tab means it isn’t saved yet.</li>
             <li>Touch up brushes: Eraser clears stray pixels, Paint fills gaps in a colour Alt-clicked from the art, Restore brings the original back. [ and ] change the size, hold Space to move.</li>
             <li>For a crisp outline on a dark tee, tick Hard edge and add a little Trim the edge in the Edge step. Any colour trims a background-removal fringe; Only near the knock-out colour keeps dark parts like tyres.</li>
             <li>For a quick black-shirt clean-up with no halftone, choose Clean cut, then Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
-            <li>To halftone most of a design but keep one part free of dots (a grey skull in red smoke), add a colour range in Select, choose Greys or pick the part’s colours, then No dots.</li>
+            <li>To halftone most of a design but keep one part free of dots (a grey skull in red smoke), add a part in Parts, choose Greys or pick its colours (or paint over it), then No dots.</li>
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
             <li>Three steps: 1 Print size, 2 Print style (Halftone or Clean cut, then a Quick start), 3 Check &amp; save. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
             <li>Every other tool is under Fine-tune, only if a design needs it. The number beside it says how many sections this design has changed.</li>
@@ -805,7 +821,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>To keep the art’s contrast and colour (smoke, glows, a grey skull) and halftone only the deep shadows, use Quick start “Shadows to dots”, then refine with Halftone levels.</li>
             <li>Fades into a black tee printing with a muddy maroon or grey edge: first push the Levels black point to about 40, then if needed try Clean colour dots (Knock out step). It prints the dots in the bright version of their colour: cleaner, but a bolder, more graphic look.</li>
             <li>DTF black ink prints as a dark matt grey, never as black as a dyed black tee. Keep “Allow for DTF black ink” on (Ink colour step): the views then show the real grey, and on black tees the darkest colours become sparse dots so the tee does the black. A Shirt-colour edge on a black tee prints in that grey too, so keep it thin.</li>
-            <li>Each new design starts clean: ink amount, halftone levels, knock out, colour ranges, edge, sharpen and background go back to the start. Your print style, Quick start, dot settings, black ink and shirt colour stay. To repeat a set-up, save a preset or use Copy settings to all.</li>
+            <li>Each new design starts clean: ink amount, halftone levels, knock out, parts, edge, sharpen and background go back to the start. Your print style, Quick start, dot settings, black ink and shirt colour stay. To repeat a set-up, save a preset or use Copy settings to all.</li>
+            <li>Parts (under Fine-tune) give one part of a design its own treatment. Choose Everything, then Paint or Box the area; or pick it by colour and paint to limit where. Then choose what happens: Own dots, No dots, Keep solid, Remove, or Main dots with its own Brightness. On/Off compares with and without.</li>
+            <li>Regular image that needs no dots? Choose Prep only: set the size, remove the background, tidy the edge, touch up, then save. Every tool works in the same order whichever style you choose (size, sharpen, touch-ups, background, edge, levels, then dots), so preparing first and adding dots later gives the same result.</li>
+            <li>Rich fade dots (Knock out step) keeps more colour in a fade as it thins out, for glows and flames on dark tees. Crisp outlines and Speck clean-up (Edge step) are on by default: untick one to compare.</li>
+            <li>Print the test chart once per printer or film (link in Ink density): it shows the smallest dot and gap your set-up holds, and which lpi fades smoothest.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
         </details>
@@ -854,6 +874,7 @@ function engine(){
   const tiles = {};
   let S = null;             // source pixels at output size {w,h,d}
   let bgCache = null;       // the background mask for S, kept while its colour and tolerance stay the same
+  const masks = new Map();  // painted areas of parts, by id: {w, h, d}, one byte a pixel, stretched over the image
   // Remove background: the background colour (found on the edge, or picked) is cleared only where it joins the outside
   // edge, so the same colour inside the design stays. Answers a mask (255 cleared; 1–254 part of an edge pixel kept, to
   // blend the fringe; 0 untouched) with .rgb, or null when the edge is clear already.
@@ -967,6 +988,7 @@ function engine(){
   // How much a colour belongs to a colour range (like Photoshop's Select > Color Range): 1 selected, 0 not, in between at the fuzzy edge.
   function selectWeight(R, r, g, b, L){
     let s;
+    if (R.type === 'all') return 1; // everything (inside the part's painted area)
     if (R.type === 'sample'){
       let best = 1e12;
       for (const c of R.samples){
@@ -1053,7 +1075,34 @@ function engine(){
     // colour ranges, applied in order to each pixel's ink amount; sel keeps one range's selection for the Selection view.
     // Recolour ranges run first, before the knock-out, so a recoloured part is judged by its new colour.
     const rules = p.rules || [], nr = rules.length, selOut = p.selOut;
-    const recol = rules.map((R, k) => R.action === 'recolour' ? k : -1).filter(k => k >= 0), nc = nr - recol.length; // nc: ranges that change the ink
+    const recol = rules.map((R, k) => R.action === 'recolour' ? k : -1).filter(k => k >= 0);
+    const nc = rules.filter(R => R.action === 'remove' || R.action === 'fade' || R.action === 'solid').length; // nc: ranges that change the ink
+    // A part's painted area: its selection only counts inside it. A part whose area was never sent selects nothing.
+    { const used = new Set(rules.map(R => R.mask)); for (const id of [...masks.keys()]) if (!used.has(id)) masks.delete(id); }
+    const hasM = rules.map(R => R.mask != null), RM = rules.map(R => R.mask != null && masks.get(R.mask) || null);
+    const W0 = w, H0 = h;
+    const sw = (k, r, g, b, L, x, y) => {
+      let s = selectWeight(rules[k], r, g, b, L);
+      if (s <= 0 || !hasM[k]) return s;
+      const M = RM[k]; if (!M) return 0;
+      let u = (x + 0.5)*M.w/W0 - 0.5, v = (y + 0.5)*M.h/H0 - 0.5; if (u < 0) u = 0; if (v < 0) v = 0;
+      let x0 = u | 0, y0 = v | 0; if (x0 > M.w - 1) x0 = M.w - 1; if (y0 > M.h - 1) y0 = M.h - 1;
+      const x1 = x0 + 1 < M.w ? x0 + 1 : x0, y1 = y0 + 1 < M.h ? y0 + 1 : y0, fu = u - x0, fv = v - y0, D = M.d;
+      const a0 = D[y0*M.w + x0], a1 = D[y0*M.w + x1], b0 = D[y1*M.w + x0], b1 = D[y1*M.w + x1];
+      return s*((a0 + (a1 - a0)*fu)*(1 - fv) + (b0 + (b1 - b0)*fu)*fv)/255;
+    };
+    // A part's own Brightness (the same midtone curve as Levels) is done before the knock-out, so the part is judged by its
+    // new colours; its selection is worked out once, before the change, and kept in sc for the part's own action.
+    const BL = rules.map(R => { if (!R.bri || R.action === 'remove' || R.action === 'recolour' || R.action === 'off') return null;
+      const t = new Float32Array(256), e = Math.pow(2, -R.bri/100); for (let v = 0; v < 256; v++) t[v] = 255*Math.pow(v/255, e); return t; });
+    const isPre = rules.map((R, k) => !!BL[k] || R.action === 'keepas' || R.action === 'off'), pre = rules.map((R, k) => isPre[k] ? k : -1).filter(k => k >= 0);
+    const sc = new Float32Array(nr + 1);
+    const wt = (k, r, g, b, L, x, y) => isPre[k] ? sc[k] : sw(k, r, g, b, L, x, y);
+    // Rich fade dots (dark tees, the art's own colours): in a knock-out fade the dots are a little larger and each dot is
+    // brightened only as far as its colour can go, so a fade to the shirt keeps its colour without looking flat.
+    const richOk = !one && !p.cut && kl < 70, richAll = richOk && !!p.rich, richR = rules.map(R => richOk && R.action === 'ramp' && !!R.rich);
+    const crisp = !p.cut && p.crisp > 0 ? Math.max(1, Math.round(p.crisp)) : 0; // crisp outlines: see the two passes below
+    let amt = crisp ? new Uint8Array(w*h) : null, amn = null, amx = null;
     const nodr = rules.map((R, k) => R.action === 'nodots' ? k : -1).filter(k => k >= 0); // No dots ranges: these parts are a clean cut inside a halftone
     const rampr = p.cut ? [] : rules.map((R, k) => R.action === 'ramp' ? k : -1).filter(k => k >= 0); // Own dots ranges: these parts have their own knock-out fade
     let sel = selOut >= 0 && selOut < nr ? new Uint8Array(w*h) : null;
@@ -1061,6 +1110,29 @@ function engine(){
     const fade = p.fade && p.fade.px > 0 && !cut ? p.fade : null, fo = !!(fade && fade.out);
     let cov = fade ? new Uint8Array(w*h) : null; // cov: each pixel's ink amount, for Fade the edge
     let fadeClip = null, pad = null, ox = 0, oy = 0; // pad: the room added round the design for an outward fade, in pixels
+    // Crisp outlines: the first pass only works out each pixel's ink amount. Where that amount changes by more than half
+    // within a few pixels, it is an outline, not a fade: the second pass gives those pixels the amount of the nearer side,
+    // so an outline is a clean line and not a row of fine dots. Real fades change far more slowly and are left alone.
+    for (let pass = crisp ? 0 : 1; pass < 2; pass++){
+    if (pass === 1 && crisp){
+      const n = w*h, tmp = new Uint8Array(n); amn = new Uint8Array(n); amx = new Uint8Array(n);
+      for (let y = 0, k = 0; y < h; y++) for (let x = 0; x < w; x++, k++){
+        let lo = 255, hi = 0; const xa = x - crisp < 0 ? 0 : x - crisp, xb = x + crisp >= w ? w - 1 : x + crisp;
+        for (let j = y*w + xa, e = y*w + xb; j <= e; j++){ const v = amt[j]; if (v < lo) lo = v; if (v > hi) hi = v; }
+        tmp[k] = lo; amx[k] = hi;
+      }
+      for (let y = 0; y < h; y++){ // down the columns, a row at a time
+        const ya = y - crisp < 0 ? 0 : y - crisp, yb = y + crisp >= h ? h - 1 : y + crisp, o = y*w;
+        amn.set(tmp.subarray(ya*w, ya*w + w), o);
+        for (let yy = ya + 1; yy <= yb; yy++){ const r = yy*w; for (let x = 0; x < w; x++){ const v = tmp[r + x]; if (v < amn[o + x]) amn[o + x] = v; } }
+      }
+      tmp.set(amx);
+      for (let y = 0; y < h; y++){
+        const ya = y - crisp < 0 ? 0 : y - crisp, yb = y + crisp >= h ? h - 1 : y + crisp, o = y*w;
+        amx.set(tmp.subarray(ya*w, ya*w + w), o);
+        for (let yy = ya + 1; yy <= yb; yy++){ const r = yy*w; for (let x = 0; x < w; x++){ const v = tmp[r + x]; if (v > amx[o + x]) amx[o + x] = v; } }
+      }
+    }
     for (let y = 0; y < h; y++){
       let fx = 0.5*cs + (y + 0.5)*sn, fy = -0.5*sn + (y + 0.5)*cs, i = y*w*4;
       for (let x = 0; x < w; x++, i += 4, fx += cs, fy -= sn){
@@ -1074,18 +1146,27 @@ function engine(){
         if (recol.length){
           const L0 = (0.299*r + 0.587*g + 0.114*b)/255;
           for (const k of recol){
-            const R = rules[k], s = selectWeight(R, r, g, b, L0);
+            const R = rules[k], s = sw(k, r, g, b, L0, x, y);
             if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0;
             if (s > 0){ r += (R.to[0] - r)*s; g += (R.to[1] - g)*s; b += (R.to[2] - b)*s; }
+          }
+        }
+        if (pre.length){
+          const Lp = (0.299*r + 0.587*g + 0.114*b)/255, r0 = r, g0 = g, b0 = b;
+          for (const k of pre){
+            const s = sc[k] = sw(k, r0, g0, b0, Lp, x, y), T = BL[k];
+            if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0;
+            if (s > 0 && T){ r += (T[(r + 0.5) | 0] - r)*s; g += (T[(g + 0.5) | 0] - g)*s; b += (T[(b + 0.5) | 0] - b)*s; }
           }
         }
         let nd = 0; // when set: this pixel gets no dots, and prints solid if at least this solid
         let boost = 0; // clean colour dots: 1/q for a dot in a knock-out fade
         let kept = false; // selected by a Keep solid range
+        let rich = richAll;
         if (nodr.length){
           const L1 = (0.299*r + 0.587*g + 0.114*b)/255;
           for (const k of nodr){
-            const s = selectWeight(rules[k], r, g, b, L1);
+            const s = wt(k, r, g, b, L1, x, y);
             if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0;
             if (s >= 0.5 && !nd && !cut) nd = rules[k].cut;
           }
@@ -1103,20 +1184,29 @@ function engine(){
               const L1 = (0.299*r + 0.587*g + 0.114*b)/255;
               q = q < 0 ? 0 : q > 1 ? 1 : q;
               for (const k of rampr){
-                const R = rules[k], s = selectWeight(R, r, g, b, L1);
+                const R = rules[k], s = wt(k, r, g, b, L1, x, y);
                 if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0;
-                if (s > 0){ let qo = (dn - R.k0)/(R.k1 - R.k0); qo = qo < 0 ? 0 : qo > 1 ? 1 : qo; q += (qo - q)*s; }
+                if (s > 0){ let qo = (dn - R.k0)/(R.k1 - R.k0); qo = qo < 0 ? 0 : qo > 1 ? 1 : qo; q += (qo - q)*s; if (s >= 0.5) rich = richR[k] || (richAll && R.rich !== false); }
               }
             }
             if (q <= 0){ if (!nc){ cls[i >> 2] = 1; continue; } c = 0; }
-            else if (q < 1){ c *= q; if (clean && 0.299*r + 0.587*g + 0.114*b > kl) boost = 1/q; } // only colours lighter than the tee
+            else if (q < 1){
+              const lighter = 0.299*r + 0.587*g + 0.114*b > kl; // only colours lighter than the tee
+              if (rich && lighter){
+                const cq = Math.pow(q, 0.75); let bo = 1/cq;
+                if (r > kr){ const m1 = (255 - kr)/(r - kr); if (m1 < bo) bo = m1; }
+                if (g > kg){ const m1 = (255 - kg)/(g - kg); if (m1 < bo) bo = m1; }
+                if (b > kb){ const m1 = (255 - kb)/(b - kb); if (m1 < bo) bo = m1; }
+                c *= cq; if (bo > 1) boost = bo;
+              } else { c *= q; if (clean && lighter) boost = 1/q; }
+            }
           }
         }
         if (nc){
           const L = (0.299*r + 0.587*g + 0.114*b)/255;
           for (let k = 0; k < nr; k++){
-            if (rules[k].action === 'recolour' || rules[k].action === 'nodots' || rules[k].action === 'ramp') continue;
-            const R = rules[k], s = selectWeight(R, r, g, b, L);
+            const A = rules[k].action; if (A !== 'remove' && A !== 'fade' && A !== 'solid') continue;
+            const R = rules[k], s = wt(k, r, g, b, L, x, y);
             if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0;
             if (s <= 0) continue;
             if (R.action === 'remove') c *= 1 - s;
@@ -1135,6 +1225,11 @@ function engine(){
             if (wn > 0){ const fe = 1 - (wn > 1 ? 1 : wn)*(1 - (f < 0 ? 0 : f)); if (fe <= 0){ cls[i >> 2] = 1; continue; } c *= fe; }
           }
         }
+        if (pass === 0){ amt[i >> 2] = nd ? (c >= nd ? 255 : 0) : c >= 1 ? 255 : (c*255 + 0.5) | 0; continue; }
+        if (crisp && !nd && !kept){
+          const lo = amn[i >> 2], hi = amx[i >> 2];
+          if (hi - lo > 128){ const v = c*255; c = hi - v <= v - lo ? hi/255 : lo/255; if (c <= 0){ cls[i >> 2] = 1; continue; } }
+        }
         if (nd){ if (c < nd){ cls[i >> 2] = 1; continue; } c = 1; } // No dots: solid or removed, never screened
         else { ch[(c > 1 ? 100 : c*100 + 0.5) | 0]++; c = lut[(c*1024) | 0]; } // ch: the chart of ink amounts
         if (c <= 0 || c < cut){ cls[i >> 2] = 1; continue; }
@@ -1148,6 +1243,57 @@ function engine(){
         else if (boost && c < 1){ const R1 = kr + (r - kr)*boost, G1 = kg + (g - kg)*boost, B1 = kb + (b - kb)*boost; out[i] = R1; out[i+1] = G1; out[i+2] = B1; } // a dot in its bright colour
         else { out[i] = r; out[i+1] = g; out[i+2] = b; }
         out[i+3] = 255; on++;
+      }
+    }
+    }
+    amt = amn = amx = null;
+    // Speck clean-up: stray specks of ink too small to be a dot (they don't hold on the film) go, and pinholes too small
+    // to be a gap are filled. The sizes come from Dot limits, so every real dot and gap is kept.
+    let speck = 0, pin = 0;
+    if (p.speck){
+      const lim = Math.min(p.drop, 1 - p.solid), T = cut ? 3 : lim > 0 ? Math.floor(0.4*lim*cell*cell) : 0;
+      if (T >= 1){
+        const n = w*h, seen = new Uint8Array(n), q = new Int32Array(T + 12);
+        for (let s0 = 0; s0 < n; s0++){
+          if (cls[s0] < 3 || seen[s0]) continue;
+          let head = 0, tail = 0, big = false; q[tail++] = s0; seen[s0] = 2;
+          while (head < tail && !big){
+            const k = q[head++], x = k % w, xa = x > 0 ? -1 : 0, xb = x < w - 1 ? 1 : 0;
+            for (let dy = -w; dy <= w && !big; dy += w){
+              const row = k + dy; if (row < 0 || row >= n) continue;
+              for (let dx = xa; dx <= xb; dx++){
+                const j = row + dx; if (j === k || cls[j] < 3 || seen[j] === 2) continue;
+                if (seen[j] === 1 || tail > T){ big = true; break; }
+                seen[j] = 2; q[tail++] = j;
+              }
+            }
+          }
+          if (big || tail > T){ for (let j = 0; j < tail; j++) seen[q[j]] = 1; continue; }
+          for (let j = 0; j < tail; j++){ const k = q[j], o = k*4; cls[k] = 1; seen[k] = 0; out[o] = out[o+1] = out[o+2] = out[o+3] = 0; if (cov) cov[k] = 0; on--; }
+          speck++;
+        }
+        seen.fill(0);
+        for (let s0 = 0; s0 < n; s0++){
+          if (cls[s0] >= 3 || seen[s0]) continue;
+          let head = 0, tail = 0, big = false; q[tail++] = s0; seen[s0] = 2;
+          while (head < tail && !big){
+            const k = q[head++], x = k % w;
+            if (x === 0 || x === w - 1 || k < w || k >= n - w){ big = true; break; } // open to the edge of the image: not a hole
+            for (const j of [k - 1, k + 1, k - w, k + w]){
+              if (cls[j] >= 3 || seen[j] === 2) continue;
+              if (seen[j] === 1 || tail > T){ big = true; break; }
+              seen[j] = 2; q[tail++] = j;
+            }
+          }
+          if (big || tail > T){ for (let j = 0; j < tail; j++) seen[q[j]] = 1; continue; }
+          for (let j = 0; j < tail; j++){ // filled in the order found, so each pixel has a neighbour with ink to copy
+            const k = q[j], o = k*4; let m = -1;
+            for (const e of [k - 1, k - w, k + 1, k + w]) if (cls[e] >= 3){ m = e; break; }
+            if (m < 0) continue;
+            const mo = m*4; out[o] = out[mo]; out[o+1] = out[mo+1]; out[o+2] = out[mo+2]; out[o+3] = 255; cls[k] = cls[m]; if (cov) cov[k] = cov[m]; on++;
+          }
+          pin++;
+        }
       }
     }
     // Fade the edge (dots only): by distance from the outside of the design, not by tone, so the inside keeps its dots as they
@@ -1336,7 +1482,7 @@ function engine(){
       }
       for (let k = 0; k < n; k++) if (edge[k]){ cls[k] = 5; const j = k*4; out[j] = er; out[j+1] = eg; out[j+2] = eb; out[j+3] = 255; on++; }
     }
-    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on, bg: p.bg ? (bgm ? bgm.rgb : 'none') : null, ch: ch.buffer, fadeClip, pad};
+    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on, bg: p.bg ? (bgm ? bgm.rgb : 'none') : null, ch: ch.buffer, fadeClip, pad, speck, pin};
   }
   // a's pixels (c values each, w × h) placed at l, t on a W × H sheet: bigger with l, t positive, cropped with them negative.
   // edge: the new room takes the nearest pixel of a, not clear.
@@ -1411,12 +1557,13 @@ function engine(){
     }
   }
   function handle(m){
+    if (m.type === 'mask'){ masks.set(m.id, {w: m.w, h: m.h, d: new Uint8Array(m.buf)}); return {msg: {type: 'mask'}}; }
     if (m.type === 'src'){
       if (m.sharp) sharpenData(new Uint8ClampedArray(m.buf), m.w, m.h, m.sharp.amount, m.sharp.sigma);
       return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
     }
     const r = run(m.p);
-    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel, bg: r.bg, ch: r.ch, fadeClip: r.fadeClip, pad: r.pad},
+    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel, bg: r.bg, ch: r.ch, fadeClip: r.fadeClip, pad: r.pad, speck: r.speck, pin: r.pin},
             transfer: r.sel ? [r.buf, r.cls, r.sel, r.ch] : [r.buf, r.cls, r.ch]};
   }
   return {handle};
@@ -1461,9 +1608,9 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
-const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how'];
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','areaV'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 var cleanReset = false; // v51 had Clean colour dots on by default
 try { if (!localStorage.getItem('tsw-dtf-clean0')){ cleanReset = true; st.clean = false; localStorage.setItem('tsw-dtf-clean0', '1'); } } catch(e){}
@@ -1551,6 +1698,7 @@ function restartEngine(msg){ // a fresh engine, the art sent again, then the cur
 }
 $('redrawBtn').addEventListener('click', () => { autoRestarts = 0; restartEngine('Redrawn with your settings.'); });
 function onMsg(m){
+  if (m.type === 'mask') return; // a part's area arrived at the engine
   if (m.type === 'src'){ if (m.v === srcV){ srcStats = m.stats; hist = m.stats.hist; drawHisto(); } return; }
   try { runSettled(); } catch(e){} if (m.type !== 'err') autoRestarts = 0;
   if (m.type === 'err'){ running = false; pending = false; $('busy').hidden = true; toast('That didn’t work: ' + m.msg); flushIdle(); return; }
@@ -1572,10 +1720,49 @@ function params(){
           k0: st.k0/100, k1: st.k1/100, ktol: st.ktol/100, knock: hexRgb(st.knock || st.shirt),
           gamma: st.finish === 'cut' ? 1 : Math.pow(2, -st.mid/50), contrast: st.finish === 'cut' ? 1 : Math.pow(2, st.con/50), // Ink density is a halftone step
           drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
-          cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
+          cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(partParams), selOut: rules.length ? activeRule : -1,
           hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
+          rich: st.rich && st.finish !== 'cut', crisp: st.crisp && st.finish !== 'cut' ? 3 : 0, speck: !!st.speck,
           clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100,
           fade: st.fade && st.finish !== 'cut' ? {px: Math.max(1, Math.round(st.fade/25.4*DPI)), out: st.fadeDir === 'out', max: [Math.round(MAX_SHORT/2.54*DPI), Math.round(MAX_LONG/2.54*DPI)]} : null};
+}
+/* A part's area: brush strokes and boxes in the file's own pixels, drawn onto a small mask (up to 1400 px wide, over the
+   crop) and sent to the engine, which keeps only the masks the last run used. So every mask the last run did not use is
+   sent again. An area list is never changed in place: each edit makes a new list, so History steps stay as they were. */
+const areaCache = new WeakMap(); let maskSeq = 0;
+function areaMask(area){
+  const c = art.crop, key = `${c.x},${c.y},${c.w},${c.h}`; let m = areaCache.get(area);
+  if (m && m.key === key) return m;
+  const w = Math.max(1, Math.min(1400, c.w)), h = Math.max(1, Math.round(w*c.h/c.w)), sx = w/c.w, sy = h/c.h;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const x = cv.getContext('2d', {willReadFrequently: true}); x.strokeStyle = x.fillStyle = '#ff2d7a'; x.lineCap = x.lineJoin = 'round';
+  const X = v => (v - c.x)*sx, Y = v => (v - c.y)*sy;
+  for (const a of area){
+    const q = a.pts;
+    if (a.m === 'box'){ x.globalCompositeOperation = 'source-over'; x.fillRect(X(Math.min(q[0], q[2])), Y(Math.min(q[1], q[3])), Math.abs(q[2] - q[0])*sx, Math.abs(q[3] - q[1])*sy); continue; }
+    x.globalCompositeOperation = a.m === 'sub' ? 'destination-out' : 'source-over'; x.lineWidth = Math.max(1, a.r*2*sx);
+    x.beginPath(); x.moveTo(X(q[0]), Y(q[1])); if (q.length === 2) x.lineTo(X(q[0]) + 0.01, Y(q[1]));
+    for (let i = 2; i < q.length; i += 2) x.lineTo(X(q[i]), Y(q[i+1]));
+    x.stroke();
+  }
+  const d = x.getImageData(0, 0, w, h).data, al = new Uint8Array(w*h); for (let i = 0; i < al.length; i++) al[i] = d[i*4 + 3];
+  m = {key, id: ++maskSeq, w, h, a: al, cv}; areaCache.set(area, m); return m;
+}
+const hasArea = R => !!(R.area && R.area.length);
+function partParams(R){
+  const q = ruleParams(R);
+  if (R.off) q.action = 'off';
+  if (hasArea(R) && art) q.mask = areaMask(R.area).id; else if (R.type === 'all') q.mask = -1; // Everything, with no area marked yet: nothing
+  return q;
+}
+function sendMasks(){
+  const have = bus.have || new Set(), now = new Set();
+  for (const R of rules){
+    if (!hasArea(R) || !art) continue;
+    const m = areaMask(R.area); if (now.has(m.id)) continue; now.add(m.id);
+    if (!have.has(m.id)){ const b = m.a.slice().buffer; bus.post({type: 'mask', id: m.id, w: m.w, h: m.h, buf: b}, [b]); }
+  }
+  bus.have = now;
 }
 function schedule(){
   if (resetsReady) syncResets();
@@ -1586,7 +1773,8 @@ function schedule(){
   if (running){ pending = true; return; }
   running = true;
   $('busy').hidden = false;
-  bus.post({type: 'run', id: ++runId, v: srcV, p: params()});
+  const prm = params(); sendMasks();
+  bus.post({type: 'run', id: ++runId, v: srcV, p: prm});
   watchRun();
 }
 
@@ -1688,7 +1876,7 @@ const PANES = [ // [kind, group, name, what it shows, picture]
   ['white', 'after', 'On white', 'The print over a white fill, like a white layer behind it in Photoshop.', 'white'],
   ['base', 'after', 'White base', 'White shows where ink and its white base print.', 'base'],
   ['map', 'after', 'Ink map', 'White prints solid, pink turns into dots, grey is removed.', 'map'],
-  ['sel', 'after', 'Selection', 'The active colour range: white is selected.', 'sel']
+  ['sel', 'after', 'Selection', 'The active part: white is selected.', 'sel']
 ];
 const PANE_GROUPS = {before: 'Before · the original art', after: 'After · the print'};
 const CHECKS = 'repeating-conic-gradient(#cccccc 0 25%, #ffffff 0 50%) 0 0/8px 8px';
@@ -1701,7 +1889,7 @@ const toOrig = kind => kind.startsWith('orig') ? kind : ({shirt: 'orig', clear: 
 const shownKind = kind => compare === 'clear' ? toClear(kind) : compare === 'orig' ? toOrig(kind) : kind;
 const WHITE_LEGEND = [['#ffffff', 'White fill behind: what shows is what prints']];
 const ORIGWHITE_LEGEND = [['#ffffff', 'Original over a white fill']];
-const selLegend = () => [['#ffffff', `Selected by colour range ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
+const selLegend = () => [['#ffffff', `Selected by part ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
 function buildMask(kind){
   const m = masks[kind];
   if (!lastCls || m.key === paintN) return;
@@ -1777,7 +1965,7 @@ function paint(m){
   lastCls = new Uint8Array(m.cls); lastSel = m.sel ? new Uint8Array(m.sel) : null; paintN++;
   chist = m.ch ? new Uint32Array(m.ch) : null; drawHhisto();
   prepareViews();
-  outReady = true; lastOn = m.on;
+  outReady = true; lastOn = m.on; lastSpeck = [m.speck || 0, m.pin || 0]; syncSpeck();
   $('saveBtn').disabled = false;
   render(); updateChecks(); syncLegend();
 }
@@ -2175,6 +2363,7 @@ let drag = null;
 view.addEventListener('pointerdown', e => {
   if (cropping){ cropDown(e); return; }
   if (picking){ pickAt(e); return; }
+  if (areaTool && !spaceDown){ areaDown(e); return; }
   if (brushTool && !spaceDown){ brushDown(e); return; }
   if (st.zoom === 'fit') return;
   drag = {x: e.clientX, y: e.clientY, cx: st.cx, cy: st.cy};
@@ -2182,12 +2371,13 @@ view.addEventListener('pointerdown', e => {
 });
 view.addEventListener('pointermove', e => {
   if (cropping){ cropMove(e); return; }
+  if (areaTool && !drag){ areaMove(e); return; }
   if (brushTool && !drag){ brushMove(e); return; }
   if (!drag || !geo) return;
   st.cx = drag.cx - (e.clientX - drag.x)*geo.dpr/geo.k; st.cy = drag.cy - (e.clientY - drag.y)*geo.dpr/geo.k; render();
 });
-view.addEventListener('pointerleave', () => { if (brushAt && !stroke){ brushAt = null; drawBrush(); } });
-const endDrag = () => { if (stroke) brushUp(); drag = null; stage.classList.remove('panning'); if (cropping) cropping.drag = null; };
+view.addEventListener('pointerleave', () => { if (brushAt && !stroke && !aStroke){ brushAt = null; drawBrush(); } });
+const endDrag = () => { if (aStroke) areaUp(); if (stroke) brushUp(); drag = null; stage.classList.remove('panning'); if (cropping) cropping.drag = null; };
 view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag);
 view.addEventListener('wheel', e => {
   if (!geo || cropping) return;
@@ -2223,25 +2413,65 @@ for (const b of $('holdTray').querySelectorAll('[data-hold]')){
 let brushHintTimer = 0, brushTool = null, stroke = null, shownStrokes = [], shownUntil = 0, brushAt = null, spaceDown = false, paintPicking = false, artSeq = 0;
 const BRUSH_NAMES = {erase: 'Eraser', paint: 'Paint', restore: 'Restore'};
 const brushMm = () => 0.2*Math.pow(100, st.brushV/100); // the slider runs 0.2 to 20 mm, finer at the small end
-const brushR = () => brushMm()/2*art.crop.w/(st.widthCm*10); // the brush radius in file pixels
+const brushR = () => (areaTool ? areaMm() : brushMm())/2*art.crop.w/(st.widthCm*10); // the brush radius in file pixels
+// marking a part's area: its own, bigger brush (0.5 to 60 mm), or a dragged box
+let areaTool = null, aStroke = null;
+const areaMm = () => 0.5*Math.pow(120, st.areaV/100);
+const mmTxt = mm => `${mm < 10 ? mm.toFixed(1) : Math.round(mm)} mm`;
+function setArea(i, mode){
+  if (mode && !art) return;
+  if (mode && areaTool && areaTool.i === i && areaTool.mode === mode) mode = null; // the same chip again stops it
+  if (mode){ if (cropping) endCrop(false); if (picking) endPick(); brushTool = null; paintPicking = false; }
+  areaTool = mode ? {i, mode} : null; aStroke = null; if (!mode) brushAt = null;
+  renderRules(); syncBrush();
+}
+function areaDown(e){
+  const p = toFile(e), R = rules[areaTool.i]; if (!p || !R) return;
+  aStroke = areaTool.mode === 'box' ? {m: 'box', pts: [p.x, p.y, p.x, p.y]} : {m: areaTool.mode, r: brushR(), pts: [p.x, p.y]};
+  view.setPointerCapture(e.pointerId); brushAt = p; drawBrush();
+}
+function areaMove(e){
+  const p = toFile(e); brushAt = p;
+  if (aStroke && p){
+    const q = aStroke.pts;
+    if (aStroke.m === 'box'){ q[2] = p.x; q[3] = p.y; }
+    else if (Math.hypot(p.x - q[q.length - 2], p.y - q[q.length - 1]) >= Math.max(0.5, aStroke.r*0.15)) q.push(p.x, p.y);
+  }
+  drawBrush();
+}
+function areaUp(){
+  const a = aStroke, R = areaTool && rules[areaTool.i]; aStroke = null;
+  if (!a || !R || !art) return;
+  if (a.m === 'box' && (Math.abs(a.pts[2] - a.pts[0]) < 2 || Math.abs(a.pts[3] - a.pts[1]) < 2)){ drawBrush(); return; } // a click, not a box
+  const had = hasArea(R);
+  R.area = [...(R.area || []), a];
+  noteChange(a.m === 'sub' ? 'Part area erased' : a.m === 'box' ? 'Part area boxed' : 'Part area painted');
+  if (!had) renderRules(); // the card now says the part has an area
+  drawBrush(); schedule();
+}
 function syncBrush(){
   for (const b of $('brushChips').querySelectorAll('[data-brush]')) b.setAttribute('aria-pressed', String(b.dataset.brush === brushTool));
   const mm = brushMm(); $('brush').value = st.brushV; $('brushOut').textContent = `${mm < 10 ? mm.toFixed(1) : Math.round(mm)} mm`;
   $('paintRow').hidden = brushTool !== 'paint'; $('paintPick').value = st.paintHex;
-  stage.classList.toggle('brushing', !!brushTool);
-  $('brushHint').hidden = !brushTool; clearTimeout(brushHintTimer);
-  if (brushTool && !paintPicking) brushHintTimer = setTimeout(() => { $('brushHint').hidden = true; }, 4000); // out of the way of the art once read
-  if (brushTool) $('brushHint').textContent = paintPicking ? 'Click a colour in the art to paint with · Esc to cancel'
+  const boxing = !!areaTool && areaTool.mode === 'box';
+  stage.classList.toggle('brushing', (!!brushTool || !!areaTool) && !boxing); stage.classList.toggle('boxing', boxing);
+  $('brushHint').hidden = !brushTool && !areaTool; clearTimeout(brushHintTimer);
+  if ((brushTool || areaTool) && !paintPicking) brushHintTimer = setTimeout(() => { $('brushHint').hidden = true; }, 4000); // out of the way of the art once read
+  if (areaTool) $('brushHint').textContent = `Part ${areaTool.i + 1} · ` + (boxing ? 'drag a box over the area · hold Space to move · Esc to stop'
+    : `${areaTool.mode === 'sub' ? 'drag to take area away' : 'drag to paint the area'} · [ ] size · hold Space to move · Esc to stop`);
+  else if (brushTool) $('brushHint').textContent = paintPicking ? 'Click a colour in the art to paint with · Esc to cancel'
     : `${BRUSH_NAMES[brushTool]} · drag on the art · [ ] size · hold Space to move${brushTool === 'paint' ? ' · Alt-click picks the colour' : ''} · Esc to stop`;
   drawBrush();
 }
 function setBrush(tool){
   if (tool && !art) return;
   if (tool){ if (cropping) endCrop(false); if (picking) endPick(); }
+  const hadArea = !!areaTool; if (tool){ areaTool = null; aStroke = null; }
   brushTool = tool; paintPicking = false; if (!tool) brushAt = null;
+  if (hadArea && tool) renderRules();
   syncBrush();
 }
-function endBrush(){ if (brushTool) setBrush(null); }
+function endBrush(){ if (brushTool) setBrush(null); if (areaTool) setArea(0, null); }
 $('brushChips').addEventListener('click', e => { const b = e.target.closest('[data-brush]'); if (b) setBrush(brushTool === b.dataset.brush ? null : b.dataset.brush); });
 $('brush').addEventListener('input', e => { st.brushV = +e.target.value; syncBrush(); remember(); });
 $('paintPick').addEventListener('input', e => { st.paintHex = e.target.value; remember(); });
@@ -2324,7 +2554,25 @@ function drawBrush(){ // the stroke being drawn (and the last ones until the eng
       x.stroke();
     }
     x.globalAlpha = 1;
-    if (brushTool && brushAt && !spaceDown){
+    if (areaTool && rules[areaTool.i]){
+      const R = rules[areaTool.i], c = art.crop;
+      if (hasArea(R)){ x.globalAlpha = 0.45; x.imageSmoothingEnabled = true; x.drawImage(areaMask(R.area).cv, X(c.x), Y(c.y), c.w*f, c.h*f); }
+      if (aStroke){
+        const q = aStroke.pts;
+        if (aStroke.m === 'box'){
+          x.globalAlpha = 0.3; x.fillStyle = '#ff2d7a'; x.fillRect(X(Math.min(q[0], q[2])), Y(Math.min(q[1], q[3])), Math.abs(q[2] - q[0])*f, Math.abs(q[3] - q[1])*f);
+          x.globalAlpha = 1; x.lineWidth = Math.max(1, g.dpr); x.strokeStyle = '#ffffff'; x.strokeRect(X(Math.min(q[0], q[2])), Y(Math.min(q[1], q[3])), Math.abs(q[2] - q[0])*f, Math.abs(q[3] - q[1])*f);
+        } else {
+          x.globalAlpha = aStroke.m === 'sub' ? 0.6 : 0.45; x.strokeStyle = aStroke.m === 'sub' ? '#ffffff' : '#ff2d7a';
+          x.lineWidth = Math.max(1, aStroke.r*2*f); x.lineCap = x.lineJoin = 'round';
+          x.beginPath(); x.moveTo(X(q[0]), Y(q[1])); if (q.length === 2) x.lineTo(X(q[0]) + 0.01, Y(q[1]));
+          for (let i = 2; i < q.length; i += 2) x.lineTo(X(q[i]), Y(q[i+1]));
+          x.stroke();
+        }
+      }
+      x.globalAlpha = 1;
+    }
+    if ((brushTool || (areaTool && areaTool.mode !== 'box')) && brushAt && !spaceDown){
       const r = Math.max(2, brushR()*f), cx = X(brushAt.x), cy = Y(brushAt.y), lw = Math.max(1, g.dpr);
       x.lineWidth = lw; x.strokeStyle = 'rgba(0,0,0,0.8)'; x.beginPath(); x.arc(cx, cy, r + lw, 0, 7); x.stroke();
       x.strokeStyle = 'rgba(255,255,255,0.95)'; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke();
@@ -2333,11 +2581,14 @@ function drawBrush(){ // the stroke being drawn (and the last ones until the eng
   }
 }
 window.addEventListener('keydown', e => {
-  if (!brushTool) return;
+  if (!brushTool && !areaTool) return;
   const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
   if (typing || e.metaKey || e.ctrlKey) return;
-  if (e.key === 'Escape'){ if (paintPicking){ paintPicking = false; syncBrush(); } else setBrush(null); }
-  else if (e.key === '[' || e.key === ']'){ st.brushV = clampN(st.brushV + (e.key === ']' ? 5 : -5), 0, 100); syncBrush(); remember(); }
+  if (e.key === 'Escape'){ if (areaTool) setArea(0, null); else if (paintPicking){ paintPicking = false; syncBrush(); } else setBrush(null); }
+  else if (e.key === '[' || e.key === ']'){
+    const k = areaTool ? 'areaV' : 'brushV'; st[k] = clampN(st[k] + (e.key === ']' ? 5 : -5), 0, 100); syncBrush(); remember();
+    if (areaTool){ const o = $(`r${areaTool.i}areaV`); if (o){ o.value = st.areaV; $(`r${areaTool.i}areaVOut`).textContent = mmTxt(areaMm()); } }
+  }
   else if (e.key === ' '){ e.preventDefault(); if (!spaceDown){ spaceDown = true; stage.classList.add('space'); drawBrush(); } }
 });
 window.addEventListener('keyup', e => { if (e.key === ' ' && spaceDown){ spaceDown = false; stage.classList.remove('space'); drawBrush(); } });
@@ -2376,9 +2627,17 @@ window.addEventListener('keydown', e => {
   if (cropping && (e.key === 'Escape' || e.key === 'Enter')){ e.preventDefault(); endCrop(e.key === 'Enter'); }
 });
 let knockFrom = 'shirt'; // where the knock-out colour came from: the shirt, the art, or typed / chosen by hand
-$('cleanOn').addEventListener('change', e => { st.clean = e.target.checked; remember(); schedule(); updateChecks(); });
+$('cleanOn').addEventListener('change', e => { st.clean = e.target.checked; if (st.clean) st.rich = false; syncKnock(); remember(); schedule(); updateChecks(); });
+$('richOn').addEventListener('change', e => { st.rich = e.target.checked; if (st.rich) st.clean = false; syncKnock(); remember(); schedule(); updateChecks(); });
+$('crispOn').addEventListener('change', e => { st.crisp = e.target.checked; remember(); schedule(); });
+$('speckOn').addEventListener('change', e => { st.speck = e.target.checked; remember(); schedule(); });
+let lastSpeck = null;
+function syncSpeck(){
+  const n = lastSpeck, pl = (v, w) => `${v} ${w}${v === 1 ? '' : 's'}`;
+  $('speckNote').textContent = st.speck && n && (n[0] || n[1]) ? `Removed ${pl(n[0], 'speck')} and filled ${pl(n[1], 'pinhole')} too small to print.` : 'Removes specks of ink and fills pinholes too small to print.';
+}
 function syncKnock(){
-  $('cleanOn').checked = !!st.clean;
+  $('cleanOn').checked = !!st.clean; $('richOn').checked = !!st.rich;
   const c = st.knock || st.shirt;
   $('knockPick').value = c;
   if (document.activeElement !== $('knockHex')) $('knockHex').value = c.toUpperCase();
@@ -2468,7 +2727,7 @@ function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; 
   $('sradiusField').hidden = !st.sharp;
   const near = st.emode === 'near'; syncChips('emodeChips', 'emode', st.emode); $('emodeAny').hidden = near; $('emodeNear').hidden = !near; $('etolField').hidden = !st.edge || !near;
   syncChips('fadeChips', 'fadedir', st.fadeDir); $('fadeInNote').hidden = st.fadeDir === 'out'; $('fadeOutNote').hidden = st.fadeDir !== 'out'; syncFadeClip();
-  syncDens(); if (typeof syncHlv === 'function' && $('hlvB')) try { syncHlv(); } catch(e){} syncBack(); $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
+  syncDens(); if (typeof syncHlv === 'function' && $('hlvB')) try { syncHlv(); } catch(e){} syncBack(); $('crispOn').checked = !!st.crisp; $('speckOn').checked = !!st.speck; $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
 $('sharpChips').addEventListener('click', e => { const b = e.target.closest('[data-sharp]'); if (!b) return; st.sharp = +b.dataset.sharp; if (st.sharp) st.sradius = +b.dataset.sr; syncSliders(); remember(); schedule(); });
 $('emodeChips').addEventListener('click', e => { const b = e.target.closest('[data-emode]'); if (!b) return; st.emode = b.dataset.emode; syncSliders(); remember(); schedule(); });
 $('hardOn').addEventListener('change', e => { st.hard = e.target.checked ? hardWas : 0; syncSliders(); remember(); schedule(); });
@@ -2515,18 +2774,26 @@ $('looks').addEventListener('change', e => {
   if (st.look === 'shadows') ensureShadowRule();
   syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
-function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = !knockLook(st.look); syncStepButtons(); syncRouteSum(); }
+function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = !knockLook(st.look); syncFinChips(); syncStepButtons(); syncRouteSum(); }
 function syncRouteSum(){ syncSums(); }
 $('finishChips').addEventListener('click', e => {
-  const b = e.target.closest('[data-finish]'); if (!b || b.dataset.finish === st.finish) return;
-  st.finish = b.dataset.finish;
+  const b = e.target.closest('[data-finish]'); if (!b) return;
+  const v = b.dataset.finish, wasPrep = isPrep();
+  if (v === 'prep' ? wasPrep : (v === st.finish && !wasPrep)) return;
+  st.finish = v === 'prep' ? 'cut' : v;
+  if (v === 'prep' || (v === 'cut' && wasPrep)){ // Prep only is Clean cut with the Clean up only start; Clean cut from there knocks the shirt colour out again
+    if (st.look === 'shadows') dropShadowRule();
+    st.look = v === 'prep' ? 'edges' : 'knock'; Object.assign(st, LOOKS[st.look]); syncLook(); syncSliders(); updateNotes(); noteChange(v === 'prep' ? 'Prep only' : null);
+  }
   // a Quick start the other style doesn't offer becomes its nearest one: Shadows to dots and Full halftone → Knock out
   // the shirt colour, Remove shadows → Shadows to dots (and its untouched shadow range goes with it)
   if (!ROUTE_LOOKS[routeOf(st.finish)].includes(st.look)){ if (st.look === 'shadows') dropShadowRule(); st.look = st.finish === 'cut' ? 'knock' : 'deep'; Object.assign(st, LOOKS[st.look]); syncLook(); syncSliders(); updateNotes(); }
   syncFinish(); syncRules(); remember(); schedule();
 });
+const isPrep = () => st.finish === 'cut' && st.look === 'edges';
+function syncFinChips(){ syncChips('finishChips', 'finish', isPrep() ? 'prep' : st.finish); }
 function syncFinish(){
-  syncChips('finishChips', 'finish', st.finish);
+  syncFinChips();
   const cut = st.finish === 'cut', r = routeOf(st.finish), list = ROUTE_LOOKS[r];
   for (const el of document.querySelectorAll('.dotf, .dotk')) el.hidden = cut;
   $('cutField').hidden = !cut; $('ktolField').hidden = !cut;
@@ -2551,17 +2818,18 @@ function nameGroup(id, name, tip){ // a step's title, its fold button and the "D
 }
 
 /* ---------- colour range: like Photoshop's Select > Color Range, as cards applied top to bottom ---------- */
-const RULE_TYPES = [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights'], ['greys', 'Greys, black & white'], ['sample', 'Sampled colours']];
+const RULE_TYPES = [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights'], ['greys', 'Greys, black & white'], ['sample', 'Sampled colours'], ['all', 'Everything (in a marked area)']];
 const ACTION_TIPS = {remove: 'Remove the selected parts.', fade: 'Turn the selected parts into dots, keeping some of the ink.', solid: 'Print the selected parts fully solid.',
   recolour: 'Change the selected colours to another colour, e.g. black text to white for a dark tee. Done before the knock-out.',
   ramp: 'Give the selected parts their own dots: their own “Shirt shows through up to” and “Full ink from”, so one part can be dotted less (or more) than the rest of the design.',
-  nodots: 'Keep the selected parts free of dots, as in Clean cut: solid ink, or removed at the threshold. The rest of the design is still halftoned.'};
-const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['ramp', 'Own dots'], ['solid', 'Keep solid'], ['nodots', 'No dots'], ['recolour', 'Recolour']];
+  nodots: 'Keep the selected parts free of dots, as in Clean cut: solid ink, or removed at the threshold. The rest of the design is still halftoned.',
+  keepas: 'Leave this part on the main settings. Use it with Brightness to lighten or darken just this part.'};
+const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['ramp', 'Own dots'], ['solid', 'Keep solid'], ['nodots', 'No dots'], ['keepas', 'Main dots'], ['recolour', 'Recolour']];
 const RULE_DEFAULTS = [['shadows', 'remove'], ['highlights', 'solid'], ['midtones', 'fade'], ['sample', 'remove']];
-const MAX_RULES = 4;
+const MAX_RULES = 6;
 function newRule(type, action){ return {type, action, samples: [], range: 50, fuzz: 20, keep: 50, cut: 50, k0: 10, k1: 30, invert: false, to: '#ffffff'}; }
 function dropShadowRule(){ // the range Remove shadows added, if it's still as it was added (a changed one is the user's now)
-  const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && R.range === 50 && R.fuzz === 20);
+  const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && R.range === 50 && R.fuzz === 20 && !R.area && !R.off);
   if (i < 0) return;
   rules.splice(i, 1); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1)); syncRules();
 }
@@ -2573,9 +2841,11 @@ function ensureShadowRule(){
 function ruleParams(R){
   const fz = R.fuzz/100, rg = R.range/100, k0 = (R.k0 == null ? 10 : R.k0)/100;
   return {k0, k1: Math.max(k0 + 0.01, (R.k1 == null ? 30 : R.k1)/100), type: R.type, samples: R.samples.map(hexRgb), invert: R.invert, action: R.action, keep: R.keep/100, to: hexRgb(R.to || '#ffffff'), cut: Math.max(1, R.cut == null ? 50 : R.cut)/100,
+          bri: R.bri || 0, rich: R.rich ? true : undefined,
           reach: Math.max(0.01, fz*0.6), band: R.type === 'midtones' ? rg*0.25 : R.type === 'greys' ? rg*0.3 : rg*0.5, soft: Math.max(0.01, fz*0.5)};
 }
 function ruleNote(R){ // what a range picks, in brightness from 0% (black) to 100% (white)
+  if (R.type === 'all') return hasArea(R) ? 'Everything inside the marked area.' : 'Mark the area below: paint it, or drag a box over it. Until then this part does nothing.';
   if (R.type === 'sample') return R.samples.length ? 'The picked colours, plus colours this close to them.' : 'Pick colours in the art to select them.';
   const q = ruleParams(R), pc = v => Math.round(Math.max(0, Math.min(1, v))*100) + '%', inv = R.invert ? ' Inverted: everything else is selected.' : '';
   if (R.type === 'greys') return `Selects greys, black and white: colours up to ${pc(q.band)} saturated, fading out by ${pc(q.band + q.soft)}. Raise Range if tinted greys are missed; lower it if dull colours are caught.${inv}`;
@@ -2587,28 +2857,44 @@ function ruleSlider(i, k, label, v){
   return `<div class="field"><div class="f-head"><label for="r${i}${k}">${label}</label><output id="r${i}${k}Out" for="r${i}${k}">${v}%</output></div>` +
          `<input type="range" id="r${i}${k}" data-k="${k}" min="0" max="100" step="1" value="${v}"></div>`;
 }
+function briSlider(i, v){
+  return `<div class="field"><div class="f-head"><label for="r${i}bri">Brightness</label><output id="r${i}briOut" for="r${i}bri">${sign(v)}</output></div>` +
+         `<input type="range" id="r${i}bri" data-k="bri" min="-100" max="100" step="1" value="${v}" data-tip="Lighten or darken just this part, before its dots are made."></div>`;
+}
+function areaRow(R, i){
+  const on = areaTool && areaTool.i === i ? areaTool.mode : '', chip = (v, t, tip) => `<button class="chip" type="button" data-act="area" data-v="${v}" aria-pressed="${on === v}" data-tip="${tip}">${t}</button>`;
+  return `<div class="field"><div class="f-head"><span>Area</span><output>${hasArea(R) ? 'Marked area only' : R.type === 'all' ? 'Not marked yet' : 'Whole design'}</output></div>` +
+    `<div class="chips" role="group" aria-label="Area of part ${i + 1}">${chip('add', 'Paint', 'Paint over the area this part covers. It shows in pink.')}${hasArea(R) ? chip('sub', 'Erase', 'Take area away from this part.') : ''}${chip('box', 'Box', 'Drag a box over the area this part covers.')}` +
+    `${hasArea(R) ? `<button class="chip" type="button" data-act="area" data-v="clear" aria-pressed="false" data-tip="Forget the marked area.">Clear</button>` : ''}</div>` +
+    (on && on !== 'box' ? `<div class="f-head"><label for="r${i}areaV">Brush size</label><output id="r${i}areaVOut" for="r${i}areaV">${mmTxt(areaMm())}</output></div><input type="range" id="r${i}areaV" data-k="areaV" min="0" max="100" step="1" value="${st.areaV}">` : '') + `</div>`;
+}
 function renderRules(){
-  $('rules').innerHTML = rules.map((R, i) => `<div class="rule${i === activeRule ? ' on' : ''}" data-i="${i}">
+  if (areaTool && !rules[areaTool.i]){ areaTool = null; aStroke = null; }
+  $('rules').innerHTML = rules.map((R, i) => `<div class="rule${i === activeRule ? ' on' : ''}${R.off ? ' off' : ''}" data-i="${i}">
       <div class="rule-head">
         <span class="rule-n">${i + 1}</span>
-        <select data-k="type" aria-label="Colour range ${i + 1} selects">${RULE_TYPES.map(([v, t]) => `<option value="${v}"${v === R.type ? ' selected' : ''}>${t}</option>`).join('')}</select>
-        <button class="chip" type="button" data-act="show" aria-pressed="false" data-tip="Show this selection in black and white: white is selected.">Show</button>
-        <button class="icon" type="button" data-act="del" data-tip="Delete this colour range." aria-label="Delete colour range ${i + 1}">✕</button>
+        <select data-k="type" aria-label="Part ${i + 1} selects">${RULE_TYPES.map(([v, t]) => `<option value="${v}"${v === R.type ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        <button class="chip" type="button" data-act="off" aria-pressed="${!R.off}" data-tip="Turn this part on or off without losing its settings.">${R.off ? 'Off' : 'On'}</button>
+        <button class="chip" type="button" data-act="show" aria-pressed="false" data-tip="Show what this part covers in black and white: white is selected.">Show</button>
+        <button class="icon" type="button" data-act="del" data-tip="Delete this part." aria-label="Delete part ${i + 1}">✕</button>
       </div>
-      ${R.type !== 'sample' ? ruleSlider(i, 'range', 'Range', R.range) :
+      ${R.type === 'all' ? '' : R.type !== 'sample' ? ruleSlider(i, 'range', 'Range', R.range) :
         `<div class="samples">${R.samples.map((h, j) => `<button class="sample" type="button" data-act="unsample" data-j="${j}" style="background:${h}" title="${h.toUpperCase()}: click to remove" aria-label="Remove ${h.toUpperCase()}"></button>`).join('')}` +
         `<button class="chip" type="button" data-act="pick" aria-pressed="false" data-tip="Click colours in the art to add them to this selection.">${R.samples.length ? 'Add a colour' : 'Pick a colour'}</button></div>`}
-      ${ruleSlider(i, 'fuzz', 'Fuzziness', R.fuzz)}
+      ${R.type === 'all' ? '' : ruleSlider(i, 'fuzz', 'Fuzziness', R.fuzz)}
       <p class="f-note" data-note>${ruleNote(R)}</p>
-      <label class="check-row" data-tip="Select everything except this."><input type="checkbox" data-k="invert"${R.invert ? ' checked' : ''}> Invert</label>
-      <div class="chips" role="group" aria-label="What happens to the selection">${RULE_ACTIONS.filter(([v]) => st.finish !== 'cut' || (v !== 'fade' && v !== 'nodots' && v !== 'ramp') || v === R.action).map(([v, t]) => `<button class="chip" type="button" data-act="action" data-v="${v}" data-tip="${ACTION_TIPS[v]}" aria-pressed="${v === R.action}">${t}</button>`).join('')}</div>
+      ${R.type === 'all' ? '' : `<label class="check-row" data-tip="Select everything except this."><input type="checkbox" data-k="invert"${R.invert ? ' checked' : ''}> Invert</label>`}
+      ${areaRow(R, i)}
+      <div class="chips" role="group" aria-label="What happens to the selection">${RULE_ACTIONS.filter(([v]) => st.finish !== 'cut' || (v !== 'fade' && v !== 'nodots' && v !== 'ramp' && v !== 'keepas') || v === R.action).map(([v, t]) => `<button class="chip" type="button" data-act="action" data-v="${v}" data-tip="${ACTION_TIPS[v]}" aria-pressed="${v === R.action}">${t}</button>`).join('')}</div>
       ${R.action === 'fade' ? ruleSlider(i, 'keep', 'Ink kept', R.keep) : ''}
-      ${R.action === 'ramp' ? ruleSlider(i, 'k0', 'Shirt shows through up to', R.k0 == null ? 10 : R.k0) + ruleSlider(i, 'k1', 'Full ink from', R.k1 == null ? 30 : R.k1) + `<p class="f-note">${st.finish === 'cut' ? 'Clean cut has no dots anywhere, so this changes nothing. Choose Halftone to use it.' : 'These parts get their own dots. As in the Quick start: 0% is the shirt colour, 100% is as far from it as a colour can be. Bring the two closer together for fewer dots and more solid ink; the rest of the design keeps its own settings.'}</p>` : ''}
+      ${R.action === 'ramp' ? ruleSlider(i, 'k0', 'Shirt shows through up to', R.k0 == null ? 10 : R.k0) + ruleSlider(i, 'k1', 'Full ink from', R.k1 == null ? 30 : R.k1) + `<p class="f-note">${st.finish === 'cut' ? 'Clean cut has no dots anywhere, so this changes nothing. Choose Halftone to use it.' : 'These parts get their own dots. As in the Quick start: 0% is the shirt colour, 100% is as far from it as a colour can be. Bring the two closer together for fewer dots and more solid ink; the rest of the design keeps its own settings.'}</p>` + (st.finish === 'cut' ? '' : `<label class="check-row" data-tip="This part’s fades keep more colour as they thin out, like a hand-made halftone glow. For dark tees."><input type="checkbox" data-k="rich"${R.rich ? ' checked' : ''}> Rich fade dots in this part</label>`) : ''}
+      ${R.action === 'keepas' ? `<p class="f-note">This part keeps the main settings. Move Brightness to lighten or darken just this part.</p>` : ''}
       ${R.action === 'nodots' ? ruleSlider(i, 'cut', 'Threshold', R.cut == null ? 50 : R.cut) + `<p class="f-note">${st.finish === 'cut' ? 'Clean cut has no dots anywhere, so this changes nothing. Choose Halftone to use it.' : `No dots here: these parts print solid, or are removed where they are less solid than the threshold. Only colours within ${st.ktol}% of the knock-out colour drop out (the Knock-out tolerance), so the part keeps its shading as solid ink.`}</p>` : ''}
-      ${R.action === 'recolour' ? `<div class="knock"><span class="colorbox"><input type="color" data-k="to" value="${R.to || '#ffffff'}" aria-label="New colour for colour range ${i + 1}"></span><span>The selected colours become this colour, before the knock-out.</span></div>` : ''}
+      ${R.action === 'recolour' ? `<div class="knock"><span class="colorbox"><input type="color" data-k="to" value="${R.to || '#ffffff'}" aria-label="New colour for part ${i + 1}"></span><span>The selected colours become this colour, before the knock-out.</span></div>` : ''}
+      ${R.action !== 'remove' && R.action !== 'recolour' && st.finish !== 'cut' ? briSlider(i, R.bri || 0) : ''}
     </div>`).join('');
   $('addRule').hidden = rules.length >= MAX_RULES;
-  $('addRule').textContent = rules.length ? 'Add another colour range' : 'Add a colour range';
+  $('addRule').textContent = rules.length ? 'Add another part' : 'Add a part';
   syncShowChips(); syncPickChips();
 }
 function syncRules(){
@@ -2629,7 +2915,8 @@ function setActive(i){
 $('addRule').addEventListener('click', () => {
   if (rules.length >= MAX_RULES) return;
   const used = new Set(rules.map(R => R.type)), d = RULE_DEFAULTS.find(([t]) => !used.has(t)) || RULE_DEFAULTS[0];
-  rules.push(newRule(d[0], st.finish === 'cut' && d[1] === 'fade' ? 'remove' : d[1])); // no dots in a clean cut activeRule = rules.length - 1;
+  rules.push(newRule(d[0], st.finish === 'cut' && d[1] === 'fade' ? 'remove' : d[1])); // no dots in a clean cut
+  activeRule = rules.length - 1;
   syncRules(); schedule();
   if (d[0] === 'sample') startPick(activeRule);
 });
@@ -2639,7 +2926,8 @@ rulesBox.addEventListener('input', e => {
   if (card && k === 'to' && e.target.type === 'color'){ const i = +card.dataset.i; rules[i].to = e.target.value.toLowerCase(); setActive(i); schedule(); return; }
   if (!card || !k || e.target.type !== 'range') return;
   const i = +card.dataset.i, R = rules[i];
-  R[k] = +e.target.value; $(`r${i}${k}Out`).textContent = `${R[k]}%`;
+  if (k === 'areaV'){ st.areaV = +e.target.value; $(`r${i}areaVOut`).textContent = mmTxt(areaMm()); remember(); return; }
+  R[k] = +e.target.value; $(`r${i}${k}Out`).textContent = k === 'bri' ? sign(R[k]) : `${R[k]}%`;
   card.querySelector('[data-note]').textContent = ruleNote(R);
   setActive(i); schedule();
 });
@@ -2648,7 +2936,8 @@ rulesBox.addEventListener('change', e => {
   if (!card || !k || e.target.type === 'range') return;
   const i = +card.dataset.i, R = rules[i];
   activeRule = i;
-  if (k === 'type'){ R.type = e.target.value; renderRules(); if (R.type === 'sample' && !R.samples.length) startPick(i); }
+  if (k === 'type'){ R.type = e.target.value; if (R.type === 'all') R.invert = false; renderRules(); if (R.type === 'sample' && !R.samples.length) startPick(i); }
+  else if (k === 'rich'){ R.rich = e.target.checked; }
   else if (k === 'invert'){ R.invert = e.target.checked; renderRules(); }
   syncLegend(); schedule();
 });
@@ -2657,8 +2946,16 @@ rulesBox.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'), i = +card.dataset.i, R = rules[i];
   if (!b){ setActive(i); return; }
   const act = b.dataset.act;
+  if (act === 'off'){ R.off = !R.off; activeRule = i; renderRules(); syncLegend(); schedule(); return; }
+  if (act === 'area'){
+    const v = b.dataset.v;
+    if (v === 'clear'){ R.area = null; if (areaTool && areaTool.i === i) setArea(0, null); else renderRules(); drawBrush(); noteChange('Part area cleared'); schedule(); return; }
+    if (activeRule !== i){ activeRule = i; schedule(); }
+    setArea(i, v); return;
+  }
   if (act === 'del'){
     if (pickFor === i) endPick();
+    if (areaTool){ areaTool = null; aStroke = null; syncBrush(); }
     rules.splice(i, 1); activeRule = Math.max(0, Math.min(activeRule, rules.length - 1));
     syncRules(); schedule(); return;
   }
@@ -3011,7 +3308,7 @@ $('smoothBtn').addEventListener('change', e => { if (!art) return; art.smooth = 
 function cleanStart(){ // a new design starts clean: fixes made for the last design don't follow it. The workshop's own settings stay
   // (print style, Quick start, lpi, angle, dot shape, dot limits, threshold, black ink, shirt colour).
   const L = LOOKS[st.look] || LOOKS.knock;
-  Object.assign(st, {k0: L.k0, k1: L.k1, mid: L.mid, con: L.con, ktol: DEFAULTS.ktol, clean: DEFAULTS.clean, ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex}, HLV0, EDGE_KEYS, SHARP_KEYS, BG_KEYS);
+  Object.assign(st, {k0: L.k0, k1: L.k1, mid: L.mid, con: L.con, ktol: DEFAULTS.ktol, clean: DEFAULTS.clean, rich: DEFAULTS.rich, ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex}, HLV0, EDGE_KEYS, SHARP_KEYS, BG_KEYS);
   rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule();
 }
 function setArt(el, w, h, name, isSample, dpi, kind){
@@ -3062,7 +3359,7 @@ function loadDoc(d){ // puts a tab's design on screen: its art, settings, histor
   cur = d; art = d.art;
   restoring = true;
   const snap = d.snap;
-  for (const k of PRESET_KEYS) st[k] = snap.s[k];
+  for (const k of PRESET_KEYS) if (k in snap.s) st[k] = snap.s[k]; // designs kept from an older version lack the newer settings
   st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
   Object.assign(lv, LV0, snap.lv);
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(d.activeRule || 0, Math.max(0, rules.length - 1));
@@ -3121,7 +3418,7 @@ $('tabs').addEventListener('auxclick', e => { const t = e.target.closest('[data-
 const otherDocs = () => docs.filter(d => d !== cur && d.art && !d.art.isSample);
 $('allApplyBtn').addEventListener('click', () => {
   const n = otherDocs().length; if (!n || !art) return;
-  $('allText').textContent = `The settings of “${art.name}” go to the other ${n} tab${n === 1 ? '' : 's'}: print style, knock-out, Levels, colour ranges, ink density and colour, edge and shirt colour. Crops and touch-ups stay as they are, and each tab can undo it in History.`;
+  $('allText').textContent = `The settings of “${art.name}” go to the other ${n} tab${n === 1 ? '' : 's'}: print style, knock-out, Levels, parts picked by colour, ink density and colour, edge and shirt colour. Crops, touch-ups and painted areas stay as they are, and each tab can undo it in History.`;
   $('allSizeTxt').textContent = `Include the print size (${toMm(st.widthCm)} × ${toMm(st.widthCm*art.h/art.w)} mm, fitted to each design)`;
   $('allSize').checked = false; $('allApply').textContent = `Apply to ${n} tab${n === 1 ? '' : 's'}`;
   $('allDlg').hidden = false; $('allApply').focus();
@@ -3133,7 +3430,7 @@ $('allApply').addEventListener('click', () => {
   commitStep();
   const src = snapshot(), withSize = $('allSize').checked, list = otherDocs(), sw = st.widthCm, sh = st.widthCm*art.h/art.w;
   for (const d of list){
-    const snap = {...d.snap, s: {...src.s}, lv: {...src.lv}, rules: src.rules.map(R => ({...R, samples: [...R.samples]}))};
+    const snap = {...d.snap, s: {...src.s}, lv: {...src.lv}, rules: src.rules.filter(R => !R.area).map(R => ({...R, samples: [...R.samples]}))};
     if (withSize){ const a = d.art; snap.w = Math.max(0.5, Math.min(sw, sh*a.w/a.h, maxWidthFor(a))); } // fits inside this tab's width and height
     d.steps = d.steps.slice(0, d.stepPos + 1); d.steps.push({snap, label: `Settings from ${art.name}`, at: Date.now()});
     if (d.steps.length > HIST_MAX) d.steps.splice(1, 1);
@@ -3407,7 +3704,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -3437,12 +3734,12 @@ function starterPreset(b){ // a starter as a full preset: today's settings, with
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   Object.assign(s, {finish: 'dots', lpi: 30, angle: 22.5, shape: 'round', ink: 'art', cut: 50, ktol: 8}, b.s);
   s.knock = null; s.knockFrom = 'shirt'; // the knock-out follows the shirt
-  return {name: b.name, desc: b.desc, v: 1, s, levels: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]}))};
+  return {name: b.name, desc: b.desc, v: 1, s, levels: {...lv}, rules: rules.filter(R => !R.area).map(R => ({...R, samples: [...R.samples]}))};
 }
 function capturePreset(name, withSize){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   s.knock = st.knock; s.knockFrom = knockFrom;
-  const p = {name, v: 1, s, levels: {...lv}, rules: rules.map(R => ({...R, samples: [...R.samples]}))};
+  const p = {name, v: 1, s, levels: {...lv}, rules: rules.filter(R => !R.area).map(R => ({...R, samples: [...R.samples]}))};
   if (withSize && art) p.size = {w: +st.widthCm.toFixed(2), h: +(st.widthCm*art.h/art.w).toFixed(2)};
   return p;
 }
@@ -3644,7 +3941,7 @@ $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentEleme
 const HIST_MAX = 40;
 const sign = v => (v > 0 ? '+' : '') + v;
 const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', look: v => `Quick start: ${lookName(v)}`, cut: v => `Threshold ${v}%`, // the style first: switching it can move the Quick start too
-  lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, clean: v => v ? 'Clean colour dots on' : 'Clean colour dots off', ktol: v => `Knock-out tolerance ${v}%`,
+  lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, clean: v => v ? 'Clean colour dots on' : 'Clean colour dots off', rich: v => v ? 'Rich fade dots on' : 'Rich fade dots off', crisp: v => v ? 'Crisp outlines on' : 'Crisp outlines off', speck: v => v ? 'Speck clean-up on' : 'Speck clean-up off', ktol: v => `Knock-out tolerance ${v}%`,
   hb: () => 'Halftone levels', hg: () => 'Halftone levels', hw: () => 'Halftone levels', hob: () => 'Halftone output levels', how: () => 'Halftone output levels',
   mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
@@ -3670,8 +3967,8 @@ function describeStep(a, b){ // a short name for what changed from a to b
     if ((a.lv.lum !== false) !== (b.lv.lum !== false)) return b.lv.lum !== false ? 'Keep colour strength on' : 'Keep colour strength off';
     return `Levels ${b.lv.b} · ${b.lv.g.toFixed(2)} · ${b.lv.w}`;
   }
-  if (a.rules.length !== b.rules.length) return b.rules.length > a.rules.length ? 'Added a colour range' : 'Deleted a colour range';
-  return 'Colour range';
+  if (a.rules.length !== b.rules.length) return b.rules.length > a.rules.length ? 'Added a part' : 'Deleted a part';
+  return 'Part changed';
 }
 function noteChange(label){ // called on every change; a step is written once things settle, so a slider drag is one step
   if (restoring || !art) return;
@@ -3691,7 +3988,7 @@ function commitStep(){
 function resetSteps(label){ clearTimeout(stepTimer); stepLabel = null; steps = [{snap: snapshot(), label, at: Date.now()}]; stepPos = 0; unsaved = false; renderSteps(); }
 function applySnap(snap){
   restoring = true;
-  for (const k of PRESET_KEYS) st[k] = snap.s[k];
+  for (const k of PRESET_KEYS) if (k in snap.s) st[k] = snap.s[k]; // designs kept from an older version lack the newer settings
   st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
   Object.assign(lv, LV0, snap.lv);
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1));
@@ -3787,7 +4084,7 @@ const SUMS = { // short, so a title stays on one line
   sharpGroup: () => st.sharp ? ({50: 'Light', 100: 'Medium', 160: 'Strong'}[st.sharp] || `${st.sharp}%`) : 'Off',
   levelsGroup: () => lvIdentity() ? 'Unchanged' : 'Adjusted',
   knockGroup: () => `${st.knock ? st.knock.toUpperCase() : 'Shirt colour'} · ${st.finish === 'cut' ? `${st.ktol}%` : `${st.k0}–${st.k1}%` + (st.clean ? ' · clean' : '')}`,
-  rangeGroup: () => rules.length ? `${rules.length} range${rules.length === 1 ? '' : 's'}` : 'None',
+  rangeGroup: () => rules.length ? `${rules.length} part${rules.length === 1 ? '' : 's'}` : 'None',
   toneGroup: () => { const l = densLevel(); return `Dots · ${l ? DENS_NAMES[l] : `own ${st.drop}/${st.solid}%`}` + (hlvIdentity() ? '' : ' · levels') + (st.mid || st.con ? ' · ink ±' : ''); },
   inkGroup: () => `${st.ink === 'one' ? 'Mono' : 'Full colour'} · black ${st.blkOn ? st.blk + '%' : 'as is'}`,
   edgeGroup: () => { const p = []; if (st.hard && st.finish !== 'cut') p.push(`hard ${st.hard}%`); if (st.fade && st.finish !== 'cut') p.push(`fade ${st.fade} mm ${st.fadeDir === 'out' ? 'out' : 'in'}`); if (st.edge) p.push(`trim ${st.edge} px`); if (st.back) p.push(`edge ${st.back} px`); return p.length ? p.join(' · ').replace(/^./, c => c.toUpperCase()) : 'Off'; },
@@ -3810,7 +4107,7 @@ const SECTION_TIPS = {
   sharpGroup: 'Unsharp mask on the art at print size: crisper edges and detail before the dots. Light or Medium suits most soft files.',
   levelsGroup: 'Brightness/Contrast and Levels, like Photoshop’s, on the art’s colours before anything else. Move the black point right so more of the art counts as shadow.',
   knockGroup: 'Colours close to the shirt (or the colour you set) drop out so the shirt shows through.',
-  rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights, greys or colours, then remove, fade, give their own dots, keep solid, keep free of dots or recolour them.',
+  rangeGroup: 'Parts of the design with their own treatment: pick shadows, midtones, highlights, greys or colours, or paint an area, then remove, fade, give it its own dots or brightness, keep it solid or free of dots, or recolour it.',
   toneGroup: 'The dot controls: Dot limits (Fine, Standard, Extra safe), Drop dots under and Solid above. Then Ink amount and contrast.',
   inkGroup: 'Full colour prints the art’s own colours. Mono prints every dot in one colour.',
   touchGroup: 'Brush away stray pixels, paint over gaps or rough edges, or bring the original back. Every stroke is in History.',
@@ -3892,7 +4189,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -3922,8 +4219,8 @@ const STEP_RESETS = {
                 vals: () => st.finish === 'cut' ? {cut: DEFAULTS.cut} : {lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape}},
   sizeGroup: {name: 'Print size', same: () => !art || (Math.abs(st.widthCm - openedWidth()) < 0.005 && !art.smooth),
               reset: () => { art.smooth = false; art.sizeFrom = sizeAsOpened(art); setWidth(openedWidth(), true); buildSrcSoon(); }},
-  knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null, clean: DEFAULTS.clean})},
-  rangeGroup: {name: 'Select', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
+  knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null, clean: DEFAULTS.clean, rich: DEFAULTS.rich})},
+  rangeGroup: {name: 'Parts', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
   edgeGroup: {name: 'Edge', vals: () => ({...EDGE_KEYS})},
   bgGroup: {name: 'Background', vals: () => ({...BG_KEYS})},
   sharpGroup: {name: 'Sharpen', vals: () => ({...SHARP_KEYS})},
@@ -3990,7 +4287,7 @@ const TIPS = [
   ['[data-view="white"]', 'The print over a solid white fill, like a white layer behind it in Photoshop, to see exactly what prints. The shirt colour and knock-out stay as they are.'],
   ['[data-view="base"]', 'White shows where ink (with its white base) prints. Black is clear film.'],
   ['[data-view="map"]', 'White prints solid, pink turns into dots, grey is removed.'],
-  ['[data-view="sel"]', 'The active colour range’s selection: white is selected, grey is partly selected.'],
+  ['[data-view="sel"]', 'What the active part covers: white is selected, grey is partly selected.'],
   ['[data-view="split"]', 'Two views side by side. They zoom and move together. Hold T for both on transparent checks.'],
   ['[data-zoom="fit"]', 'Fit the whole print on screen (0 key).'],
   ['[data-zoom="life"]', 'The print at its real size on this screen, once set up with a bank card.'],
@@ -4005,7 +4302,11 @@ const TIPS = [
   ['[data-angle="22.5"]', '22.5° is the usual angle for single-colour halftones.'],
   ['#lvAuto', 'Set the black and white points from the art, like Photoshop’s Auto.'], ['#lvReset', 'Put Brightness, Contrast and Levels back to normal.'], ['#bri', 'Lighten or darken the art’s midtones. Double-click for 0.'], ['#bcon', 'More or less contrast in the art’s colours. Double-click for 0.'],
   ['#pickBtn', 'Click a colour in the art to knock it out.'], ['#knockReset', 'Knock out the shirt colour again.'],
-  ['#addRule', 'Add another selection. Each one applies after the ones above it.'],
+  ['#addRule', 'Add a part. Each one applies after the ones above it.'],
+  ['[data-finish="prep"]', 'For regular images that need no dots: set the size, remove the background, tidy the edge, touch up, then save. Nothing is knocked out.'],
+  ['#richOn', 'Fades keep more colour as they thin out, like a hand-made halftone glow. For dark tees.'],
+  ['#crispOn', 'Hard edges inside the design print as clean lines instead of being broken up by dots.'],
+  ['#speckOn', 'Removes ink specks and fills pinholes that are too small to print.'],
   ['#presetNew', 'Save the current set-up under a new name.'], ['#presetUpdate', 'Save the current settings over the chosen preset.'],
   ['#presetDelete', 'Delete the chosen preset.'], ['#presetShare', 'Copy this computer’s preset to the shared list.'],
   ['#histUndo', 'Go back one step.'], ['#histRedo', 'Go forward one step.'],
@@ -4015,7 +4316,7 @@ const TIPS = [
   ['#cropDraw', 'Drag a crop on the preview. Enter applies it, Esc cancels.'], ['#cropReset', 'Use the whole file again.'],
   ['[data-ink="art"]', 'Print each dot in the art’s own colour.'], ['[data-ink="one"]', 'Print every dot in one ink colour.'],
   ['#sizeChips [data-w="max"]', 'The largest size that fits within 400 × 500 mm.'],
-  ['#tuneToggle', 'Every other tool: crop, dots, background, sharpen, levels, knock out, colour ranges, ink, edge and touch up. Open it only when a design needs it.'],
+  ['#tuneToggle', 'Every other tool: crop, dots, background, sharpen, levels, knock out, parts, ink, edge and touch up. Open it only when a design needs it.'],
   ['#sizeTrimBtn', 'Cut away the empty margin around the art, so the print width measures the art itself.']
 ];
 for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el.dataset.tip = t;
