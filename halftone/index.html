@@ -151,7 +151,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .group.folded .sec-toggle::before{transform:rotate(-45deg);margin-bottom:0}
 .g-actions{display:flex;gap:16px}
 .levels{display:grid;gap:4px}
-#histo{display:block;width:100%;height:84px;background:var(--soft);border:1px solid var(--line);border-radius:var(--r);color:var(--muted)}
+#histo,#hhisto{display:block;width:100%;height:84px;background:var(--soft);border:1px solid var(--line);border-radius:var(--r);color:var(--muted)}
 .lv-track{position:relative;height:16px}
 .lv-h{position:absolute;top:0;width:16px;height:15px;margin-left:-8px;padding:0;border:0;background:none;cursor:ew-resize;touch-action:none}
 .lv-h::before,.lv-h::after{content:"";position:absolute;clip-path:polygon(50% 0,100% 100%,0 100%)}
@@ -611,6 +611,35 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <input type="range" id="solid" min="60" max="100" step="1" value="88">
           <p class="f-note" id="solidNote">Dots this big join into solid ink.</p>
         </div>
+        <div class="field dotf" id="hlvField">
+          <div class="g-head"><div class="lv-sub">Halftone levels</div><div class="g-actions"><button class="link" type="button" id="hlvReset" hidden>Reset</button></div></div>
+          <p class="f-note">Like the halftone Levels in Lightning DTF Prep: they change how much ink each part gets, so where and how far the dots spread. The colours stay the art’s own. The chart shows how much of the print gets each amount of ink, from none (left) to solid (right).</p>
+          <div class="levels" id="hlv">
+            <canvas id="hhisto" role="img" aria-label="How much of the print gets each amount of ink"></canvas>
+            <div class="lv-track" id="hlvTrack">
+              <button class="lv-h lv-black" type="button" data-h="hb" role="slider" aria-label="Halftone black point" aria-valuemin="0" aria-valuemax="98" aria-valuenow="0"></button>
+              <button class="lv-h lv-gray" type="button" data-h="hg" role="slider" aria-label="Halftone midtones" aria-valuemin="0.1" aria-valuemax="9.99" aria-valuenow="1.00"></button>
+              <button class="lv-h lv-white" type="button" data-h="hw" role="slider" aria-label="Halftone white point" aria-valuemin="2" aria-valuemax="100" aria-valuenow="100"></button>
+            </div>
+            <div class="lv-nums">
+              <input type="number" id="hlvB" min="0" max="98" step="1" value="0" aria-label="Halftone black point">
+              <input type="number" id="hlvG" min="0.1" max="9.99" step="0.01" value="1.00" aria-label="Halftone midtones">
+              <input type="number" id="hlvW" min="2" max="100" step="1" value="100" aria-label="Halftone white point">
+            </div>
+            <div class="lv-sub">Output (force dots)</div>
+            <div class="lv-grad" aria-hidden="true"></div>
+            <div class="lv-track" id="hlvOutTrack">
+              <button class="lv-h lv-black" type="button" data-h="hob" role="slider" aria-label="Halftone output black" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></button>
+              <button class="lv-h lv-white" type="button" data-h="how" role="slider" aria-label="Halftone output white" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"></button>
+            </div>
+            <div class="lv-nums">
+              <input type="number" id="hlvOB" min="0" max="100" step="1" value="0" aria-label="Halftone output black">
+              <input type="number" id="hlvOW" min="0" max="100" step="1" value="100" aria-label="Halftone output white">
+            </div>
+          </div>
+          <p class="f-note">Black point: parts with less ink than this drop out. White point: parts with more print solid. Midtones: left gives more ink in between, right less. Output black gives every inked part at least this much, so small dots reach further into fades. Output white caps the ink.</p>
+          <p class="f-note" id="hlvForce" hidden>Output white is below Solid above, so nothing prints solid: the dots run through every area.</p>
+        </div>
         <div class="lv-sub">Overall ink</div>
         <div class="field">
           <div class="f-head"><label for="mid">Ink amount</label><output id="midOut" for="mid">0</output></div>
@@ -718,6 +747,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>25–35 lpi suits most tees. Go to 45 or more for small or detailed prints.</li>
             <li>22.5° is the usual angle for single-colour halftones. It hides the rows of dots best.</li>
             <li>On dark tees, “Shirt shows through” lets the shirt be your darkest colour, so the print is lighter and breathes.</li>
+            <li>Halftone levels (Ink density) work like Lightning DTF Prep’s: Levels on the dots, not the colours. Move the white point left to keep more of the art’s colour solid; the black point right to end fades sooner; output black to spread small dots further.</li>
             <li>Keep the smallest dots, and the smallest gaps between dots, around 0.3 mm or more: tiny dots can wash off and tiny gaps fill in. The Dot limits buttons in Ink density do this for you: Standard suits most prints, Fine keeps more detail, Extra safe holds best. They follow the lines per inch.</li>
             <li>Press V to step through the views. Press T to flick between Transparent and the last view: the checks show every bit of ink that was removed. Bottom right, hold Original or Transparent to flick between them in place (or hold O; in Split, hold T).</li>
             <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
@@ -921,8 +951,10 @@ function engine(){
     const {w, h, d} = S, out = new Uint8ClampedArray(w*h*4), t = tile(p.shape);
     const cls = new Uint8Array(w*h); // what happened to each pixel: 0 clear, 1 removed, 2 gap between dots, 3 dot, 4 solid, 5 shirt-colour edge
     const lut = new Float32Array(1025);
+    const hl = p.hlv; // Halftone levels, like Lightning DTF Prep's: on how much ink each part gets, not on its colour
     for (let i = 0; i <= 1024; i++){
       let c = i/1024;
+      if (hl){ let x = (c - hl.b)/Math.max(0.001, hl.w - hl.b); x = x < 0 ? 0 : x > 1 ? 1 : x; c = hl.ob + Math.pow(x, 1/hl.g)*(hl.ow - hl.ob); }
       if (p.gamma !== 1) c = Math.pow(c, p.gamma);
       c = (c - 0.5)*p.contrast + 0.5;
       c = c < 0 ? 0 : c > 1 ? 1 : c;
@@ -930,6 +962,7 @@ function engine(){
       lut[i] = c;
     }
     lut[0] = 0;
+    const ch = new Uint32Array(101);
     const cell = p.dpi/p.lpi, th = p.angle*Math.PI/180, cs = Math.cos(th)/cell, sn = Math.sin(th)/cell;
     const tone = p.tone, lum = p.metric === 'lum', k0 = p.k0, ks = Math.max(0.001, p.k1 - p.k0), ktol = p.ktol || 0;
     const kr = p.knock[0], kg = p.knock[1], kb = p.knock[2], kl = (0.299*kr + 0.587*kg + 0.114*kb);
@@ -1036,7 +1069,7 @@ function engine(){
           }
         }
         if (nd){ if (c < nd){ cls[i >> 2] = 1; continue; } c = 1; } // No dots: solid or removed, never screened
-        else c = lut[(c*1024) | 0];
+        else { ch[(c > 1 ? 100 : c*100 + 0.5) | 0]++; c = lut[(c*1024) | 0]; } // ch: the chart of ink amounts
         if (c <= 0 || c < cut){ cls[i >> 2] = 1; continue; }
         if (c < 1 && !cut){
           const u = fx - Math.floor(fx), v = fy - Math.floor(fy);
@@ -1097,7 +1130,7 @@ function engine(){
       }
       for (let k = 0; k < n; k++) if (edge[k]){ cls[k] = 5; const j = k*4; out[j] = er; out[j+1] = eg; out[j+2] = eb; out[j+3] = 255; on++; }
     }
-    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on, bg: p.bg ? (bgm ? bgm.rgb : 'none') : null};
+    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on, bg: p.bg ? (bgm ? bgm.rgb : 'none') : null, ch: ch.buffer};
   }
   // Marks in gone the pixels up to D steps in from the outside, moving only through pixels accept() allows (all when null).
   // Steps alternate 4 and 8 neighbours, so the band is an octagon: close to an even width all round.
@@ -1135,8 +1168,8 @@ function engine(){
       return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
     }
     const r = run(m.p);
-    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel, bg: r.bg},
-            transfer: r.sel ? [r.buf, r.cls, r.sel] : [r.buf, r.cls]};
+    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel, bg: r.bg, ch: r.ch},
+            transfer: r.sel ? [r.buf, r.cls, r.sel, r.ch] : [r.buf, r.cls, r.ch]};
   }
   return {handle};
 }
@@ -1177,9 +1210,9 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
-const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean'];
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 var cleanReset = false; // v51 had Clean colour dots on by default
 try { if (!localStorage.getItem('tsw-dtf-clean0')){ cleanReset = true; st.clean = false; localStorage.setItem('tsw-dtf-clean0', '1'); } } catch(e){}
@@ -1285,6 +1318,7 @@ function params(){
           gamma: st.finish === 'cut' ? 1 : Math.pow(2, -st.mid/50), contrast: st.finish === 'cut' ? 1 : Math.pow(2, st.con/50), // Ink density is a halftone step
           drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
+          hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
           clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100};
 }
 function schedule(){
@@ -1465,6 +1499,7 @@ function paint(m){
   outCtx.putImageData(new ImageData(px, m.w, m.h), 0, 0);
   outMips = buildMips(outCanvas); buildInkView(px, m.w, m.h);
   lastCls = new Uint8Array(m.cls); lastSel = m.sel ? new Uint8Array(m.sel) : null; paintN++;
+  chist = m.ch ? new Uint32Array(m.ch) : null; drawHhisto();
   prepareViews();
   outReady = true; lastOn = m.on;
   $('saveBtn').disabled = false;
@@ -2139,7 +2174,7 @@ function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; 
   for (const b of $('sharpChips').querySelectorAll('[data-sharp]')) b.setAttribute('aria-pressed', String(+b.dataset.sharp === st.sharp && (!st.sharp || Math.abs(+b.dataset.sr - st.sradius) < 1e-6)));
   $('sradiusField').hidden = !st.sharp;
   const near = st.emode === 'near'; syncChips('emodeChips', 'emode', st.emode); $('emodeAny').hidden = near; $('emodeNear').hidden = !near; $('etolField').hidden = !st.edge || !near;
-  syncDens(); syncBack(); $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
+  syncDens(); if (typeof syncHlv === 'function' && $('hlvB')) try { syncHlv(); } catch(e){} syncBack(); $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
 $('sharpChips').addEventListener('click', e => { const b = e.target.closest('[data-sharp]'); if (!b) return; st.sharp = +b.dataset.sharp; if (st.sharp) st.sradius = +b.dataset.sr; syncSliders(); remember(); schedule(); });
 $('emodeChips').addEventListener('click', e => { const b = e.target.closest('[data-emode]'); if (!b) return; st.emode = b.dataset.emode; syncSliders(); remember(); schedule(); });
 $('hardOn').addEventListener('change', e => { st.hard = e.target.checked ? hardWas : 0; syncSliders(); remember(); schedule(); });
@@ -2367,7 +2402,7 @@ function setLevel(k, v){
 function syncLevels(){
   // the grey point sits where the curve gives 50%, as in Photoshop: left of centre brightens (midtones above 1.00)
   const pos = {b: lv.b, w: lv.w, g: lv.b + (lv.w - lv.b)*Math.pow(0.5, lv.g), ob: lv.ob, ow: lv.ow};
-  for (const h of document.querySelectorAll('.lv-h')){ const k = h.dataset.h; h.style.left = `${pos[k]/255*100}%`; h.setAttribute('aria-valuenow', k === 'g' ? lv.g.toFixed(2) : String(lv[k])); }
+  for (const h of document.querySelectorAll('#levelsGroup .lv-h')){ const k = h.dataset.h; h.style.left = `${pos[k]/255*100}%`; h.setAttribute('aria-valuenow', k === 'g' ? lv.g.toFixed(2) : String(lv[k])); }
   $('lvB').value = lv.b; $('lvG').value = lv.g.toFixed(2); $('lvW').value = lv.w; $('lvOB').value = lv.ob; $('lvOW').value = lv.ow;
   $('lvReset').hidden = lvIdentity();
   const sgn = v => (v > 0 ? '+' : '') + v;
@@ -2392,7 +2427,7 @@ for (const track of [$('lvTrack'), $('lvOutTrack')]){
     h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
   });
 }
-for (const h of document.querySelectorAll('.lv-h')) h.addEventListener('keydown', e => {
+for (const h of document.querySelectorAll('#levelsGroup .lv-h')) h.addEventListener('keydown', e => {
   const dir = {ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1}[e.key], k = h.dataset.h;
   if (!dir) return;
   e.preventDefault();
@@ -2419,6 +2454,56 @@ function drawHisto(){
 }
 new ResizeObserver(() => drawHisto()).observe($('histo'));
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawHisto); } catch(e){}
+
+/* ---------- Halftone levels: Levels on how much ink each part gets (the dots), in %, like the image Levels above ---------- */
+const HLV0 = {hb: 0, hg: 1, hw: 100, hob: 0, how: 100};
+let chist = null; // how much of the print got each amount of ink (0–100%) in the last update
+function hlvIdentity(){ return st.hb === 0 && st.hg === 1 && st.hw === 100 && st.hob === 0 && st.how === 100; }
+function setHlv(k, v){
+  if (!Number.isFinite(v)){ syncHlv(); return; }
+  if (k === 'hb') st.hb = clampN(Math.round(v), 0, st.hw - 2);
+  else if (k === 'hw') st.hw = clampN(Math.round(v), st.hb + 2, 100);
+  else if (k === 'hg') st.hg = clampN(Math.round(v*100)/100, 0.1, 9.99);
+  else st[k] = clampN(Math.round(v), 0, 100);
+  syncHlv(); remember(); schedule();
+}
+function syncHlv(){
+  const pos = {hb: st.hb, hw: st.hw, hg: st.hb + (st.hw - st.hb)*Math.pow(0.5, st.hg), hob: st.hob, how: st.how};
+  for (const h of document.querySelectorAll('#hlv .lv-h')){ const k = h.dataset.h; h.style.left = `${pos[k]}%`; h.setAttribute('aria-valuenow', k === 'hg' ? st.hg.toFixed(2) : String(st[k])); }
+  $('hlvB').value = st.hb; $('hlvG').value = st.hg.toFixed(2); $('hlvW').value = st.hw; $('hlvOB').value = st.hob; $('hlvOW').value = st.how;
+  $('hlvReset').hidden = hlvIdentity(); $('hlvForce').hidden = !(st.how/100 < st.solid/100);
+}
+for (const [id, k] of [['hlvB', 'hb'], ['hlvG', 'hg'], ['hlvW', 'hw'], ['hlvOB', 'hob'], ['hlvOW', 'how']]) $(id).addEventListener('change', e => setHlv(k, parseFloat(e.target.value)));
+for (const track of [$('hlvTrack'), $('hlvOutTrack')]){
+  track.addEventListener('pointerdown', e => {
+    const h = e.target.closest('.lv-h'); if (!h) return;
+    e.preventDefault(); h.focus(); h.setPointerCapture(e.pointerId);
+    const move = ev => {
+      const r = track.getBoundingClientRect(), v = clampN((ev.clientX - r.left)/r.width, 0, 1)*100, k = h.dataset.h;
+      if (k === 'hg') setHlv('hg', Math.log(clampN((v - st.hb)/Math.max(1, st.hw - st.hb), 0.01, 0.99))/Math.log(0.5));
+      else setHlv(k, v);
+    };
+    const up = () => { h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); };
+    h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+  });
+}
+for (const h of document.querySelectorAll('#hlv .lv-h')) h.addEventListener('keydown', e => {
+  const dir = {ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1}[e.key], k = h.dataset.h;
+  if (!dir) return;
+  e.preventDefault();
+  if (k === 'hg') setHlv('hg', st.hg - dir*(e.shiftKey ? 0.25 : 0.05)); else setHlv(k, st[k] + dir*(e.shiftKey ? 10 : 1));
+});
+$('hlvReset').addEventListener('click', () => { Object.assign(st, HLV0); syncHlv(); remember(); schedule(); });
+function drawHhisto(){
+  const c = $('hhisto'), dpr = window.devicePixelRatio || 1, W = Math.max(1, Math.round(c.clientWidth*dpr)), H = Math.max(1, Math.round(c.clientHeight*dpr));
+  if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
+  const x = c.getContext('2d'); x.clearRect(0, 0, W, H);
+  if (!chist) return;
+  const cap = Math.max(1, [...chist].sort((a, b) => a - b)[95]); // the 6th-tallest bar, so solid areas don't flatten the rest
+  x.fillStyle = getComputedStyle(c).color;
+  for (let i = 0; i <= 100; i++){ const bh = Math.min(1, chist[i]/cap)*(H - 4*dpr); if (bh > 0) x.fillRect(Math.floor(i*W/101), H - bh, Math.ceil(W/101), bh); }
+}
+new ResizeObserver(() => drawHhisto()).observe($('hhisto'));
 
 let wTimer = 0;
 // width or height: type either one, the other follows the art's shape
@@ -2909,7 +2994,7 @@ function settingsText(){
     (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
-         (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
+         (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.finish !== 'cut' && !hlvIdentity() ? `; halftone levels ${st.hb} ${st.hg.toFixed(2)} ${st.hw}, output ${st.hob}-${st.how}` : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
          (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
@@ -2998,7 +3083,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -3236,6 +3321,7 @@ const HIST_MAX = 40;
 const sign = v => (v > 0 ? '+' : '') + v;
 const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', look: v => `Quick start: ${lookName(v)}`, cut: v => `Threshold ${v}%`, // the style first: switching it can move the Quick start too
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, clean: v => v ? 'Clean colour dots on' : 'Clean colour dots off', ktol: v => `Knock-out tolerance ${v}%`,
+  hb: () => 'Halftone levels', hg: () => 'Halftone levels', hw: () => 'Halftone levels', hob: () => 'Halftone output levels', how: () => 'Halftone output levels',
   mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
   knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt',
@@ -3374,7 +3460,7 @@ const SUMS = { // short, so a title stays on one line
   levelsGroup: () => lvIdentity() ? 'Unchanged' : 'Adjusted',
   knockGroup: () => `${st.knock ? st.knock.toUpperCase() : 'Shirt colour'} · ${st.finish === 'cut' ? `${st.ktol}%` : `${st.k0}–${st.k1}%` + (st.clean ? ' · clean' : '')}`,
   rangeGroup: () => rules.length ? `${rules.length} range${rules.length === 1 ? '' : 's'}` : 'None',
-  toneGroup: () => { const l = densLevel(); return `Dots · ${l ? DENS_NAMES[l] : `own ${st.drop}/${st.solid}%`}` + (st.mid || st.con ? ' · ink ±' : ''); },
+  toneGroup: () => { const l = densLevel(); return `Dots · ${l ? DENS_NAMES[l] : `own ${st.drop}/${st.solid}%`}` + (hlvIdentity() ? '' : ' · levels') + (st.mid || st.con ? ' · ink ±' : ''); },
   inkGroup: () => `${st.ink === 'one' ? 'Mono' : 'Full colour'} · black ${st.blkOn ? st.blk + '%' : 'as is'}`,
   edgeGroup: () => { const p = []; if (st.hard && st.finish !== 'cut') p.push(`hard ${st.hard}%`); if (st.edge) p.push(`trim ${st.edge} px`); if (st.back) p.push(`edge ${st.back} px`); return p.length ? p.join(' · ').replace(/^./, c => c.toUpperCase()) : 'Off'; },
   touchGroup: () => art && art.strokesN ? `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}` : 'None',
@@ -3454,7 +3540,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -3489,7 +3575,7 @@ const STEP_RESETS = {
   bgGroup: {name: 'Background', vals: () => ({...BG_KEYS})},
   sharpGroup: {name: 'Sharpen', vals: () => ({...SHARP_KEYS})},
   touchGroup: {name: 'Touch up', same: () => !art || !art.strokesN, reset: () => { art.strokesN = 0; rebuildEdits(art); buildSrcSoon(); }},
-  toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), ...densVals('std')})},
+  toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), ...densVals('std'), ...HLV0})},
   inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex})}
 };
 function stepIsReset(id){ const r = STEP_RESETS[id]; if (r.same) return r.same(); const v = r.vals(); return Object.keys(v).every(k => st[k] === v[k]); }
