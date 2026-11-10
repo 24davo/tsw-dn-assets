@@ -546,8 +546,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <div class="f-head"><label for="bcon">Contrast</label><output id="bconOut" for="bcon">0</output></div>
           <input type="range" id="bcon" min="-100" max="100" step="1" value="0">
         </div>
-        <label class="check-row" data-tip="Like using Brightness/Contrast in Luminosity blend mode in Photoshop: lighter or darker, with colours as strong as before."><input type="checkbox" id="bcLum" checked> Keep colour strength</label>
-        <p class="f-note"><span>Lighter or darker, and more or less contrast, before the dots.</span><span class="more-x" hidden> Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes them apart (or together). With Keep colour strength on, only lightness changes, so colours don’t turn grey or pastel. Untick it to work on each colour channel, as Photoshop does. Double-click a slider to put it back to 0.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        <label class="check-row" data-tip="Like using Brightness/Contrast in Luminosity blend mode in Photoshop: lighter or darker, with colours as strong as before."><input type="checkbox" id="bcLum"> Keep colour strength</label>
+        <p class="f-note"><span>Lighter or darker, and more or less contrast, before the dots.</span><span class="more-x" hidden> Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes them apart (or together). They work on each colour channel, as Photoshop does. Tick Keep colour strength to change only lightness, so colours don’t turn grey or pastel. Double-click a slider to put it back to 0.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="lv-sub">Levels</div>
         <p class="f-note"><span>Drag the black point right for more shadow, or the white point left for more highlights.</span><span class="more-x" hidden> Like Photoshop’s Levels. All of this runs first, on the art’s colours, and the adjusted colours are what prints.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="levels">
@@ -2441,7 +2441,7 @@ rulesBox.addEventListener('click', e => {
 });
 
 /* ---------- Levels: like Photoshop's, applied to the art's colours before everything else ---------- */
-const LV0 = {b: 0, g: 1, w: 255, ob: 0, ow: 255, bri: 0, bc: 0, lum: true}; // bri, bc: Brightness and Contrast; lum: they keep colour strength
+const LV0 = {b: 0, g: 1, w: 255, ob: 0, ow: 255, bri: 0, bc: 0, lum: false}; // bri, bc: Brightness and Contrast; lum: they keep colour strength (off unless ticked)
 const lv = {...LV0};
 let hist = null;
 const levelsOnlyIdentity = () => lv.b === 0 && lv.g === 1 && lv.w === 255 && lv.ob === 0 && lv.ow === 255;
