@@ -410,6 +410,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <label class="look"><input type="radio" name="look" id="lookShadows" value="shadows"><span class="look-t">Remove shadows</span><span class="look-d">Quick clean-up for dark shirts. Shadows drop out and the rest prints solid, with no dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookEdges" value="edges"><span class="look-t">Fix soft edges</span><span class="look-d">Shadows, glows and fades become solid dots. Solid parts stay solid.</span></label>
           <label class="look"><input type="radio" name="look" id="lookKnock" value="knock"><span class="look-t">Shirt shows through</span><span class="look-d">Colours close to the shirt drop out. Shading turns into dots.</span></label>
+          <label class="look"><input type="radio" name="look" id="lookDeep" value="deep"><span class="look-t">Shadows to dots</span><span class="look-d">Only the deepest shadows turn into dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookFull" value="full"><span class="look-t">Full halftone</span><span class="look-d">The whole design becomes dots for a soft, vintage print.</span></label>
         </div>
       </section>
@@ -766,6 +767,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Print style starts open; the other sections start folded: click a title to open it, or Expand all. The grey text beside a folded title says how it’s set or what’s inside (the dot controls are in Ink density). Hover over anything for a short tip.</li>
             <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z. Revert (top of Tools) goes back to the design as it was opened; Reset to defaults puts the tool’s own settings back.</li>
             <li>If the preview ever seems stuck, it restarts itself; after a few seconds “Updating…” also offers Redraw.</li>
+            <li>To keep the art’s contrast and colour (smoke, glows, a grey skull) and halftone only the deep shadows, use Quick start “Shadows to dots”, then refine with Halftone levels.</li>
             <li>Fades into a black tee printing with a muddy maroon or grey edge: first push the Levels black point to about 40, then if needed try Clean colour dots (Knock out step). It prints the dots in the bright version of their colour: cleaner, but a bolder, more graphic look.</li>
             <li>DTF black ink prints as a dark matt grey, never as black as a dyed black tee. Keep “Allow for DTF black ink” on (Ink colour step): the views then show the real grey, and on black tees the darkest colours become sparse dots so the tee does the black. A Shirt-colour edge on a black tee prints in that grey too, so keep it thin.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
@@ -1199,6 +1201,7 @@ const LOOKS = { // Drop dots under and Solid above come from the dot limits (den
   shadows: {k0: 0, k1: 100, mid: 0, con: 0},
   edges: {k0: 0,  k1: 100, mid: 0, con: 0},
   knock: {k0: 10, k1: 70,  mid: 0, con: 0},
+  deep:  {k0: 8,  k1: 30,  mid: 0, con: 0}, // Shadows to dots: the ramp sits in the darkest third, so mid-tones stay solid
   full:  {k0: 0,  k1: 100, mid: 0, con: 0}
 };
 /* Dot limits: the smallest dot and the smallest gap between dots, in mm, that each level keeps to. Drop dots under and Solid
@@ -1211,10 +1214,12 @@ function densVals(level, lpi){
 function densLevel(lpi){ for (const k of ['fine', 'std', 'safe']){ const v = densVals(k, lpi); if (v.drop === st.drop && v.solid === st.solid) return k; } return null; }
 /* The two print styles (routes). Each offers its own Quick starts, in this order; the same look can mean a little
    different thing in each (Knock out in Clean cut is a hard knock-out at the tolerance, with no dots). */
-const ROUTE_LOOKS = {dots: ['edges', 'knock', 'full'], cut: ['shadows', 'knock', 'edges']};
+const ROUTE_LOOKS = {dots: ['edges', 'knock', 'deep', 'full'], cut: ['shadows', 'knock', 'edges']};
+const knockLook = l => l === 'knock' || l === 'deep' || l === 'full'; // the Quick starts that knock out the shirt colour
 const LOOK_TEXT = {
   dots: {edges: ['Fix soft edges', 'Shadows, glows and fades become solid dots. Solid parts stay solid.'],
          knock: ['Shirt shows through', 'Colours close to the shirt drop out. Shading turns into dots.'],
+         deep: ['Shadows to dots', 'Only the deepest shadows turn into dots and fade into the shirt. Colours, greys and contrast keep their strength. Refine with Halftone levels.'],
          full: ['Full halftone', 'The whole design becomes dots for a soft, vintage print.']},
   cut: {shadows: ['Remove shadows', 'Quick clean-up for dark shirts. Shadows drop out and the rest prints solid.'],
         knock: ['Knock out the shirt colour', 'Colours close to the shirt drop out. Everything else prints solid.'],
@@ -1328,7 +1333,7 @@ function hexRgb(h){ const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255,
 function rgbHex(r, g, b){ return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join(''); }
 function params(){
   return {lpi: st.lpi, angle: st.angle, shape: st.shape, dpi: DPI,
-          tone: st.look === 'knock' || st.look === 'full', metric: st.look === 'full' ? 'lum' : 'max',
+          tone: knockLook(st.look), metric: st.look === 'full' ? 'lum' : 'max',
           k0: st.k0/100, k1: st.k1/100, ktol: st.ktol/100, knock: hexRgb(st.knock || st.shirt),
           gamma: st.finish === 'cut' ? 1 : Math.pow(2, -st.mid/50), contrast: st.finish === 'cut' ? 1 : Math.pow(2, st.con/50), // Ink density is a halftone step
           drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
@@ -2231,11 +2236,11 @@ $('looks').addEventListener('change', e => {
   const lvl = densLevel() || 'std';
   st.look = e.target.value; Object.assign(st, LOOKS[st.look], densVals(lvl));
   if (was === 'shadows' && st.look !== 'shadows') dropShadowRule(); // leaving Remove shadows takes its own range with it
-  if (st.look === 'shadows') st.finish = 'cut'; else if (st.look === 'full') st.finish = 'dots'; // each is offered in one style only
+  if (st.look === 'shadows') st.finish = 'cut'; else if (st.look === 'full' || st.look === 'deep') st.finish = 'dots'; // each is offered in one style only
   if (st.look === 'shadows') ensureShadowRule();
   syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
-function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look !== 'knock' && st.look !== 'full'; syncStepButtons(); syncRouteSum(); }
+function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = !knockLook(st.look); syncStepButtons(); syncRouteSum(); }
 function syncRouteSum(){ syncSums(); }
 $('finishChips').addEventListener('click', e => {
   const b = e.target.closest('[data-finish]'); if (!b || b.dataset.finish === st.finish) return;
@@ -2575,7 +2580,7 @@ function updateChecks(){
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (st.bgOn && Array.isArray(bgFound)) rows.push(['info', '✂', `Background removed (${(st.bgHex || rgbHex(bgFound[0], bgFound[1], bgFound[2])).toUpperCase()})`, `Cleared where it joins the outside edge, within ${st.bgTol}%. The same colour inside the design stays.`]);
   if (st.sharp) rows.push(['info', '↗', `Sharpened ${st.sharp}% at ${(+st.sradius).toFixed(1)} px`, 'Unsharp mask on the art at print size, before the dots.']);
-  if (st.clean && st.finish !== 'cut' && (st.look === 'knock' || st.look === 'full') && st.ink !== 'one' && linY(hexRgb(st.knock || st.shirt)) < linY([70, 70, 70]))
+  if (st.clean && st.finish !== 'cut' && knockLook(st.look) && st.ink !== 'one' && linY(hexRgb(st.knock || st.shirt)) < linY([70, 70, 70]))
     rows.push(['info', '✦', 'Clean colour dots', 'The dots in fades print in the bright version of their colour, so the fade looks like the art without muddy dark ink.']);
   if (st.blkOn) rows.push(['info', '◐', `DTF black ink allowed for (${blkHex().toUpperCase()})`, blkActs() && st.ink !== 'one'
     ? 'On this tee, colours darker than the ink can print got fewer dots, so the tee’s black does the darkest parts. The views show ink no darker than this grey.'
@@ -3023,7 +3028,7 @@ function settingsText(){
   const levels = (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') + ((lv.bri || lv.bc) && lv.lum !== false ? ' (colour strength kept)' : '') +
     (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
-         (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
+         (knockLook(st.look) ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.finish !== 'cut' && !hlvIdentity() ? `; halftone levels ${st.hb} ${st.hg.toFixed(2)} ${st.hw}, output ${st.hob}-${st.how}` : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
          (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
