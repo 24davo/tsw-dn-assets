@@ -578,7 +578,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
         <div class="field dotk">
           <label class="check-row"><input type="checkbox" id="cleanOn"> Clean colour dots</label>
-          <p class="f-note" id="cleanNote">Dark tees: the dots in a fade print in the bright version of their colour, sized so the fade still looks like the art. No muddy dark ink at the edges of fades or in dark lettering.</p>
+          <p class="f-note" id="cleanNote">Off by default. Dark tees: the dots in a fade print in the bright version of their colour, sized so the fade still looks like the art. No muddy dark ink at the edges of fades or in dark lettering, but a bolder, more graphic look.</p>
         </div>
       </section>
 
@@ -735,7 +735,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Print style starts open; the other sections start folded: click a title to open it, or Expand all. The grey text beside a folded title says how it’s set or what’s inside (the dot controls are in Ink density). Hover over anything for a short tip.</li>
             <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z. Revert (top of Tools) goes back to the design as it was opened; Reset to defaults puts the tool’s own settings back.</li>
             <li>If the preview ever seems stuck, it restarts itself; after a few seconds “Updating…” also offers Redraw.</li>
-            <li>Fades into a black tee: keep Clean colour dots on (Knock out step). The dots print in the bright version of their colour, so fades and dark lettering don’t print as muddy maroon or grey.</li>
+            <li>Fades into a black tee printing with a muddy maroon or grey edge: first push the Levels black point to about 40, then if needed try Clean colour dots (Knock out step). It prints the dots in the bright version of their colour: cleaner, but a bolder, more graphic look.</li>
             <li>DTF black ink prints as a dark matt grey, never as black as a dyed black tee. Keep “Allow for DTF black ink” on (Ink colour step): the views then show the real grey, and on black tees the darkest colours become sparse dots so the tee does the black. A Shirt-colour edge on a black tee prints in that grey too, so keep it thin.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
@@ -1177,10 +1177,12 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: true}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
+var cleanReset = false; // v51 had Clean colour dots on by default
+try { if (!localStorage.getItem('tsw-dtf-clean0')){ cleanReset = true; st.clean = false; localStorage.setItem('tsw-dtf-clean0', '1'); } } catch(e){}
 try { if (!localStorage.getItem('tsw-dtf-dens1')){ if ([[15, 92], [15, 90], [15, 96]].some(([d, v]) => st.drop === d && st.solid === v)) Object.assign(st, densVals('std')); localStorage.setItem('tsw-dtf-dens1', '1'); } } catch(e){}
 function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
@@ -2808,6 +2810,7 @@ async function restoreDocs(){ // answers how many designs came back
       const a = makeArt(im, rec.fullW, rec.fullH, rec.name, false, rec.dpi, {vector: rec.isVector, jpegQ: rec.jpegQ});
       Object.assign(a, {file, quiet: true, smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0});
       if (rec.snap.crop){ a.crop = {...rec.snap.crop}; a.w = a.crop.w; a.h = a.crop.h; }
+      if (cleanReset){ for (const x of [rec.snap, ...(rec.steps || []).map(t => t.snap)]) if (x && x.s) x.s.clean = false; }
       if (a.strokesN) rebuildEdits(a);
       back.push({id: ++docSeq, key, art: a, fileKept: true, snap: rec.snap, activeRule: rec.activeRule || 0, steps: rec.steps && rec.steps.length ? rec.steps : [{snap: rec.snap, label: `Opened ${rec.name}`, at: Date.now()}],
                  stepPos: rec.steps && rec.steps.length ? Math.min(rec.stepPos, rec.steps.length - 1) : 0, unsaved: !!rec.unsaved, zoom: rec.zoom || 'fit', cx: rec.cx || 0, cy: rec.cy || 0, suffix: rec.suffix || '', done: rec.done || []});
@@ -3451,7 +3454,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: true};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
