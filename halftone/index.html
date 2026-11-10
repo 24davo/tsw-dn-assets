@@ -715,7 +715,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <button class="chip" type="button" data-fadedir="out">Outward</button>
           </div>
           <p class="f-note" id="fadeInNote"><span>The outline breaks into dots that shrink to nothing, this far in. Further in, nothing changes.</span><span class="more-x" hidden> The print stays the same size. It works by distance from the edge, not by colour, so the dots inside the design stay as they are. The last dots are the smallest Dot limits allows. Small gaps inside the design are left alone; clear areas over 1 cm² count as an edge.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
-          <p class="f-note" id="fadeOutNote" hidden><span>Dots in the edge’s own colour trail off past the outline, this far out. The design itself doesn’t change.</span><span class="more-x" hidden> It needs clear space around the design in the file: the fade stops at the edge of the file. The colour is copied from the nearest part of the edge, so look it over in the preview. Art that already fades into the shirt colour has nothing to carry on.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+          <p class="f-note" id="fadeOutNote" hidden><span>Dots in the edge’s own colour trail off past the outline, this far out. The design itself doesn’t change.</span><span class="more-x" hidden> When the design sits close to the edge of the file, room is added for the fade, so the print comes out that much bigger: the size shown includes it. The colour is copied from the nearest part of the edge, so look it over in the preview. Art that already fades into the shirt colour has nothing to carry on.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
           <p class="f-note" id="fadeClip" hidden></p>
         </div>
         <div class="field">
@@ -987,8 +987,9 @@ function engine(){
     return R.invert ? 1 - s : s;
   }
   function run(p){
-    const {w, h, d} = S, out = new Uint8ClampedArray(w*h*4), t = tile(p.shape);
-    const cls = new Uint8Array(w*h); // what happened to each pixel: 0 clear, 1 removed, 2 gap between dots, 3 dot, 4 solid, 5 shirt-colour edge
+    let {w, h, d} = S, out = new Uint8ClampedArray(w*h*4); // let: an outward fade may add room round the design
+    const t = tile(p.shape);
+    let cls = new Uint8Array(w*h); // what happened to each pixel: 0 clear, 1 removed, 2 gap between dots, 3 dot, 4 solid, 5 shirt-colour edge
     const lut = new Float32Array(1025);
     const hl = p.hlv; // Halftone levels, like Lightning DTF Prep's: on how much ink each part gets, not on its colour
     for (let i = 0; i <= 1024; i++){
@@ -1054,10 +1055,11 @@ function engine(){
     const rules = p.rules || [], nr = rules.length, selOut = p.selOut;
     const recol = rules.map((R, k) => R.action === 'recolour' ? k : -1).filter(k => k >= 0), nc = nr - recol.length; // nc: ranges that change the ink
     const nodr = rules.map((R, k) => R.action === 'nodots' ? k : -1).filter(k => k >= 0); // No dots ranges: these parts are a clean cut inside a halftone
-    const sel = selOut >= 0 && selOut < nr ? new Uint8Array(w*h) : null;
+    let sel = selOut >= 0 && selOut < nr ? new Uint8Array(w*h) : null;
     let on = 0;
-    const fade = p.fade && p.fade.px > 0 && !cut ? p.fade : null, fo = !!(fade && fade.out), cov = fade ? new Uint8Array(w*h) : null; // cov: each pixel's ink amount, for Fade the edge
-    let fadeClip = null;
+    const fade = p.fade && p.fade.px > 0 && !cut ? p.fade : null, fo = !!(fade && fade.out);
+    let cov = fade ? new Uint8Array(w*h) : null; // cov: each pixel's ink amount, for Fade the edge
+    let fadeClip = null, pad = null, ox = 0, oy = 0; // pad: the room added round the design for an outward fade, in pixels
     for (let y = 0; y < h; y++){
       let fx = 0.5*cs + (y + 0.5)*sn, fy = -0.5*sn + (y + 0.5)*cs, i = y*w*4;
       for (let x = 0; x < w; x++, i += 4, fx += cs, fy -= sn){
@@ -1141,6 +1143,32 @@ function engine(){
     // Fade the edge (dots only): by distance from the outside of the design, not by tone, so the inside keeps its dots as they
     // are. Inward: the ink within the band ramps down to nothing at the edge. Outward: the edge's colour carries on past the
     // design and ramps down to nothing. The ramp is screened like any tone and ends at the smallest dot Dot limits allows.
+    // Room for an outward fade: where the ink sits closer to a side of the image than the fade is long, the image grows on
+    // that side (up to the largest print, when the page gives it). Sides with space stay as they are.
+    if (fo){
+      let x0 = w, x1 = -1, y0 = h, y1 = -1;
+      for (let y = 0, k = 0; y < h; y++) for (let x = 0; x < w; x++, k++) if (cls[k] >= 2){ if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (x1 >= 0){
+        const need = fade.px + 2, want = m => Math.max(0, need - m);
+        let pl = want(x0), pr = want(w - 1 - x1), pt = want(y0), pb = want(h - 1 - y1);
+        if (fade.max){ // the largest print, either way round: the way that leaves the fade the most room
+          const [A, B] = fade.max; let best = null;
+          for (const [mw, mh] of [[A, B], [B, A]]){
+            const aw = Math.max(0, mw - w), ah = Math.max(0, mh - h), sc = Math.min(1, pl + pr ? aw/(pl + pr) : 1, pt + pb ? ah/(pt + pb) : 1) - (w > mw || h > mh ? 1 : 0);
+            if (!best || sc > best.sc) best = {aw, ah, sc};
+          }
+          if (pl + pr > best.aw){ const sum = pl + pr; pl = Math.floor(pl*best.aw/sum); pr = Math.floor(pr*best.aw/sum); }
+          if (pt + pb > best.ah){ const sum = pt + pb; pt = Math.floor(pt*best.ah/sum); pb = Math.floor(pb*best.ah/sum); }
+        }
+        if (pl || pr || pt || pb){
+          const W2 = w + pl + pr, H2 = h + pt + pb;
+          out = shift(out, 4, w, h, pl, pt, W2, H2); cls = shift(cls, 1, w, h, pl, pt, W2, H2); cov = shift(cov, 1, w, h, pl, pt, W2, H2);
+          if (sel) sel = shift(sel, 1, w, h, pl, pt, W2, H2);
+          d = shift(d, 4, w, h, pl, pt, W2, H2, true); // the source's edge colours carry on into the room, for Trim
+          w = W2; h = H2; ox = pl; oy = pt; pad = {l: pl, t: pt, r: pr, b: pb};
+        }
+      }
+    }
     if (fade){
       const n = w*h, F = fade.px, F3 = F*3, outside = new Uint8Array(n), q = new Int32Array(n);
       // The design's shape: the ink, with every gap under 3 mm wide closed over (specks, cracks and threads of removed
@@ -1204,7 +1232,7 @@ function engine(){
           if (!near || m === cov[k]) continue;
           let c = m/255; if (c >= p.solid) c = 1;
           if (c < 1){
-            const fx = (x + 0.5)*cs + (y + 0.5)*sn, fy = -(x + 0.5)*sn + (y + 0.5)*cs, u = fx - Math.floor(fx), v = fy - Math.floor(fy);
+            const gx = x - ox + 0.5, gy = y - oy + 0.5, fx = gx*cs + gy*sn, fy = -gx*sn + gy*cs, u = fx - Math.floor(fx), v = fy - Math.floor(fy);
             if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]) continue;
           }
           const j = k*4;
@@ -1225,7 +1253,7 @@ function engine(){
           if (y === 0) clip[0] = 1; if (x === w - 1) clip[1] = 1; if (y === h - 1) clip[2] = 1; if (x === 0) clip[3] = 1;
           if (c >= p.solid) c = 1;
           if (c < 1){
-            const fx = (x + 0.5)*cs + (y + 0.5)*sn, fy = -(x + 0.5)*sn + (y + 0.5)*cs, u = fx - Math.floor(fx), v = fy - Math.floor(fy);
+            const gx = x - ox + 0.5, gy = y - oy + 0.5, fx = gx*cs + gy*sn, fy = -gx*sn + gy*cs, u = fx - Math.floor(fx), v = fy - Math.floor(fy);
             if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]){ cls[k] = 2; continue; }
             cls[k] = 3;
           } else cls[k] = 4;
@@ -1235,6 +1263,19 @@ function engine(){
         }
         for (let j = 0; j < n*4; j += 4) if (!out[j+3]) out[j] = out[j+1] = out[j+2] = 0; // the colours kept in the gaps go again
         fadeClip = clip;
+        if (pad){ // keep only the room the fade used
+          let x0 = w, x1 = -1, y0 = h, y1 = -1;
+          for (let y = 0, k = 0; y < h; y++) for (let x = 0; x < w; x++, k++) if (cls[k] >= 2){ if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+          const cl = Math.min(pad.l, x0), ct = Math.min(pad.t, y0), cr = Math.min(pad.r, w - 1 - x1), cb = Math.min(pad.b, h - 1 - y1);
+          if (cl || ct || cr || cb){
+            const W2 = w - cl - cr, H2 = h - ct - cb;
+            out = shift(out, 4, w, h, -cl, -ct, W2, H2); cls = shift(cls, 1, w, h, -cl, -ct, W2, H2);
+            if (sel) sel = shift(sel, 1, w, h, -cl, -ct, W2, H2);
+            d = shift(d, 4, w, h, -cl, -ct, W2, H2);
+            w = W2; h = H2; pad = {l: pad.l - cl, t: pad.t - ct, r: pad.r - cr, b: pad.b - cb};
+            if (!(pad.l || pad.t || pad.r || pad.b)) pad = null;
+          }
+        }
       }
     }
     // Edge clean-up works from the outside of the design only: "outside" is every pixel with no ink in the design's shape
@@ -1285,7 +1326,23 @@ function engine(){
       }
       for (let k = 0; k < n; k++) if (edge[k]){ cls[k] = 5; const j = k*4; out[j] = er; out[j+1] = eg; out[j+2] = eb; out[j+3] = 255; on++; }
     }
-    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on, bg: p.bg ? (bgm ? bgm.rgb : 'none') : null, ch: ch.buffer, fadeClip};
+    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on, bg: p.bg ? (bgm ? bgm.rgb : 'none') : null, ch: ch.buffer, fadeClip, pad};
+  }
+  // a's pixels (c values each, w × h) placed at l, t on a W × H sheet: bigger with l, t positive, cropped with them negative.
+  // edge: the new room takes the nearest pixel of a, not clear.
+  function shift(a, c, w, h, l, t, W, H, edge){
+    const o = new a.constructor(W*H*c), X0 = Math.max(0, l), X1 = Math.min(W, l + w);
+    for (let Y = 0; Y < H; Y++){
+      let sy = Y - t;
+      if (sy < 0 || sy >= h){ if (!edge) continue; sy = sy < 0 ? 0 : h - 1; }
+      o.set(a.subarray((sy*w + X0 - l)*c, (sy*w + X1 - l)*c), (Y*W + X0)*c);
+      if (edge){
+        const r0 = Y*W*c, f = (Y*W + X0)*c, e = (Y*W + X1 - 1)*c;
+        for (let j = r0; j < f; j++) o[j] = o[f + (j - r0) % c];
+        for (let j = e + c; j < r0 + W*c; j++) o[j] = o[e + (j - e) % c];
+      }
+    }
+    return o;
   }
   // Distance from the seeds (dist 0 there, 65535 elsewhere), 3 per pixel and 4 per diagonal step, in two sweeps. src, when
   // given, ends up holding each pixel's nearest seed.
@@ -1349,7 +1406,7 @@ function engine(){
       return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
     }
     const r = run(m.p);
-    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel, bg: r.bg, ch: r.ch, fadeClip: r.fadeClip},
+    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel, bg: r.bg, ch: r.ch, fadeClip: r.fadeClip, pad: r.pad},
             transfer: r.sel ? [r.buf, r.cls, r.sel, r.ch] : [r.buf, r.cls, r.ch]};
   }
   return {handle};
@@ -1508,7 +1565,7 @@ function params(){
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
           hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
           clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100,
-          fade: st.fade && st.finish !== 'cut' ? {px: Math.max(1, Math.round(st.fade/25.4*DPI)), out: st.fadeDir === 'out'} : null};
+          fade: st.fade && st.finish !== 'cut' ? {px: Math.max(1, Math.round(st.fade/25.4*DPI)), out: st.fadeDir === 'out', max: [Math.round(MAX_SHORT/2.54*DPI), Math.round(MAX_LONG/2.54*DPI)]} : null};
 }
 function schedule(){
   if (resetsReady) syncResets();
@@ -1529,15 +1586,20 @@ function maxWidthCm(){ return art ? maxWidthFor(art) : MAX_SHORT; }
 function outW(){ return Math.max(1, Math.round(st.widthCm/2.54*DPI)); }
 const toMm = cm => Math.round(cm*10); // sizes are kept in cm, and shown and typed in mm
 function outH(){ return Math.max(1, Math.round(outW()*art.h/art.w)); }
+function syncSizeText(){ // the print's size; an outward fade can add room round the design, and the file is that much bigger
+  if (!art) return;
+  const w = st.widthCm, h = w*art.h/art.w, room = hasRoom(), mm = room ? `${pxToMm(printPxW())} × ${pxToMm(printPxH())} mm` : `${toMm(w)} × ${toMm(h)} mm`;
+  $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px at 300 dpi.` + (room ? ` With the fade past the edge, it prints ${mm}.` : '');
+  $('sizeRead').textContent = `${mm}${room ? ' with the fade' : ''} · ${printPxW()} × ${printPxH()} px`;
+  if ($('fileSize')) $('fileSize').textContent = mm + (room ? ' with the fade' : '');
+}
 function setWidth(cm, quiet, typing){
   const max = maxWidthCm(), w = Math.max(0.5, Math.min(cm || 1, max)), h = w*art.h/art.w;
   if (!quiet && cm > max + 0.001) toast(`Largest print is 400 × 500 mm, so it’s set to ${toMm(w)} × ${toMm(h)} mm.`);
   st.widthCm = w;
   if (typing !== $('wcm')) $('wcm').value = toMm(w);
   if (typing !== $('hcm')) $('hcm').value = toMm(h);
-  $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px at 300 dpi.`;
-  $('sizeRead').textContent = `${toMm(w)} × ${toMm(h)} mm · ${outW()} × ${outH()} px`;
-  if ($('fileSize')) $('fileSize').textContent = `${toMm(w)} × ${toMm(h)} mm`;
+  syncSizeText();
   syncSums();
   syncQuality();
   syncSizeAsk();
@@ -1695,6 +1757,8 @@ function buildSrc(){
 function paint(m){
   if (m.bg !== undefined){ bgFound = m.bg; syncBg(); } // the background the engine found on the edge
   fadeClipped = m.fadeClip || null; syncFadeClip();
+  { const r = m.pad || {l: 0, t: 0, r: 0, b: 0}, same = r.l === fadeRoom.l && r.t === fadeRoom.t && r.r === fadeRoom.r && r.b === fadeRoom.b;
+    if (!same){ if (st.zoom !== 'fit'){ st.cx += r.l - fadeRoom.l; st.cy += r.t - fadeRoom.t; } fadeRoom = r; syncSizeText(); syncFileName(); } }
   if (m.v >= shownUntil) shownStrokes = []; // the engine has caught up with the strokes, so their trails can go
   outCanvas.width = m.w; outCanvas.height = m.h;
   const px = new Uint8ClampedArray(m.buf);
@@ -1755,7 +1819,8 @@ function drawPane(p, dpr){
   vctx.fillStyle = paneBg(p.kind); vctx.fillRect(X, Y, W, H);
   const levels = levelsFor(p.kind);
   if (levels){
-    const OW = levels[0].width, OH = levels[0].height, side = st.view === 'split' ? 12 : 24;
+    const roomy = hasRoom() && outReady, inRoom = roomy && (levels === srcMips || levels === origMips); // the original, drawn where it sits in the bigger print
+    const SW = levels[0].width, SH = levels[0].height, OW = inRoom ? SW + fadeRoom.l + fadeRoom.r : SW, OH = inRoom ? SH + fadeRoom.t + fadeRoom.b : SH, side = st.view === 'split' ? 12 : 24;
     const bw = Math.max(40, p.w - side*2), bh = Math.max(40, p.h - p.top - p.bottom), s = Math.min(bw/OW, bh/OH);
     g.fitK = s*dpr;
     if (st.zoom === 'fit'){
@@ -1770,7 +1835,9 @@ function drawPane(p, dpr){
     else if (isWhite(p.kind)){ vctx.fillStyle = '#ffffff'; vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // a solid white layer behind the art
     const k = g.k, L = k < 1 ? Math.min(levels.length - 1, Math.max(0, Math.floor(Math.log2(1/k)))) : 0, mip = levels[L];
     vctx.imageSmoothingEnabled = k < 1; vctx.imageSmoothingQuality = 'high';
-    vctx.drawImage(mip, 0, 0, mip.width, mip.height, g.dx, g.dy, OW*k, OH*k);
+    if (inRoom) vctx.drawImage(mip, 0, 0, mip.width, mip.height, g.dx + fadeRoom.l*k, g.dy + fadeRoom.t*k, SW*k, SH*k);
+    else vctx.drawImage(mip, 0, 0, mip.width, mip.height, g.dx, g.dy, OW*k, OH*k);
+    g.px = roomy ? fadeRoom.l : 0; g.py = roomy ? fadeRoom.t : 0; g.rw = roomy ? fadeRoom.l + fadeRoom.r : 0; // where the design sits in this picture
     if (isMask(p.kind)){ // outline the print box so clear film reads against the background
       const lw = Math.max(1, Math.round(dpr));
       vctx.strokeStyle = '#5c5c5c'; vctx.lineWidth = lw; vctx.strokeRect(g.dx - lw/2, g.dy - lw/2, OW*k + lw, OH*k + lw);
@@ -2172,8 +2239,8 @@ $('paintFromArt').addEventListener('click', () => { if (brushTool !== 'paint') s
 function toFile(e){ // the pointer in the file's own pixels
   const r = view.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, g = geoAt(px, py);
   if (!g || !g.OW || !art) return null;
-  const f = art.crop.w/g.OW;
-  return {x: art.crop.x + (px*g.dpr - g.dx)/g.k*f, y: art.crop.y + (py*g.dpr - g.dy)/g.k*f};
+  const f = art.crop.w/(g.OW - (g.rw || 0));
+  return {x: art.crop.x + ((px*g.dpr - g.dx)/g.k - (g.px || 0))*f, y: art.crop.y + ((py*g.dpr - g.dy)/g.k - (g.py || 0))*f};
 }
 function brushDown(e){
   const p = toFile(e); if (!p) return;
@@ -2237,7 +2304,7 @@ function drawBrush(){ // the stroke being drawn (and the last ones until the eng
   const list = stroke ? [...shownStrokes, stroke] : shownStrokes;
   for (const g of geos){
     if (!g.OW) continue;
-    const f = g.OW/art.crop.w*g.k, X = v => g.dx + (v - art.crop.x)*f, Y = v => g.dy + (v - art.crop.y)*f;
+    const f = (g.OW - (g.rw || 0))/art.crop.w*g.k, X = v => g.dx + (g.px || 0)*g.k + (v - art.crop.x)*f, Y = v => g.dy + (g.py || 0)*g.k + (v - art.crop.y)*f;
     x.save(); x.beginPath(); x.rect(g.x*g.dpr, g.y*g.dpr, g.w*g.dpr, g.h*g.dpr); x.clip();
     for (const s of list){
       x.globalAlpha = s.mode === 'paint' ? 0.9 : 0.55; x.strokeStyle = s.mode === 'paint' ? s.color : s.mode === 'erase' ? '#ff2d7a' : '#2bd47d';
@@ -2346,12 +2413,15 @@ $('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncS
 
 const pxMm = v => v ? `${(v*25.4/DPI).toFixed(2)} mm · ${v} px` : 'Off'; // edge widths: print pixels at 300 dpi
 const EDGE_KEYS = {hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in'};
+var fadeRoom = {l: 0, t: 0, r: 0, b: 0}; // the room the engine added round the design for an outward fade, in print pixels
+const hasRoom = () => !!(fadeRoom.l || fadeRoom.t || fadeRoom.r || fadeRoom.b);
+const pxToMm = v => Math.round(v/DPI*25.4);
+const printPxW = () => outW() + fadeRoom.l + fadeRoom.r, printPxH = () => outH() + fadeRoom.t + fadeRoom.b; // the saved file, fade included
 var fadeClipped = null; // the sides of the file an outward fade ran into, from the engine (var: syncSliders may ask before this line runs)
 function syncFadeClip(){
   const sides = st.fade && st.fadeDir === 'out' && st.finish !== 'cut' && fadeClipped ? ['top', 'right', 'bottom', 'left'].filter((s, i) => fadeClipped[i]) : [];
   $('fadeClip').hidden = !sides.length;
-  if (sides.length) $('fadeClip').textContent = sides.length === 4 ? 'The fade runs into every side of the file: there’s no clear space past the design there. Fade inward instead.'
-    : `The fade is cut off at the ${sides.length > 1 ? sides.slice(0, -1).join(', ') + ' and ' + sides[sides.length - 1] : sides[0]} of the file: there’s no clear space there. Fade inward, or crop less tightly.`;
+  if (sides.length) $('fadeClip').textContent = `The fade is cut off at ${sides.length === 4 ? 'every side' : 'the ' + (sides.length > 1 ? sides.slice(0, -1).join(', ') + ' and ' + sides[sides.length - 1] : sides[0])}: with the fade, the print would be over the largest size, 400 × 500 mm. Make the design a little smaller, or fade inward.`;
 }
 var backWas = 3; // the edge width to go back to when it's ticked again (var: syncKnock may ask before this line runs)
 function syncBack(){
@@ -3223,7 +3293,7 @@ function fileName(){
   const clean = t => t.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
   const base = art.isSample ? 'sample-art' : clean((art.name || 'art').replace(/\.[a-z0-9]+$/i, '').replace(/_twedit(_.*)?$/i, '')) || 'art';
   const extra = clean($('nameSuffix').value);
-  return `${base}_twedit_${toMm(st.widthCm)}w` + (st.finish === 'cut' ? '' : `_${st.lpi}lpi`) + (extra ? `_${extra}` : '') + '.png';
+  return `${base}_twedit_${hasRoom() ? pxToMm(printPxW()) : toMm(st.widthCm)}w` + (st.finish === 'cut' ? '' : `_${st.lpi}lpi`) + (extra ? `_${extra}` : '') + '.png';
 }
 function syncFileName(){ if (art) $('nameNote').innerHTML = `Saves as <b>${esc(fileName())}</b>`; }
 $('nameSuffix').addEventListener('input', () => { syncFileName(); persistSoon(); });
@@ -3238,7 +3308,7 @@ function settingsText(){
          (knockLook(st.look) ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.finish !== 'cut' && !hlvIdentity() ? `; halftone levels ${st.hb} ${st.hg.toFixed(2)} ${st.hw}, output ${st.hob}-${st.how}` : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
          (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.fade && st.finish !== 'cut' ? `; edge faded ${st.fade} mm ${st.fadeDir === 'out' ? 'outward' : 'inward'}` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
-         `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
+         `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (hasRoom() ? `, ${pxToMm(printPxW())} x ${pxToMm(printPxH())} mm with the fade` : '') + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
 let saving = false;
 async function savePng(){ // answers true once the PNG is saved
