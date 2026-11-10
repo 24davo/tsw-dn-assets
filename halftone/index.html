@@ -707,6 +707,17 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           </div>
           <p class="f-note"><span>Soft edges and glows print fully solid or are removed, for a crisp outline.</span><span class="more-x" hidden> Like a Threshold action on the transparency. The film never has half see-through pixels (they’d print as a white haze), but with dots, soft edges and glows turn into dots. Pixels at least this solid stay.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
+        <div class="field dotf" id="fadeField">
+          <div class="f-head"><label for="fade">Fade the edge</label><output id="fadeOut" for="fade">Off</output></div>
+          <input type="range" id="fade" min="0" max="20" step="0.5" value="0">
+          <div class="chips" id="fadeChips" role="group" aria-label="Which way to fade">
+            <button class="chip" type="button" data-fadedir="in">Inward</button>
+            <button class="chip" type="button" data-fadedir="out">Outward</button>
+          </div>
+          <p class="f-note" id="fadeInNote"><span>The outline breaks into dots that shrink to nothing, this far in. Further in, nothing changes.</span><span class="more-x" hidden> The print stays the same size. It works by distance from the edge, not by colour, so the dots inside the design stay as they are. The last dots are the smallest Dot limits allows. Small gaps inside the design are left alone; clear areas over 1 cm² count as an edge.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+          <p class="f-note" id="fadeOutNote" hidden><span>Dots in the edge’s own colour trail off past the outline, this far out. The design itself doesn’t change.</span><span class="more-x" hidden> It needs clear space around the design in the file: the fade stops at the edge of the file. The colour is copied from the nearest part of the edge, so look it over in the preview. Art that already fades into the shirt colour has nothing to carry on.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+          <p class="f-note" id="fadeClip" hidden></p>
+        </div>
         <div class="field">
           <div class="f-head"><label for="edge">Trim the edge</label><output id="edgeOut" for="edge">Off</output></div>
           <input type="range" id="edge" min="0" max="24" step="1" value="0">
@@ -1045,6 +1056,8 @@ function engine(){
     const nodr = rules.map((R, k) => R.action === 'nodots' ? k : -1).filter(k => k >= 0); // No dots ranges: these parts are a clean cut inside a halftone
     const sel = selOut >= 0 && selOut < nr ? new Uint8Array(w*h) : null;
     let on = 0;
+    const fade = p.fade && p.fade.px > 0 && !cut ? p.fade : null, fo = !!(fade && fade.out), cov = fade ? new Uint8Array(w*h) : null; // cov: each pixel's ink amount, for Fade the edge
+    let fadeClip = null;
     for (let y = 0; y < h; y++){
       let fx = 0.5*cs + (y + 0.5)*sn, fy = -0.5*sn + (y + 0.5)*cs, i = y*w*4;
       for (let x = 0; x < w; x++, i += 4, fx += cs, fy -= sn){
@@ -1113,15 +1126,115 @@ function engine(){
         if (nd){ if (c < nd){ cls[i >> 2] = 1; continue; } c = 1; } // No dots: solid or removed, never screened
         else { ch[(c > 1 ? 100 : c*100 + 0.5) | 0]++; c = lut[(c*1024) | 0]; } // ch: the chart of ink amounts
         if (c <= 0 || c < cut){ cls[i >> 2] = 1; continue; }
+        if (cov) cov[i >> 2] = nd && !fo ? 0 : c >= 1 ? 255 : Math.max(1, (c*255 + 0.5) | 0); // a No dots part is never faded inward
         if (c < 1 && !cut){
           const u = fx - Math.floor(fx), v = fy - Math.floor(fy);
-          if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]){ cls[i >> 2] = 2; continue; }
+          if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]){ cls[i >> 2] = 2; if (fo){ out[i] = r; out[i+1] = g; out[i+2] = b; } continue; } // fo: the gap's colour is kept for the fade, and cleared after it
           cls[i >> 2] = 3;
         } else cls[i >> 2] = 4;
         if (one){ out[i] = ir; out[i+1] = ig; out[i+2] = ib; }
         else if (boost && c < 1){ const R1 = kr + (r - kr)*boost, G1 = kg + (g - kg)*boost, B1 = kb + (b - kb)*boost; out[i] = R1; out[i+1] = G1; out[i+2] = B1; } // a dot in its bright colour
         else { out[i] = r; out[i+1] = g; out[i+2] = b; }
         out[i+3] = 255; on++;
+      }
+    }
+    // Fade the edge (dots only): by distance from the outside of the design, not by tone, so the inside keeps its dots as they
+    // are. Inward: the ink within the band ramps down to nothing at the edge. Outward: the edge's colour carries on past the
+    // design and ramps down to nothing. The ramp is screened like any tone and ends at the smallest dot Dot limits allows.
+    if (fade){
+      const n = w*h, F = fade.px, F3 = F*3, outside = new Uint8Array(n), q = new Int32Array(n);
+      // The design's shape: the ink, with every gap under 3 mm wide closed over (specks, cracks and threads of removed
+      // colour are inside the design, not its edge). dist: distance from the ink, and src its nearest ink pixel.
+      const dist = new Uint16Array(n).fill(65535), src = fo ? new Int32Array(n) : null, R3 = Math.max(3, Math.round(1.5/25.4*p.dpi)*3);
+      for (let k = 0; k < n; k++) if (cls[k] >= 2){ dist[k] = 0; if (src) src[k] = k; }
+      chamfer(w, h, dist, src);
+      const far = new Uint16Array(n);
+      for (let k = 0; k < n; k++) far[k] = dist[k] > R3 ? 0 : 65535;
+      for (let x = 0; x < w; x++){ if (dist[x]) far[x] = 0; if (dist[n - w + x]) far[n - w + x] = 0; } // past the edge of the image is open too
+      for (let y = 0; y < h; y++){ if (dist[y*w]) far[y*w] = 0; if (dist[y*w + w - 1]) far[y*w + w - 1] = 0; }
+      chamfer(w, h, far, null);
+      // the real outside (1): clear pixels outside that shape, joined to the edge of the image or 1 cm² or more.
+      // A smaller enclosed gap (2) is part of the design: no fade around it.
+      const minHole = Math.pow(10/25.4*p.dpi, 2);
+      let head = 0, tail = 0;
+      const add = k => { if (cls[k] <= 1 && far[k] <= R3 && !outside[k]){ outside[k] = 1; q[tail++] = k; } };
+      const spread = () => { while (head < tail){ const k = q[head++], x = k % w; if (x > 0) add(k - 1); if (x < w - 1) add(k + 1); if (k >= w) add(k - w); if (k + w < n) add(k + w); } };
+      for (let x = 0; x < w; x++){ add(x); add(n - w + x); }
+      for (let y = 0; y < h; y++){ add(y*w); add(y*w + w - 1); }
+      spread();
+      for (let s0 = 0; s0 < n; s0++){
+        if (cls[s0] > 1 || outside[s0] || far[s0] > R3) continue;
+        head = tail = 0; add(s0); spread();
+        if (tail < minHole) for (let j = 0; j < tail; j++) outside[q[j]] = 2;
+      }
+      if (!fo){
+        for (let k = 0; k < n; k++) dist[k] = outside[k] === 1 ? 0 : 65535;
+        for (let x = 0; x < w; x++){ if (dist[x]) dist[x] = 3; if (dist[n - w + x]) dist[n - w + x] = 3; } // the edge of the image is an edge too
+        for (let y = 0; y < h; y++){ if (dist[y*w]) dist[y*w] = 3; if (dist[y*w + w - 1]) dist[y*w + w - 1] = 3; }
+        chamfer(w, h, dist, null);
+        for (let k = 0; k < n; k++){
+          if (cls[k] < 3 || dist[k] >= F3 || !cov[k]) continue;
+          const c = cov[k]/255*dist[k]/F3;
+          if (c >= p.solid) continue;
+          let keep = false;
+          if (c > 0 && c >= p.drop){
+            const x = k % w, y = (k - x)/w, fx = (x + 0.5)*cs + (y + 0.5)*sn, fy = -(x + 0.5)*sn + (y + 0.5)*cs, u = fx - Math.floor(fx), v = fy - Math.floor(fy);
+            keep = c > t[((v*N) | 0)*N + ((u*N) | 0)];
+          }
+          if (keep) cls[k] = 3;
+          else { cls[k] = c < p.drop ? 1 : 2; const j = k*4; out[j] = out[j+1] = out[j+2] = out[j+3] = 0; on--; }
+        }
+      } else {
+        const clip = [0, 0, 0, 0], healed = []; // clip: top, right, bottom, left: the fade ran into the edge of the image there
+        for (let x = 0; x < w; x++){ if (!dist[x]) clip[0] = 1; if (!dist[n - w + x]) clip[2] = 1; }
+        for (let y = 0; y < h; y++){ if (!dist[y*w]) clip[3] = 1; if (!dist[y*w + w - 1]) clip[1] = 1; }
+        // the soft pixels on the outline itself take the ink amount just inside them, or they'd show as a thin broken line
+        // between the design and its fade
+        for (let k = 0; k < n; k++){
+          if (cls[k] < 2 || cov[k] === 255) continue;
+          const x = k % w, y = (k - x)/w; let near = false, m = cov[k];
+          for (let dy = -3; dy <= 3; dy++){
+            const yy = y + dy; if (yy < 0 || yy >= h) continue;
+            for (let dx = -3; dx <= 3; dx++){
+              const xx = x + dx; if (xx < 0 || xx >= w) continue;
+              const kk = yy*w + xx;
+              if (outside[kk] === 1){ if (dx >= -2 && dx <= 2 && dy >= -2 && dy <= 2) near = true; } else if (cov[kk] > m) m = cov[kk];
+            }
+          }
+          if (!near || m === cov[k]) continue;
+          let c = m/255; if (c >= p.solid) c = 1;
+          if (c < 1){
+            const fx = (x + 0.5)*cs + (y + 0.5)*sn, fy = -(x + 0.5)*sn + (y + 0.5)*cs, u = fx - Math.floor(fx), v = fy - Math.floor(fy);
+            if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]) continue;
+          }
+          const j = k*4;
+          if (cls[k] === 2){ on++; out[j+3] = 255; if (one){ out[j] = ir; out[j+1] = ig; out[j+2] = ib; } }
+          cls[k] = c < 1 ? 3 : 4; healed.push(k, m);
+        }
+        for (let j = 0; j < healed.length; j += 2) cov[healed[j]] = healed[j+1];
+        for (let k = 0; k < n; k++){
+          if (outside[k] !== 1 || dist[k] > F3*1.1) continue;
+          const s = src[k], x = k % w, y = (k - x)/w, sx = s % w, sy = (s - sx)/w, de = Math.hypot(x - sx, y - sy);
+          if (!de || de >= F) continue;
+          let s2 = s; // the edge pixel itself is often a soft one: 3 px further in gives the edge's real colour and ink amount
+          const qx = Math.round(sx + (sx - x)/de*3), qy = Math.round(sy + (sy - y)/de*3);
+          if (qx < 0 || qy < 0 || qx >= w || qy >= h || cls[qy*w + qx] < 2) continue; // a hairline or a speck (under 4 px through) grows no fade
+          if (cov[qy*w + qx] > cov[s]) s2 = qy*w + qx;
+          let c = cov[s2]/255*(1 - de/F);
+          if (c <= 0 || c < p.drop) continue;
+          if (y === 0) clip[0] = 1; if (x === w - 1) clip[1] = 1; if (y === h - 1) clip[2] = 1; if (x === 0) clip[3] = 1;
+          if (c >= p.solid) c = 1;
+          if (c < 1){
+            const fx = (x + 0.5)*cs + (y + 0.5)*sn, fy = -(x + 0.5)*sn + (y + 0.5)*cs, u = fx - Math.floor(fx), v = fy - Math.floor(fy);
+            if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]){ cls[k] = 2; continue; }
+            cls[k] = 3;
+          } else cls[k] = 4;
+          const j = k*4, j2 = s2*4;
+          if (one){ out[j] = ir; out[j+1] = ig; out[j+2] = ib; } else { out[j] = out[j2]; out[j+1] = out[j2+1]; out[j+2] = out[j2+2]; }
+          out[j+3] = 255; on++;
+        }
+        for (let j = 0; j < n*4; j += 4) if (!out[j+3]) out[j] = out[j+1] = out[j+2] = 0; // the colours kept in the gaps go again
+        fadeClip = clip;
       }
     }
     // Edge clean-up works from the outside of the design only: "outside" is every pixel with no ink in the design's shape
@@ -1172,7 +1285,33 @@ function engine(){
       }
       for (let k = 0; k < n; k++) if (edge[k]){ cls[k] = 5; const j = k*4; out[j] = er; out[j+1] = eg; out[j+2] = eb; out[j+3] = 255; on++; }
     }
-    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on, bg: p.bg ? (bgm ? bgm.rgb : 'none') : null, ch: ch.buffer};
+    return {w, h, buf: out.buffer, cls: cls.buffer, sel: sel ? sel.buffer : null, on, bg: p.bg ? (bgm ? bgm.rgb : 'none') : null, ch: ch.buffer, fadeClip};
+  }
+  // Distance from the seeds (dist 0 there, 65535 elsewhere), 3 per pixel and 4 per diagonal step, in two sweeps. src, when
+  // given, ends up holding each pixel's nearest seed.
+  function chamfer(w, h, dist, src){
+    for (let y = 0, k = 0; y < h; y++) for (let x = 0; x < w; x++, k++){
+      let dk = dist[k]; if (!dk) continue;
+      let s = -1, v;
+      if (x > 0 && (v = dist[k-1] + 3) < dk){ dk = v; s = k - 1; }
+      if (y > 0){
+        if ((v = dist[k-w] + 3) < dk){ dk = v; s = k - w; }
+        if (x > 0 && (v = dist[k-w-1] + 4) < dk){ dk = v; s = k - w - 1; }
+        if (x < w - 1 && (v = dist[k-w+1] + 4) < dk){ dk = v; s = k - w + 1; }
+      }
+      if (s >= 0){ dist[k] = dk; if (src) src[k] = src[s]; }
+    }
+    for (let y = h - 1, k = w*h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--, k--){
+      let dk = dist[k]; if (!dk) continue;
+      let s = -1, v;
+      if (x < w - 1 && (v = dist[k+1] + 3) < dk){ dk = v; s = k + 1; }
+      if (y < h - 1){
+        if ((v = dist[k+w] + 3) < dk){ dk = v; s = k + w; }
+        if (x < w - 1 && (v = dist[k+w+1] + 4) < dk){ dk = v; s = k + w + 1; }
+        if (x > 0 && (v = dist[k+w-1] + 4) < dk){ dk = v; s = k + w - 1; }
+      }
+      if (s >= 0){ dist[k] = dk; if (src) src[k] = src[s]; }
+    }
   }
   // Marks in gone the pixels up to D steps in from the outside, moving only through pixels accept() allows (all when null).
   // Steps alternate 4 and 8 neighbours, so the band is an octagon: close to an even width all round.
@@ -1210,7 +1349,7 @@ function engine(){
       return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
     }
     const r = run(m.p);
-    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel, bg: r.bg, ch: r.ch},
+    return {msg: {type: 'run', id: m.id, v: m.v, w: r.w, h: r.h, on: r.on, buf: r.buf, cls: r.cls, sel: r.sel, bg: r.bg, ch: r.ch, fadeClip: r.fadeClip},
             transfer: r.sel ? [r.buf, r.cls, r.sel, r.ch] : [r.buf, r.cls, r.ch]};
   }
   return {handle};
@@ -1255,7 +1394,7 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
@@ -1368,7 +1507,8 @@ function params(){
           drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
           hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
-          clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100};
+          clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100,
+          fade: st.fade && st.finish !== 'cut' ? {px: Math.max(1, Math.round(st.fade/25.4*DPI)), out: st.fadeDir === 'out'} : null};
 }
 function schedule(){
   if (resetsReady) syncResets();
@@ -1554,6 +1694,7 @@ function buildSrc(){
 
 function paint(m){
   if (m.bg !== undefined){ bgFound = m.bg; syncBg(); } // the background the engine found on the edge
+  fadeClipped = m.fadeClip || null; syncFadeClip();
   if (m.v >= shownUntil) shownStrokes = []; // the engine has caught up with the strokes, so their trails can go
   outCanvas.width = m.w; outCanvas.height = m.h;
   const px = new Uint8ClampedArray(m.buf);
@@ -2204,7 +2345,14 @@ shirtTray.addEventListener('click', e => { const b = e.target.closest('button.sw
 $('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncShirt(); remember(); render(); if ((st.look !== 'edges' && !st.knock) || st.blkOn) schedule(); });
 
 const pxMm = v => v ? `${(v*25.4/DPI).toFixed(2)} mm · ${v} px` : 'Off'; // edge widths: print pixels at 300 dpi
-const EDGE_KEYS = {hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null};
+const EDGE_KEYS = {hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in'};
+var fadeClipped = null; // the sides of the file an outward fade ran into, from the engine (var: syncSliders may ask before this line runs)
+function syncFadeClip(){
+  const sides = st.fade && st.fadeDir === 'out' && st.finish !== 'cut' && fadeClipped ? ['top', 'right', 'bottom', 'left'].filter((s, i) => fadeClipped[i]) : [];
+  $('fadeClip').hidden = !sides.length;
+  if (sides.length) $('fadeClip').textContent = sides.length === 4 ? 'The fade runs into every side of the file: there’s no clear space past the design there. Fade inward instead.'
+    : `The fade is cut off at the ${sides.length > 1 ? sides.slice(0, -1).join(', ') + ' and ' + sides[sides.length - 1] : sides[0]} of the file: there’s no clear space there. Fade inward, or crop less tightly.`;
+}
 var backWas = 3; // the edge width to go back to when it's ticked again (var: syncKnock may ask before this line runs)
 function syncBack(){
   const c = st.backHex || st.shirt;
@@ -2232,17 +2380,19 @@ $('bgOn').addEventListener('change', e => { st.bgOn = e.target.checked; syncBg()
 $('bgPick').addEventListener('click', () => picking ? endPick() : startPick('bg'));
 $('bgAuto').addEventListener('click', () => { st.bgHex = null; syncBg(); noteChange('Background colour found on the edge'); schedule(); });
 let hardWas = 50; // the hard edge threshold to go back to when it's ticked again
-const SLIDERS = [['back', pxMm], ['bgTol', v => `${v}%`], ['sharp', v => v ? `${v}%` : 'Off'], ['sradius', v => `${(+v).toFixed(1)} px`], ['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
+const SLIDERS = [['fade', v => v ? `${v} mm` : 'Off'], ['back', pxMm], ['bgTol', v => `${v}%`], ['sharp', v => v ? `${v}%` : 'Off'], ['sradius', v => `${(+v).toFixed(1)} px`], ['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
                  ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`]];
 function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi);
   syncBg();
   for (const b of $('sharpChips').querySelectorAll('[data-sharp]')) b.setAttribute('aria-pressed', String(+b.dataset.sharp === st.sharp && (!st.sharp || Math.abs(+b.dataset.sr - st.sradius) < 1e-6)));
   $('sradiusField').hidden = !st.sharp;
   const near = st.emode === 'near'; syncChips('emodeChips', 'emode', st.emode); $('emodeAny').hidden = near; $('emodeNear').hidden = !near; $('etolField').hidden = !st.edge || !near;
+  syncChips('fadeChips', 'fadedir', st.fadeDir); $('fadeInNote').hidden = st.fadeDir === 'out'; $('fadeOutNote').hidden = st.fadeDir !== 'out'; syncFadeClip();
   syncDens(); if (typeof syncHlv === 'function' && $('hlvB')) try { syncHlv(); } catch(e){} syncBack(); $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
 $('sharpChips').addEventListener('click', e => { const b = e.target.closest('[data-sharp]'); if (!b) return; st.sharp = +b.dataset.sharp; if (st.sharp) st.sradius = +b.dataset.sr; syncSliders(); remember(); schedule(); });
 $('emodeChips').addEventListener('click', e => { const b = e.target.closest('[data-emode]'); if (!b) return; st.emode = b.dataset.emode; syncSliders(); remember(); schedule(); });
 $('hardOn').addEventListener('change', e => { st.hard = e.target.checked ? hardWas : 0; syncSliders(); remember(); schedule(); });
+$('fadeChips').addEventListener('click', e => { const b = e.target.closest('[data-fadedir]'); if (!b) return; st.fadeDir = b.dataset.fadedir; syncSliders(); remember(); schedule(); });
 $('lpiChips').addEventListener('click', e => { const b = e.target.closest('[data-lpi]'); if (!b) return; const lvl = densLevel(); st.lpi = +b.dataset.lpi; if (lvl) Object.assign(st, densVals(lvl)); syncSliders(); updateNotes(); remember(); schedule(); });
 for (const [id, fmt] of SLIDERS){
   $(id).addEventListener('input', e => {
@@ -2633,7 +2783,8 @@ function updateChecks(){
     : 'The views show black ink as the grey it prints. The tee is lighter than that grey, so the dots are unchanged.']);
   if (art.strokesN) rows.push(['info', '✎', `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}`, 'Brushed by hand in Touch up. They’re part of the saved PNG.']);
   const hardOn = st.hard && st.finish !== 'cut';
-  if (hardOn || st.edge || st.back) rows.push(['info', '→', 'Edge tidied', [hardOn ? `Hard edge at ${st.hard}%` : '', st.edge ? `trimmed ${pxMm(st.edge)} off the outline${st.emode === 'near' ? ', knock-out colour only' : ''}` : '', st.back ? `a ${pxMm(st.back)} edge in ${(st.backHex || st.shirt).toUpperCase()} added around it` : ''].filter(Boolean).join(', ').replace(/^./, ch => ch.toUpperCase()) + '.']);
+  const fadeOn = st.fade && st.finish !== 'cut';
+  if (hardOn || st.edge || st.back || fadeOn) rows.push(['info', '→', 'Edge tidied', [hardOn ? `Hard edge at ${st.hard}%` : '', fadeOn ? `faded into dots ${st.fade} mm ${st.fadeDir === 'out' ? 'outward' : 'inward'}` : '', st.edge ? `trimmed ${pxMm(st.edge)} off the outline${st.emode === 'near' ? ', knock-out colour only' : ''}` : '', st.back ? `a ${pxMm(st.back)} edge in ${(st.backHex || st.shirt).toUpperCase()} added around it` : ''].filter(Boolean).join(', ').replace(/^./, ch => ch.toUpperCase()) + '.']);
   if (s && outReady && s.total){
     const before = s.vis/s.total*100, after = lastOn/s.total*100, cut = s.vis ? Math.round((1 - lastOn/s.vis)*100) : 0;
     rows.push(cut > 0 ? ['info', '↘', `Ink area down ${cut}%`, `Ink covered ${before.toFixed(0)}% of the print box, now ${after.toFixed(0)}%. Less ink feels softer and breathes.`]
@@ -3086,7 +3237,7 @@ function settingsText(){
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (knockLook(st.look) ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.finish !== 'cut' && !hlvIdentity() ? `; halftone levels ${st.hb} ${st.hg.toFixed(2)} ${st.hw}, output ${st.hob}-${st.how}` : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
-         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
+         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.fade && st.finish !== 'cut' ? `; edge faded ${st.fade} mm ${st.fadeDir === 'out' ? 'outward' : 'inward'}` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
 let saving = false;
@@ -3174,7 +3325,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -3419,6 +3570,7 @@ const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print
   bgOn: v => v ? 'Background removed' : 'Background kept', bgTol: v => `Background tolerance ${v}%`, bgHex: v => v ? `Background colour ${v.toUpperCase()}` : 'Background colour found on the edge',
   sharp: v => v ? `Sharpen ${v}%` : 'Sharpen off', sradius: v => `Sharpen radius ${(+v).toFixed(1)} px`,
   back: v => v ? `Shirt-colour edge ${pxMm(v)}` : 'Shirt-colour edge off', backHex: v => v ? `Edge colour ${v.toUpperCase()}` : 'Edge colour follows the shirt',
+  fade: v => v ? `Fade the edge ${v} mm` : 'Fade the edge off', fadeDir: v => v === 'out' ? 'Fade the edge outward' : 'Fade the edge inward',
   hard: v => v ? `Hard edge ${v}%` : 'Hard edge off', edge: v => v ? `Trim the edge ${pxMm(v)}` : 'Trim the edge off', etol: v => `Trim colour tolerance ${v}%`, emode: v => v === 'near' ? 'Trim the knock-out colour only' : 'Trim any colour'};
 function snapshot(){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
@@ -3556,7 +3708,7 @@ const SUMS = { // short, so a title stays on one line
   rangeGroup: () => rules.length ? `${rules.length} range${rules.length === 1 ? '' : 's'}` : 'None',
   toneGroup: () => { const l = densLevel(); return `Dots · ${l ? DENS_NAMES[l] : `own ${st.drop}/${st.solid}%`}` + (hlvIdentity() ? '' : ' · levels') + (st.mid || st.con ? ' · ink ±' : ''); },
   inkGroup: () => `${st.ink === 'one' ? 'Mono' : 'Full colour'} · black ${st.blkOn ? st.blk + '%' : 'as is'}`,
-  edgeGroup: () => { const p = []; if (st.hard && st.finish !== 'cut') p.push(`hard ${st.hard}%`); if (st.edge) p.push(`trim ${st.edge} px`); if (st.back) p.push(`edge ${st.back} px`); return p.length ? p.join(' · ').replace(/^./, c => c.toUpperCase()) : 'Off'; },
+  edgeGroup: () => { const p = []; if (st.hard && st.finish !== 'cut') p.push(`hard ${st.hard}%`); if (st.fade && st.finish !== 'cut') p.push(`fade ${st.fade} mm ${st.fadeDir === 'out' ? 'out' : 'in'}`); if (st.edge) p.push(`trim ${st.edge} px`); if (st.back) p.push(`edge ${st.back} px`); return p.length ? p.join(' · ').replace(/^./, c => c.toUpperCase()) : 'Off'; },
   touchGroup: () => art && art.strokesN ? `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}` : 'None',
   checkGroup: () => checkWarns ? `${checkWarns} to check` : 'Ready'
 };
@@ -3580,7 +3732,7 @@ const SECTION_TIPS = {
   toneGroup: 'The dot controls: Dot limits (Fine, Standard, Extra safe), Drop dots under and Solid above. Then Ink amount and contrast.',
   inkGroup: 'Full colour prints the art’s own colours. Mono prints every dot in one colour.',
   touchGroup: 'Brush away stray pixels, paint over gaps or rough edges, or bring the original back. Every stroke is in History.',
-  edgeGroup: 'Tidy the outline: a hard edge with no soft pixels, and a trim off the outside of the outline, of any colour or just the knock-out colour.',
+  edgeGroup: 'Tidy the outline: a hard edge with no soft pixels, a fade into dots, and a trim off the outside of the outline, of any colour or just the knock-out colour.',
   checkGroup: 'A last check that the film will print and wash well, then save the PNG.'
 };
 try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
@@ -3658,7 +3810,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
