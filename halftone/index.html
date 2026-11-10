@@ -592,13 +592,22 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <input type="range" id="con" min="-50" max="50" step="1" value="0">
         </div>
         <div class="field dotf">
-          <div class="f-head"><label for="drop">Drop dots under</label><output id="dropOut" for="drop">15%</output></div>
-          <input type="range" id="drop" min="0" max="40" step="1" value="15">
+          <div class="f-head"><span>Dot limits</span></div>
+          <div class="chips" id="densChips" role="group" aria-label="Dot limits">
+            <button class="chip" type="button" data-dens="fine" aria-pressed="false">Fine</button>
+            <button class="chip" type="button" data-dens="std" aria-pressed="false">Standard</button>
+            <button class="chip" type="button" data-dens="safe" aria-pressed="false">Extra safe</button>
+          </div>
+          <p class="f-note" id="densNote"></p>
+        </div>
+        <div class="field dotf">
+          <div class="f-head"><label for="drop">Drop dots under</label><output id="dropOut" for="drop">14%</output></div>
+          <input type="range" id="drop" min="0" max="40" step="1" value="14">
           <p class="f-note" id="dropNote">Smallest dot about 0.32 mm across.</p>
         </div>
         <div class="field dotf">
           <div class="f-head"><label for="solid">Solid above</label><output id="solidOut" for="solid">92%</output></div>
-          <input type="range" id="solid" min="60" max="100" step="1" value="92">
+          <input type="range" id="solid" min="60" max="100" step="1" value="88">
           <p class="f-note" id="solidNote">Dots this big join into solid ink.</p>
         </div>
       </section>
@@ -699,7 +708,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>25–35 lpi suits most tees. Go to 45 or more for small or detailed prints.</li>
             <li>22.5° is the usual angle for single-colour halftones. It hides the rows of dots best.</li>
             <li>On dark tees, “Shirt shows through” lets the shirt be your darkest colour, so the print is lighter and breathes.</li>
-            <li>Keep the smallest dots, and the smallest gaps between dots, around 0.3 mm or more: tiny dots can wash off and tiny gaps fill in. At 30 lpi that’s Drop dots under 12–15% and Solid above 88–90%; at 35 lpi about 18% and 85%.</li>
+            <li>Keep the smallest dots, and the smallest gaps between dots, around 0.3 mm or more: tiny dots can wash off and tiny gaps fill in. The Dot limits buttons in Ink density do this for you: Standard suits most prints, Fine keeps more detail, Extra safe holds best. They follow the lines per inch.</li>
             <li>Press V to step through the views. Press T to flick between Transparent and the last view: the checks show every bit of ink that was removed.</li>
             <li>In Split, pick what each side shows. Zooming and dragging move both sides together, and every change updates both live.</li>
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
@@ -1124,12 +1133,20 @@ const WORKER_SRC = `const E=(${engine.toString()})();onmessage=e=>{const m=e.dat
 const DPI = 300;
 const MAX_SHORT = 40, MAX_LONG = 50; // largest print, cm, either way round
 const SHIRTS = [['Black','#111111'],['Rich black','#000000'],['White','#ffffff'],['Navy','#1d2742'],['Charcoal','#3d3d40'],['Grey marle','#a8a8a8'],['Red','#c21a26'],['Royal','#2552a8'],['Bottle green','#1f4a33'],['Natural','#eee3cc']];
-const LOOKS = {
-  shadows: {k0: 0, k1: 100, mid: 0, con: 0, drop: 15, solid: 92},
-  edges: {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 90},
-  knock: {k0: 10, k1: 70,  mid: 0, con: 0, drop: 15, solid: 92},
-  full:  {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 96}
+const LOOKS = { // Drop dots under and Solid above come from the dot limits (densVals), not the Quick start
+  shadows: {k0: 0, k1: 100, mid: 0, con: 0},
+  edges: {k0: 0,  k1: 100, mid: 0, con: 0},
+  knock: {k0: 10, k1: 70,  mid: 0, con: 0},
+  full:  {k0: 0,  k1: 100, mid: 0, con: 0}
 };
+/* Dot limits: the smallest dot and the smallest gap between dots, in mm, that each level keeps to. Drop dots under and Solid
+   above are worked out for the lines per inch (rounded so the dot or gap is never smaller than the target), so a level
+   holds when the lpi changes. Standard is the default. */
+function densVals(level, lpi){
+  const t = {fine: [0.30, 0.30], std: [0.35, 0.32], safe: [0.40, 0.36]}[level] || [0.35, 0.32], cell = 25.4/(lpi || st.lpi), a = mm => Math.PI/4*(mm/cell)**2*100;
+  return {drop: Math.min(40, Math.ceil(a(t[0]) - 1e-9)), solid: Math.max(60, Math.floor(100 - a(t[1]) + 1e-9))};
+}
+function densLevel(lpi){ for (const k of ['fine', 'std', 'safe']){ const v = densVals(k, lpi); if (v.drop === st.drop && v.solid === st.solid) return k; } return null; }
 /* The two print styles (routes). Each offers its own Quick starts, in this order; the same look can mean a little
    different thing in each (Knock out in Clean cut is a hard knock-out at the tolerance, with no dots). */
 const ROUTE_LOOKS = {dots: ['edges', 'knock', 'full'], cut: ['shadows', 'knock', 'edges']};
@@ -1144,12 +1161,13 @@ const LOOK_TEXT = {
 const routeOf = f => f === 'cut' ? 'cut' : 'dots';
 function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[routeOf(finish || st.finish)][look] || LOOK_TEXT.dots[look] || LOOK_TEXT.cut[look]; return t ? t[0] : look; }
 const $ = id => document.getElementById(id);
-const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
+const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
             edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
+try { if (!localStorage.getItem('tsw-dtf-dens1')){ if ([[15, 92], [15, 90], [15, 96]].some(([d, v]) => st.drop === d && st.solid === v)) Object.assign(st, densVals('std')); localStorage.setItem('tsw-dtf-dens1', '1'); } } catch(e){}
 function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
 const stage = $('stage'), view = $('view'), vctx = view.getContext('2d');
@@ -2097,19 +2115,30 @@ function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; 
   for (const b of $('sharpChips').querySelectorAll('[data-sharp]')) b.setAttribute('aria-pressed', String(+b.dataset.sharp === st.sharp && (!st.sharp || Math.abs(+b.dataset.sr - st.sradius) < 1e-6)));
   $('sradiusField').hidden = !st.sharp;
   const near = st.emode === 'near'; syncChips('emodeChips', 'emode', st.emode); $('emodeAny').hidden = near; $('emodeNear').hidden = !near; $('etolField').hidden = !st.edge || !near;
-  syncBack(); $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
+  syncDens(); syncBack(); $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
 $('sharpChips').addEventListener('click', e => { const b = e.target.closest('[data-sharp]'); if (!b) return; st.sharp = +b.dataset.sharp; if (st.sharp) st.sradius = +b.dataset.sr; syncSliders(); remember(); schedule(); });
 $('emodeChips').addEventListener('click', e => { const b = e.target.closest('[data-emode]'); if (!b) return; st.emode = b.dataset.emode; syncSliders(); remember(); schedule(); });
 $('hardOn').addEventListener('change', e => { st.hard = e.target.checked ? hardWas : 0; syncSliders(); remember(); schedule(); });
-$('lpiChips').addEventListener('click', e => { const b = e.target.closest('[data-lpi]'); if (!b) return; st.lpi = +b.dataset.lpi; syncSliders(); updateNotes(); remember(); schedule(); });
+$('lpiChips').addEventListener('click', e => { const b = e.target.closest('[data-lpi]'); if (!b) return; const lvl = densLevel(); st.lpi = +b.dataset.lpi; if (lvl) Object.assign(st, densVals(lvl)); syncSliders(); updateNotes(); remember(); schedule(); });
 for (const [id, fmt] of SLIDERS){
   $(id).addEventListener('input', e => {
     let v = +e.target.value;
     if (id === 'k0' && v >= st.k1){ st.k1 = Math.min(100, v + 5); }
     if (id === 'k1' && v <= st.k0){ st.k0 = Math.max(0, v - 5); }
-    st[id] = v; syncSliders(); updateNotes(); remember(); schedule();
+    if (id === 'lpi'){ const lvl = densLevel(); st.lpi = v; if (lvl) Object.assign(st, densVals(lvl)); } // the dot limits follow the lpi
+    else st[id] = v;
+    syncSliders(); updateNotes(); remember(); schedule();
   });
 }
+const DENS_NAMES = {fine: 'Fine', std: 'Standard', safe: 'Extra safe'};
+function syncDens(){
+  const lvl = densLevel();
+  for (const b of $('densChips').querySelectorAll('[data-dens]')) b.setAttribute('aria-pressed', String(b.dataset.dens === lvl));
+  $('densNote').textContent = lvl
+    ? `${DENS_NAMES[lvl]} at ${st.lpi} lpi: smallest dot about ${minDotMm().toFixed(2)} mm, smallest gap about ${minGapMm().toFixed(2)} mm.` + (lvl === 'std' ? ' Recommended for most prints.' : lvl === 'fine' ? ' The most detail in fades; test it on your fabric.' : ' Holds best in the wash and on textured fabric.')
+    : 'Your own values below. Pick a button to go back to a tested setting. Each one follows the lines per inch.';
+}
+$('densChips').addEventListener('click', e => { const b = e.target.closest('[data-dens]'); if (!b) return; Object.assign(st, densVals(b.dataset.dens)); syncSliders(); updateNotes(); remember(); schedule(); });
 function syncChips(boxId, attr, val){ for (const b of $(boxId).querySelectorAll(`[data-${attr}]`)) b.setAttribute('aria-pressed', String(b.dataset[attr] === String(val))); }
 $('angleChips').addEventListener('click', e => { const b = e.target.closest('[data-angle]'); if (!b) return; st.angle = +b.dataset.angle; syncChips('angleChips', 'angle', st.angle); remember(); schedule(); });
 $('shapeChips').addEventListener('click', e => { const b = e.target.closest('[data-shape]'); if (!b) return; st.shape = b.dataset.shape; syncChips('shapeChips', 'shape', st.shape); remember(); schedule(); });
@@ -2125,7 +2154,8 @@ $('blk').addEventListener('input', e => { st.blk = +e.target.value; syncBlk(); r
 $('looks').addEventListener('change', e => {
   if (e.target.name !== 'look') return;
   const was = st.look;
-  st.look = e.target.value; Object.assign(st, LOOKS[st.look]);
+  const lvl = densLevel() || 'std';
+  st.look = e.target.value; Object.assign(st, LOOKS[st.look], densVals(lvl));
   if (was === 'shadows' && st.look !== 'shadows') dropShadowRule(); // leaving Remove shadows takes its own range with it
   if (st.look === 'shadows') st.finish = 'cut'; else if (st.look === 'full') st.finish = 'dots'; // each is offered in one style only
   if (st.look === 'shadows') ensureShadowRule();
@@ -2958,13 +2988,13 @@ function useShared(list){ shared = [].concat(list || []).filter(isPreset); share
    style only: the file's own fixes (Levels, colour ranges, background, sharpen, edge, touch-ups, crop, size) stay. */
 const STARTERS = [
   {name: 'Black tee · halftone fade', desc: 'Black and near-black drop out to the shirt, shading turns into dots, solid colours stay solid, with a crisp outline.',
-   s: {look: 'knock', shirt: '#111111', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92, hard: 50}},
+   s: {look: 'knock', shirt: '#111111', k0: 10, k1: 70, mid: 0, con: 0, drop: 14, solid: 88, hard: 50}},
   {name: 'Glows & soft shadows · any tee', desc: 'Only the soft parts (glows, drop shadows, fades) turn into dots; solid parts stay solid. Keeps the shirt colour you have.',
-   s: {look: 'edges', k0: 0, k1: 100, mid: 0, con: 0, drop: 15, solid: 90, hard: 0}},
+   s: {look: 'edges', k0: 0, k1: 100, mid: 0, con: 0, drop: 14, solid: 88, hard: 0}},
   {name: 'White tee · halftone fade', desc: 'White and near-white drop out to the shirt, shading turns into dots, solid colours stay solid, with a crisp outline.',
-   s: {look: 'knock', shirt: '#ffffff', k0: 10, k1: 70, mid: 0, con: 0, drop: 15, solid: 92, hard: 50}},
+   s: {look: 'knock', shirt: '#ffffff', k0: 10, k1: 70, mid: 0, con: 0, drop: 14, solid: 88, hard: 50}},
   {name: 'Vintage full halftone · dark tee', desc: 'The whole design becomes dots by brightness for a worn, vintage feel on dark tees.',
-   s: {look: 'full', shirt: '#111111', k0: 0, k1: 100, mid: 0, con: 10, drop: 18, solid: 96, hard: 50}}
+   s: {look: 'full', shirt: '#111111', k0: 0, k1: 100, mid: 0, con: 10, drop: 18, solid: 92, hard: 50}}
 ];
 function starterPreset(b){ // a starter as a full preset: today's settings, with the starter's halftone style on top
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
@@ -3371,7 +3401,7 @@ function stepDone(g){
   else savePng();
   syncFoldAll();
 }
-const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
+const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
                   ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
@@ -3407,7 +3437,7 @@ const STEP_RESETS = {
   bgGroup: {name: 'Background', vals: () => ({...BG_KEYS})},
   sharpGroup: {name: 'Sharpen', vals: () => ({...SHARP_KEYS})},
   touchGroup: {name: 'Touch up', same: () => !art || !art.strokesN, reset: () => { art.strokesN = 0; rebuildEdits(art); buildSrcSoon(); }},
-  toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), drop: lookVal('drop'), solid: lookVal('solid')})},
+  toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), ...densVals('std')})},
   inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex})}
 };
 function stepIsReset(id){ const r = STEP_RESETS[id]; if (r.same) return r.same(); const v = r.vals(); return Object.keys(v).every(k => st[k] === v[k]); }
@@ -3468,6 +3498,9 @@ const TIPS = [
   ['[data-zoom="1"]', 'One file pixel per screen pixel: the true dot shapes.'],
   ['[data-zoom="2"]', 'Twice 1:1.'], ['[data-zoom="4"]', 'Four times 1:1.'],
   ['#zoomRange', 'Zoom from Fit up to 800%. Pinch, Ctrl/Cmd + scroll, or the + and − keys also zoom.'],
+  ['[data-dens="fine"]', 'Smallest dots and gaps about 0.30 mm: the most detail in fades, the least room for error.'],
+  ['[data-dens="std"]', 'Dots about 0.35 mm, gaps about 0.32 mm. Recommended for most prints.'],
+  ['[data-dens="safe"]', 'Dots about 0.40 mm, gaps about 0.36 mm: holds best in the wash and on textured fabric, with a little less detail.'],
   ['[data-finish="dots"]', 'Shading, fades and soft or partly removed areas become halftone dots. Shows the halftone tools.'],
   ['[data-finish="cut"]', 'No dots: every pixel is either solid or removed, at the threshold. Shows the clean cut tools.'],
   ['[data-angle="22.5"]', '22.5° is the usual angle for single-colour halftones.'],
