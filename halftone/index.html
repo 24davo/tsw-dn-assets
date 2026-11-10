@@ -162,7 +162,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .lv-nums input:focus{border-color:var(--ink);outline:none}
 .lv-sub{margin-top:8px;font-size:13px;font-weight:600}
 .lv-grad{height:10px;border:1px solid var(--line);border-radius:2px;background:linear-gradient(90deg,#000000,#ffffff)}
-.o-right{display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.o-right{display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-left:auto}
 #zoomRange{width:130px;margin:0 4px;accent-color:var(--ink)}
 .cal{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.55)}
 .cal-box{display:grid;gap:14px;width:min(960px,100%);max-height:100%;overflow:auto;padding:24px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
@@ -1763,8 +1763,9 @@ view.addEventListener('dblclick', e => {
 
 const cmp = $('compareBtn');
 const cmpOn = () => { if (!compare){ compare = true; syncLegend(); render(); } }, cmpOff = () => { if (compare){ compare = false; syncLegend(); render(); } };
-cmp.addEventListener('pointerdown', e => { e.preventDefault(); cmpOn(); });
-cmp.addEventListener('pointerup', cmpOff); cmp.addEventListener('pointerleave', cmpOff); cmp.addEventListener('pointercancel', cmpOff);
+cmp.addEventListener('pointerdown', e => { e.preventDefault(); try { cmp.setPointerCapture(e.pointerId); } catch(err){} cmpOn(); }); // captured: the hold lasts until the button is let go
+cmp.addEventListener('pointerup', cmpOff); cmp.addEventListener('pointercancel', cmpOff); cmp.addEventListener('lostpointercapture', cmpOff);
+cmp.addEventListener('pointerleave', e => { if (!cmp.hasPointerCapture(e.pointerId)) cmpOff(); });
 cmp.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); cmpOn(); } });
 cmp.addEventListener('keyup', cmpOff); cmp.addEventListener('blur', cmpOff);
 
