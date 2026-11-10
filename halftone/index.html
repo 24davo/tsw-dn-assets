@@ -409,6 +409,36 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
+      <section class="group step" id="cropGroup">
+        <h2>Crop</h2>
+        <div class="preset-actions">
+          <button class="chip" type="button" id="cropTrim">Trim to the art</button>
+          <button class="chip" type="button" id="cropDraw" aria-pressed="false">Draw a crop</button>
+          <button class="chip" type="button" id="cropReset" hidden>Reset crop</button>
+        </div>
+        <p class="f-note" id="cropNote">No crop: the whole file is used.</p>
+      </section>
+
+      <section class="group step" id="sizeGroup">
+        <h2>Print size</h2>
+        <div class="size">
+          <div class="num"><input type="number" id="wcm" min="5" max="500" step="1" value="250" aria-label="Print width in millimetres"><span>mm wide</span></div>
+          <span class="by">×</span>
+          <div class="num"><input type="number" id="hcm" min="5" max="500" step="1" value="250" aria-label="Print height in millimetres"><span>mm high</span></div>
+        </div>
+        <div class="chips" id="sizeChips">
+          <button class="chip" type="button" data-w="90">Chest 90 mm</button>
+          <button class="chip" type="button" data-w="280">Front 280 mm</button>
+          <button class="chip" type="button" data-w="330">Back 330 mm</button>
+          <button class="chip" type="button" data-w="max">Largest</button>
+        </div>
+        <div class="check q-note" id="qualityNote" hidden></div>
+        <label class="check-row" id="smoothRow" hidden data-tip="Redraws the art from its real pixels with smooth edges, so the blocks don’t print as steps. Leave it off for pixel-art designs."><input type="checkbox" id="smoothBtn"> Smooth the enlarged pixels</label>
+        <p class="f-note" id="sizeNote">Saved at 300 dpi. Largest print is 400 × 500 mm either way round.</p>
+        <p class="f-note">Type either side and the other follows. The original art is resized to this first, then Levels, colour ranges and dots are worked out at this size, so the dots are true to the print.</p>
+        <p class="f-note" id="lifeNote"></p>
+      </section>
+
       <section class="group step" id="finishGroup">
         <h2>Halftone dots</h2>
         <div class="field" id="cutField" hidden>
@@ -442,16 +472,6 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group step" id="cropGroup">
-        <h2>Crop</h2>
-        <div class="preset-actions">
-          <button class="chip" type="button" id="cropTrim">Trim to the art</button>
-          <button class="chip" type="button" id="cropDraw" aria-pressed="false">Draw a crop</button>
-          <button class="chip" type="button" id="cropReset" hidden>Reset crop</button>
-        </div>
-        <p class="f-note" id="cropNote">No crop: the whole file is used.</p>
-      </section>
-
       <section class="group step" id="bgGroup">
         <h2>Background</h2>
         <p class="f-note">For JPGs and screenshots on a plain background. The background colour is cleared only where it joins the outside edge, so the same colour inside the design (white text, eyes, highlights) stays. Spots of it shut inside a letter (the middle of an O) stay too: brush them away with the Eraser in Touch up.</p>
@@ -465,26 +485,6 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <p class="f-note">How close a colour must be to the background to go. Raise it for noisy JPGs; lower it if parts of the design start to go too.</p>
           </div>
         </div>
-      </section>
-
-      <section class="group step" id="sizeGroup">
-        <h2>Print size</h2>
-        <div class="size">
-          <div class="num"><input type="number" id="wcm" min="5" max="500" step="1" value="250" aria-label="Print width in millimetres"><span>mm wide</span></div>
-          <span class="by">×</span>
-          <div class="num"><input type="number" id="hcm" min="5" max="500" step="1" value="250" aria-label="Print height in millimetres"><span>mm high</span></div>
-        </div>
-        <div class="chips" id="sizeChips">
-          <button class="chip" type="button" data-w="90">Chest 90 mm</button>
-          <button class="chip" type="button" data-w="280">Front 280 mm</button>
-          <button class="chip" type="button" data-w="330">Back 330 mm</button>
-          <button class="chip" type="button" data-w="max">Largest</button>
-        </div>
-        <div class="check q-note" id="qualityNote" hidden></div>
-        <label class="check-row" id="smoothRow" hidden data-tip="Redraws the art from its real pixels with smooth edges, so the blocks don’t print as steps. Leave it off for pixel-art designs."><input type="checkbox" id="smoothBtn"> Smooth the enlarged pixels</label>
-        <p class="f-note" id="sizeNote">Saved at 300 dpi. Largest print is 400 × 500 mm either way round.</p>
-        <p class="f-note">Type either side and the other follows. The original art is resized to this first, then Levels, colour ranges and dots are worked out at this size, so the dots are true to the print.</p>
-        <p class="f-note" id="lifeNote"></p>
       </section>
 
       <section class="group step" id="sharpGroup">
@@ -697,7 +697,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
-            <li>JPG on a white background: tick Remove the background (step 4). To change a colour, e.g. black text to white for a dark tee, add a colour range, pick the colour and choose Recolour.</li>
+            <li>JPG on a white background: tick Remove the background (step 5). To change a colour, e.g. black text to white for a dark tee, add a colour range, pick the colour and choose Recolour.</li>
             <li>Open several designs at once: each opens in its own tab (+ or Open art, or drop several files) with its own settings, touch-ups and history. A dot on a tab means it isn’t saved yet.</li>
             <li>Touch up brushes: Eraser clears stray pixels, Paint fills gaps in a colour Alt-clicked from the art, Restore brings the original back. [ and ] change the size, hold Space to move.</li>
             <li>For a crisp outline on a dark tee, tick Hard edge and add a little Trim the edge in the Edge step. Any colour trims a background-removal fringe; Only near the knock-out colour keeps dark parts like tyres.</li>
@@ -1168,7 +1168,7 @@ bus = makeBus();
 let watchT = 0, slowT = 0, autoRestarts = 0;
 function watchRun(){ clearTimeout(watchT); clearTimeout(slowT); slowT = setTimeout(() => setSlow(true), 6000); watchT = setTimeout(() => engineTrouble('slow'), 20000*Math.pow(2, autoRestarts)); }
 function runSettled(){ clearTimeout(watchT); clearTimeout(slowT); setSlow(false); }
-function setSlow(on){ $('busy').classList.toggle('slow', on); $('redrawBtn').hidden = !on; $('busyTxt').textContent = on ? 'Still updating…' : 'Updating…'; }
+function setSlow(on){ const b = $('busy'), rb = $('redrawBtn'), t = $('busyTxt'); if (b) b.classList.toggle('slow', on); if (rb) rb.hidden = !on; if (t) t.textContent = on ? 'Still updating…' : 'Updating…'; }
 function engineTrouble(kind){
   if (autoRestarts >= 2){
     if (kind === 'slow'){ setSlow(true); $('busyTxt').textContent = 'Still updating: big prints take longer on some computers.'; return; }
@@ -1188,7 +1188,7 @@ function restartEngine(msg){ // a fresh engine, the art sent again, then the cur
 $('redrawBtn').addEventListener('click', () => { autoRestarts = 0; restartEngine('Redrawn with your settings.'); });
 function onMsg(m){
   if (m.type === 'src'){ if (m.v === srcV){ srcStats = m.stats; hist = m.stats.hist; drawHisto(); } return; }
-  runSettled(); if (m.type !== 'err') autoRestarts = 0;
+  try { runSettled(); } catch(e){} if (m.type !== 'err') autoRestarts = 0;
   if (m.type === 'err'){ running = false; pending = false; $('busy').hidden = true; toast('That didn’t work: ' + m.msg); flushIdle(); return; }
   running = false;
   if (m.v === srcV) paint(m);
@@ -1235,6 +1235,7 @@ function setWidth(cm, quiet, typing){
   $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px, saved at 300 dpi. Largest print is 400 × 500 mm either way round.`;
   $('sizeRead').textContent = `${toMm(w)} × ${toMm(h)} mm · ${outW()} × ${outH()} px`;
   if ($('fileSize')) $('fileSize').textContent = `${toMm(w)} × ${toMm(h)} mm`;
+  if ($('sizeSum')) $('sizeSum').textContent = `${toMm(w)} × ${toMm(h)} mm`;
   syncQuality();
   if (resetsReady) syncResets();
 }
@@ -2625,7 +2626,7 @@ $('allSaveBtn').addEventListener('click', async () => {
   let saved = 0;
   for (const d of list){
     switchTo(d);
-    $('busy').textContent = `Saving ${saved + 1} of ${list.length}…`;
+    $('busyTxt').textContent = `Saving ${saved + 1} of ${list.length}…`;
     if (!(await savePng())) break;
     saved++;
   }
@@ -2804,7 +2805,7 @@ async function savePng(){ // answers true once the PNG is saved
   let ok = false;
   try {
     await idle();
-    $('busy').textContent = 'Preparing the PNG…'; $('busy').hidden = false;
+    $('busyTxt').textContent = 'Preparing the PNG…'; $('busy').hidden = false;
     await new Promise(r => setTimeout(r, 30));
     const raw = await new Promise((res, rej) => outCanvas.toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
     const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop DTF Halftone'], ['Comment', settingsText()]]);
@@ -2813,7 +2814,7 @@ async function savePng(){ // answers true once the PNG is saved
   } catch(err){
     $('busy').hidden = true; toast(err && err.message ? err.message : 'Saving didn’t work.');
   } finally {
-    $('busy').textContent = 'Updating…'; saving = false; $('saveBtn').disabled = !outReady;
+    $('busyTxt').textContent = 'Updating…'; saving = false; $('saveBtn').disabled = !outReady;
   }
   if (ok){ commitStep(); unsaved = false; renderTabs(); }
   return ok;
@@ -3278,6 +3279,7 @@ for (const g of document.querySelectorAll('.panel > .group')){
   if (g.classList.contains('step')){ const n = document.createElement('span'); n.className = 'step-n'; n.setAttribute('aria-hidden', 'true'); b.appendChild(n); }
   b.appendChild(document.createTextNode(h.textContent));
   if (g.id === 'routeGroup') b.insertAdjacentHTML('beforeend', '<span class="sec-sum" id="routeSum"></span>'); // the choice, shown while folded
+  if (g.id === 'sizeGroup') b.insertAdjacentHTML('beforeend', `<span class="sec-sum" id="sizeSum">${$('sizeRead').textContent.split(' · ')[0]}</span>`); // the print size, shown while folded
   if (SECTION_TIPS[g.id]) b.dataset.tip = SECTION_TIPS[g.id];
   h.textContent = ''; h.appendChild(b);
   const set = open => { g.classList.toggle('folded', !open); b.setAttribute('aria-expanded', String(open)); };
