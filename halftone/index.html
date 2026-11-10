@@ -3732,28 +3732,45 @@ function savePresets(){ if (!writeJSON('tsw-dtf-presets', presets)) toast('This 
 function putLocal(p){ const i = presets.findIndex(x => sameName(x.name, p.name)); if (i >= 0) presets[i] = p; else presets.push(p); savePresets(); return i >= 0; }
 function dropLocal(name){ const i = presets.findIndex(x => sameName(x.name, name)); if (i >= 0){ presets.splice(i, 1); savePresets(); } }
 function useShared(list){ shared = [].concat(list || []).filter(isPreset); sharedAt = Date.now(); writeJSON('tsw-dtf-shared', shared); writeJSON('tsw-dtf-shared-at', sharedAt); }
-/* Starters: four built-in set-ups at 30 lpi (go to 35 by hand), on every computer, read-only. They set the halftone
-   style only: the file's own fixes (Levels, colour ranges, background, sharpen, edge, touch-ups, crop, size) stay. */
+/* Starters: ten built-in set-ups at 30 lpi (go to 35 by hand), on every computer, read-only. Each is a whole halftone
+   style (Quick start, fade range, rich dots, Fade the edge, and sometimes a part of its own), so flipping through them
+   never leaves bits of the last one behind. The file's own fixes (Levels, its own parts, background, sharpen, touch-ups,
+   crop, size) stay. Tested on Elefus (flames + grey skull), a bright boxed picture and a blue gradient, 11 Nov 2026. */
 const STARTERS = [
-  {name: 'Black tee · halftone fade', desc: 'Black and near-black drop out to the shirt, shading turns into dots, solid colours stay solid, with a crisp outline.',
-   s: {look: 'knock', shirt: '#111111', k0: 10, k1: 70, mid: 0, con: 0, drop: 14, solid: 88, hard: 50}},
+  {name: 'Black tee · everyday', desc: 'Start here. Only the darkest shading turns into dots; colours stay solid and bright.',
+   s: {look: 'deep', shirt: '#111111', k0: 8, k1: 30}},
+  {name: 'Black tee · medium fade', desc: 'Shadows and darker colours fade into the shirt through dots; bright colours stay solid.',
+   s: {look: 'knock', shirt: '#111111', k0: 6, k1: 50, rich: true}},
+  {name: 'Black tee · long fade (flames, smoke, glows)', desc: 'A long, soft fade into the shirt with rich colour dots. Best for flames, smoke, glows and light effects.',
+   s: {look: 'knock', shirt: '#111111', k0: 5, k1: 72, rich: true}},
+  {name: 'Black tee · long fade, greys stay solid', desc: 'The long fade for colours, while greys and whites (skulls, metal, lettering) stay solid. Adds a Greys part you can adjust.',
+   s: {look: 'knock', shirt: '#111111', k0: 5, k1: 72, rich: true}, rules: [{type: 'greys', action: 'ramp', k0: 10, k1: 24}]},
+  {name: 'Photo or boxed picture · soft dotted edge', desc: 'The picture stays solid and its hard outside edge fades into the shirt over 6 mm of dots. Keeps the shirt colour you have.',
+   s: {look: 'deep', k0: 8, k1: 30, fade: 6, fadeDir: 'in'}},
   {name: 'Glows & soft shadows · any tee', desc: 'Only the soft parts (glows, drop shadows, fades) turn into dots; solid parts stay solid. Keeps the shirt colour you have.',
-   s: {look: 'edges', k0: 0, k1: 100, mid: 0, con: 0, drop: 14, solid: 88, hard: 0}},
-  {name: 'White tee · halftone fade', desc: 'White and near-white drop out to the shirt, shading turns into dots, solid colours stay solid, with a crisp outline.',
-   s: {look: 'knock', shirt: '#ffffff', k0: 10, k1: 70, mid: 0, con: 0, drop: 14, solid: 88, hard: 50}},
-  {name: 'Vintage full halftone · dark tee', desc: 'The whole design becomes dots by brightness for a worn, vintage feel on dark tees.',
-   s: {look: 'full', shirt: '#111111', k0: 0, k1: 100, mid: 0, con: 10, drop: 18, solid: 92, hard: 50}}
+   s: {look: 'edges', k0: 0, k1: 100, hard: 0}},
+  {name: 'White tee · everyday', desc: 'Only the palest shading turns into dots; colours stay solid.',
+   s: {look: 'deep', shirt: '#ffffff', k0: 8, k1: 30}},
+  {name: 'White tee · halftone fade', desc: 'White and near-white drop out to the shirt, pale shading turns into dots, solid colours stay solid.',
+   s: {look: 'knock', shirt: '#ffffff', k0: 10, k1: 70}},
+  {name: 'Coloured tee · blend into the shirt', desc: 'Pick the shirt colour first. That colour drops out of the design and shading near it turns into dots.',
+   s: {look: 'knock', k0: 10, k1: 60}},
+  {name: 'Vintage full halftone · dark tee', desc: 'The whole design becomes dots by brightness, in rich colour, for a worn, vintage feel on dark tees.',
+   s: {look: 'full', shirt: '#111111', k0: 0, k1: 55, rich: true, drop: 18, solid: 92}} // full ink from 55%: at 100% a dark design (Elefus) nearly vanished
 ];
 function starterPreset(b){ // a starter as a full preset: today's settings, with the starter's halftone style on top
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
-  Object.assign(s, {finish: 'dots', lpi: 30, angle: 22.5, shape: 'round', ink: 'art', cut: 50, ktol: 8}, b.s);
+  Object.assign(s, {finish: 'dots', lpi: 30, angle: 22.5, shape: 'round', ink: 'art', cut: 50, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88, hard: 50, rich: false, clean: false, crisp: true, speck: true, fade: 0, fadeDir: 'in'}, b.s);
   s.knock = null; s.knockFrom = 'shirt'; // the knock-out follows the shirt
-  return {name: b.name, desc: b.desc, v: 1, s, levels: {...lv}, rules: rules.filter(R => !R.area).map(R => ({...R, samples: [...R.samples]}))};
+  // the file's own parts stay; a part the last starter brought goes, and this starter's own come in
+  const own = rules.filter(R => !R.area && !R.starter).map(R => ({...R, samples: [...R.samples]}));
+  const mine = (b.rules || []).map(R => ({...newRule(R.type, R.action), ...R, starter: true}));
+  return {name: b.name, desc: b.desc, v: 1, s, levels: {...lv}, rules: own.concat(mine).slice(0, MAX_RULES)};
 }
 function capturePreset(name, withSize){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   s.knock = st.knock; s.knockFrom = knockFrom;
-  const p = {name, v: 1, s, levels: {...lv}, rules: rules.filter(R => !R.area).map(R => ({...R, samples: [...R.samples]}))};
+  const p = {name, v: 1, s, levels: {...lv}, rules: rules.filter(R => !R.area).map(R => { const c = {...R, samples: [...R.samples]}; delete c.starter; return c; })};
   if (withSize && art) p.size = {w: +st.widthCm.toFixed(2), h: +(st.widthCm*art.h/art.w).toFixed(2)};
   return p;
 }
