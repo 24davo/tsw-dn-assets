@@ -613,6 +613,14 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <span class="colorbox"><input type="color" id="inkPick" value="#ffffff" aria-label="Ink colour"></span>
           <span id="inkTxt">Every dot prints in this colour.</span>
         </div>
+        <div class="lv-sub">Black ink</div>
+        <label class="check-row"><input type="checkbox" id="blkOn"> Allow for DTF black ink</label>
+        <div class="field" id="blkField">
+          <div class="f-head"><label for="blk">Black ink prints as</label><output id="blkOut" for="blk">20% grey</output></div>
+          <input type="range" id="blk" min="5" max="40" step="1" value="20">
+          <div class="knock"><span class="eswatch" id="blkSwatch" aria-hidden="true"></span><span id="blkTxt">#333333</span></div>
+        </div>
+        <p class="f-note" id="blkNote">DTF black ink can’t match a dyed black tee: it prints as a dark matt grey. With this on, On shirt and On white show ink no darker than this grey. On tees darker than it, colours darker than the ink can print get fewer dots (or are removed in Clean cut), so the tee’s own black does the darkest parts instead of grey patches. The saved PNG keeps the art’s colours. Set once for your printer: it’s remembered on this computer.</p>
       </section>
 
       <section class="group step" id="edgeGroup">
@@ -708,6 +716,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Print style starts open; the other sections start folded: click a title to open it, or Expand all. Hover over anything for a short tip.</li>
             <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z. Revert (top of Tools) goes back to the design as it was opened; Reset to defaults puts the tool’s own settings back.</li>
             <li>If the preview ever seems stuck, it restarts itself; after a few seconds “Updating…” also offers Redraw.</li>
+            <li>DTF black ink prints as a dark matt grey, never as black as a dyed black tee. Keep “Allow for DTF black ink” on (Ink colour step): the views then show the real grey, and on black tees the darkest colours become sparse dots so the tee does the black. A Shirt-colour edge on a black tee prints in that grey too, so keep it thin.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
         </details>
@@ -907,6 +916,12 @@ function engine(){
     // 100% = as different from the knock-out colour as a colour can be (white on a black shirt, black on a white one)
     const far = lum ? Math.max(kl, 255 - kl) : Math.max(kr, 255 - kr, kg, 255 - kg, kb, 255 - kb);
     const one = p.one, ir = p.ink[0], ig = p.ink[1], ib = p.ink[2];
+    // DTF black ink: the darkest the ink prints is a dark matt grey (pb), lighter than a dyed black tee (ys). A colour T prints as
+    // P = max(T, pb) per channel; mixing P dots with the tee to look like T takes coverage (Y(T) - Y(tee)) / (Y(P) - Y(tee)), in
+    // linear light. Only on tees darker than the ink black, only with the art's own colours (not Mono).
+    const blk = p.inkBlack && p.inkBlack.ys < p.inkBlack.yb && !one ? p.inkBlack : null;
+    const L2 = blk ? new Float32Array(256) : null;
+    if (L2) for (let v = 0; v < 256; v++){ const u = v/255; L2[v] = u <= 0.04045 ? u/12.92 : Math.pow((u + 0.055)/1.055, 2.4); }
     const cut = p.cut || 0; // clean cut: no screen, pixels at least this solid print solid, the rest is removed
     const hard = p.hard || 0; // hard edge (dots only): see-through pixels at least this solid become solid, the rest go, before any dots
     let lv = null; // Levels (like Photoshop's), applied to the colours before anything else
@@ -953,6 +968,7 @@ function engine(){
           }
         }
         let nd = 0; // when set: this pixel gets no dots, and prints solid if at least this solid
+        let kept = false; // selected by a Keep solid range
         if (nodr.length){
           const L1 = (0.299*r + 0.587*g + 0.114*b)/255;
           for (const k of nodr){
@@ -983,9 +999,19 @@ function engine(){
             if (s <= 0) continue;
             if (R.action === 'remove') c *= 1 - s;
             else if (R.action === 'fade') c *= 1 - s*(1 - R.keep);
-            else c += ((a >= 128 ? 1 : 0) - c)*s; // keep solid: full ink wherever the art is at least half opaque
+            else { c += ((a >= 128 ? 1 : 0) - c)*s; if (s >= 0.5) kept = true; } // keep solid: full ink wherever the art is at least half opaque
           }
           if (c <= 0){ cls[i >> 2] = 1; continue; }
+        }
+        if (blk && !kept){ // a part kept solid by hand stays as it is
+          const R8 = r < 0 ? 0 : r > 255 ? 255 : r | 0, G8 = g < 0 ? 0 : g > 255 ? 255 : g | 0, B8 = b < 0 ? 0 : b > 255 ? 255 : b | 0;
+          const yt = 0.2126*L2[R8] + 0.7152*L2[G8] + 0.0722*L2[B8];
+          const yp = 0.2126*L2[R8 > blk.rgb[0] ? R8 : blk.rgb[0]] + 0.7152*L2[G8 > blk.rgb[1] ? G8 : blk.rgb[1]] + 0.0722*L2[B8 > blk.rgb[2] ? B8 : blk.rgb[2]];
+          if (yt < yp){ // greys and near-blacks only: coloured darks are printed with the colour inks and are meant to show
+            const mx = R8 > G8 ? (R8 > B8 ? R8 : B8) : (G8 > B8 ? G8 : B8), mn = R8 < G8 ? (R8 < B8 ? R8 : B8) : (G8 < B8 ? G8 : B8);
+            const wn = 1 - (mx - mn)/255/0.15, f = (yt - blk.ys)/(yp - blk.ys);
+            if (wn > 0){ const fe = 1 - (wn > 1 ? 1 : wn)*(1 - (f < 0 ? 0 : f)); if (fe <= 0){ cls[i >> 2] = 1; continue; } c *= fe; }
+          }
         }
         if (nd){ if (c < nd){ cls[i >> 2] = 1; continue; } c = 1; } // No dots: solid or removed, never screened
         else c = lut[(c*1024) | 0];
@@ -1120,15 +1146,32 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
-const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex'];
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 
 const stage = $('stage'), view = $('view'), vctx = view.getContext('2d');
 const srcCanvas = document.createElement('canvas'), srcCtx = srcCanvas.getContext('2d', {willReadFrequently: true});
 const outCanvas = document.createElement('canvas'), outCtx = outCanvas.getContext('2d');
+const inkCanvas = document.createElement('canvas'), inkCtx = inkCanvas.getContext('2d'); // the print as it looks: ink no darker than the printed black
+let viewMips = null;
+function buildInkView(px, W, H){ // greys and near-blacks lifted to the printed black, as in the dot maths; colours left as they are
+  if (!st.blkOn || !W){ viewMips = null; inkCanvas.width = inkCanvas.height = 1; return; }
+  const pb = Math.round(st.blk/100*255), v = new Uint8ClampedArray(px);
+  for (let i = 0; i < v.length; i += 4){
+    if (!v[i+3]) continue;
+    const r = v[i], g = v[i+1], b = v[i+2];
+    if (r >= pb && g >= pb && b >= pb) continue;
+    const mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b), wn = 1 - (mx - mn)/255/0.15;
+    if (wn <= 0) continue;
+    const w = wn > 1 ? 1 : wn;
+    if (r < pb) v[i] = r + (pb - r)*w; if (g < pb) v[i+1] = g + (pb - g)*w; if (b < pb) v[i+2] = b + (pb - b)*w;
+  }
+  inkCanvas.width = W; inkCanvas.height = H; inkCtx.putImageData(new ImageData(v, W, H), 0, 0);
+  viewMips = buildMips(inkCanvas);
+}
 const masks = {base: {canvas: document.createElement('canvas'), mips: null, key: -1}, map: {canvas: document.createElement('canvas'), mips: null, key: -1}};
 const origCanvas = document.createElement('canvas'), origCtx = origCanvas.getContext('2d');
 let lastCls = null, paintN = 0, origFor = 0, origMips = null;
@@ -1197,6 +1240,9 @@ function onMsg(m){
 function flushIdle(){ while (idleWaiters.length) idleWaiters.shift()(); }
 function idle(){ return (running || pending) ? new Promise(r => idleWaiters.push(r)) : Promise.resolve(); }
 
+const linY = ([r, g, b]) => { const l = v => { v /= 255; return v <= 0.04045 ? v/12.92 : Math.pow((v + 0.055)/1.055, 2.4); }; return 0.2126*l(r) + 0.7152*l(g) + 0.0722*l(b); };
+const blkHex = () => { const v = Math.round(st.blk/100*255); return rgbHex(v, v, v); }; // the grey DTF black ink prints as
+const blkActs = () => st.blkOn && linY(hexRgb(st.shirt)) < linY(hexRgb(blkHex())); // the tee is darker than the printed black
 function hexRgb(h){ const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function rgbHex(r, g, b){ return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join(''); }
 function params(){
@@ -1206,7 +1252,7 @@ function params(){
           gamma: st.finish === 'cut' ? 1 : Math.pow(2, -st.mid/50), contrast: st.finish === 'cut' ? 1 : Math.pow(2, st.con/50), // Ink density is a halftone step
           drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
-          levels: lvIdentity() ? null : {...lv}, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100};
+          levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100};
 }
 function schedule(){
   if (resetsReady) syncResets();
@@ -1339,9 +1385,10 @@ function prepareViews(){
 }
 function levelsFor(kind){
   if (kind === 'orig' || kind === 'origclear' || kind === 'origwhite') return srcMips;
-  if (kind === 'clear' || kind === 'white') return outMips || srcMips;
+  if (kind === 'clear') return outMips || srcMips; // the film itself: the PNG's own colours
+  if (kind === 'white') return viewMips || outMips || srcMips;
   if (kind === 'origbase') return origMips;
-  if (kind === 'shirt') return outMips || srcMips;
+  if (kind === 'shirt') return viewMips || outMips || srcMips;
   if (kind === 'sel') return rules.length ? selMips : null;
   return masks[kind].mips || outMips;
 }
@@ -1378,8 +1425,9 @@ function paint(m){
   if (m.bg !== undefined){ bgFound = m.bg; syncBg(); } // the background the engine found on the edge
   if (m.v >= shownUntil) shownStrokes = []; // the engine has caught up with the strokes, so their trails can go
   outCanvas.width = m.w; outCanvas.height = m.h;
-  outCtx.putImageData(new ImageData(new Uint8ClampedArray(m.buf), m.w, m.h), 0, 0);
-  outMips = buildMips(outCanvas);
+  const px = new Uint8ClampedArray(m.buf);
+  outCtx.putImageData(new ImageData(px, m.w, m.h), 0, 0);
+  outMips = buildMips(outCanvas); buildInkView(px, m.w, m.h);
   lastCls = new Uint8Array(m.cls); lastSel = m.sel ? new Uint8Array(m.sel) : null; paintN++;
   prepareViews();
   outReady = true; lastOn = m.on;
@@ -2010,8 +2058,8 @@ function syncShirt(){
   $('shirtPick').value = st.shirt;
   syncKnock();
 }
-shirtTray.addEventListener('click', e => { const b = e.target.closest('button.sw'); if (!b) return; st.shirt = b.dataset.hex; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
-$('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncShirt(); remember(); render(); if (st.look !== 'edges' && !st.knock) schedule(); });
+shirtTray.addEventListener('click', e => { const b = e.target.closest('button.sw'); if (!b) return; st.shirt = b.dataset.hex; syncShirt(); remember(); render(); if ((st.look !== 'edges' && !st.knock) || st.blkOn) schedule(); });
+$('shirtPick').addEventListener('input', e => { st.shirt = e.target.value; syncShirt(); remember(); render(); if ((st.look !== 'edges' && !st.knock) || st.blkOn) schedule(); });
 
 const pxMm = v => v ? `${(v*25.4/DPI).toFixed(2)} mm · ${v} px` : 'Off'; // edge widths: print pixels at 300 dpi
 const EDGE_KEYS = {hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null};
@@ -2067,7 +2115,13 @@ $('angleChips').addEventListener('click', e => { const b = e.target.closest('[da
 $('shapeChips').addEventListener('click', e => { const b = e.target.closest('[data-shape]'); if (!b) return; st.shape = b.dataset.shape; syncChips('shapeChips', 'shape', st.shape); remember(); schedule(); });
 $('inkChips').addEventListener('click', e => { const b = e.target.closest('[data-ink]'); if (!b) return; st.ink = b.dataset.ink; syncInk(); remember(); schedule(); });
 $('inkPick').addEventListener('input', e => { st.inkHex = e.target.value; remember(); schedule(); });
-function syncInk(){ syncChips('inkChips', 'ink', st.ink); $('inkRow').hidden = st.ink !== 'one'; $('inkPick').value = st.inkHex; }
+function syncInk(){ syncChips('inkChips', 'ink', st.ink); $('inkRow').hidden = st.ink !== 'one'; $('inkPick').value = st.inkHex; syncBlk(); }
+function syncBlk(){
+  $('blkOn').checked = st.blkOn; $('blkField').hidden = !st.blkOn;
+  $('blk').value = st.blk; $('blkOut').textContent = `${st.blk}% grey`; $('blkTxt').textContent = blkHex().toUpperCase(); $('blkSwatch').style.background = blkHex();
+}
+$('blkOn').addEventListener('change', e => { st.blkOn = e.target.checked; syncBlk(); remember(); schedule(); });
+$('blk').addEventListener('input', e => { st.blk = +e.target.value; syncBlk(); remember(); schedule(); });
 $('looks').addEventListener('change', e => {
   if (e.target.name !== 'look') return;
   const was = st.look;
@@ -2352,6 +2406,9 @@ function updateChecks(){
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (st.bgOn && Array.isArray(bgFound)) rows.push(['info', '✂', `Background removed (${(st.bgHex || rgbHex(bgFound[0], bgFound[1], bgFound[2])).toUpperCase()})`, `Cleared where it joins the outside edge, within ${st.bgTol}%. The same colour inside the design stays.`]);
   if (st.sharp) rows.push(['info', '↗', `Sharpened ${st.sharp}% at ${(+st.sradius).toFixed(1)} px`, 'Unsharp mask on the art at print size, before the dots.']);
+  if (st.blkOn) rows.push(['info', '◐', `DTF black ink allowed for (${blkHex().toUpperCase()})`, blkActs() && st.ink !== 'one'
+    ? 'On this tee, colours darker than the ink can print got fewer dots, so the tee’s black does the darkest parts. The views show ink no darker than this grey.'
+    : 'The views show black ink as the grey it prints. The tee is lighter than that grey, so the dots are unchanged.']);
   if (art.strokesN) rows.push(['info', '✎', `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}`, 'Brushed by hand in Touch up. They’re part of the saved PNG.']);
   const hardOn = st.hard && st.finish !== 'cut';
   if (hardOn || st.edge || st.back) rows.push(['info', '→', 'Edge tidied', [hardOn ? `Hard edge at ${st.hard}%` : '', st.edge ? `trimmed ${pxMm(st.edge)} off the outline${st.emode === 'near' ? ', knock-out colour only' : ''}` : '', st.back ? `a ${pxMm(st.back)} edge in ${(st.backHex || st.shirt).toUpperCase()} added around it` : ''].filter(Boolean).join(', ').replace(/^./, ch => ch.toUpperCase()) + '.']);
@@ -2794,7 +2851,7 @@ function settingsText(){
     (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
-         (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') +
+         (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
          (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
