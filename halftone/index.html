@@ -205,6 +205,9 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .choice[aria-pressed="true"]{border-color:var(--ink);background:var(--soft);box-shadow:inset 0 0 0 1px var(--ink)}
 .choice-t{font-size:15px;font-weight:800;letter-spacing:-.01em}
 .choice-d{font-size:12px;color:var(--muted);line-height:1.4}
+.route{gap:10px}
+.route .choice{padding:14px 12px}
+.route .choice-t{font-size:17px}
 .field{display:grid;gap:6px}
 .f-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .f-head label,.f-head span{font-weight:600;font-size:13px}
@@ -350,6 +353,15 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
 
+      <section class="group route" id="routeGroup">
+        <h2>Print style</h2>
+        <div class="choices" id="finishChips" role="group" aria-label="Print style">
+          <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone</span><span class="choice-d">Shading, fades and soft edges turn into dots.</span></button>
+          <button class="choice" type="button" data-finish="cut"><span class="choice-t">Clean cut</span><span class="choice-d">No dots. Every pixel prints solid or is removed.</span></button>
+        </div>
+        <p class="f-note">Choose this first. The tools below change to suit it; the ones both styles use stay.</p>
+      </section>
+
       <section class="group" id="presetGroup">
         <h2>Presets</h2>
         <select class="preset-sel" id="presetSel" aria-label="Choose a preset"><option value="">Choose a preset…</option></select>
@@ -394,12 +406,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       </section>
 
       <section class="group step" id="finishGroup">
-        <h2>Print style</h2>
-        <p class="f-note">Decide this first: everything after it is shown in this style.</p>
-        <div class="choices" id="finishChips" role="group" aria-label="Print style">
-          <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone dots</span><span class="choice-d">Shading, fades and soft edges turn into dots. Set the dot size, angle and shape below.</span></button>
-          <button class="choice" type="button" data-finish="cut"><span class="choice-t">Clean cut</span><span class="choice-d">No dots. Every pixel prints solid or is removed at the threshold below.</span></button>
-        </div>
+        <h2>Halftone dots</h2>
         <div class="field" id="cutField" hidden>
           <div class="f-head"><label for="cut">Threshold</label><output id="cutOut" for="cut">50%</output></div>
           <input type="range" id="cut" min="5" max="95" step="1" value="50">
@@ -615,7 +622,6 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           </div>
           <p class="f-note">Like a Threshold action on the transparency. The film never has half see-through pixels (they’d print as a white haze), but with dots, soft edges and glows turn into dots. Hard edge makes them fully solid or removes them instead, for a crisp outline. Pixels at least this solid stay.</p>
         </div>
-        <p class="f-note" id="hardCut" hidden>Hard edge: Clean cut already makes every edge hard. Set how solid a pixel must be with the Threshold in Print style.</p>
         <div class="field">
           <div class="f-head"><label for="edge">Trim the edge</label><output id="edgeOut" for="edge">Off</output></div>
           <input type="range" id="edge" min="0" max="24" step="1" value="0">
@@ -624,7 +630,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <button class="chip" type="button" data-emode="near">Only near <span class="eswatch" id="edgeSwatch" aria-hidden="true"></span> <span id="edgeHex">#111111</span></button>
           </div>
           <p class="f-note" id="emodeAny">Trims every colour off the outline, up to this far in, like Photoshop’s Select › Modify › Contract. The print is then ready for any shirt colour: good for the leftover fringe after a background removal. 1 px is 0.08 mm.</p>
-          <p class="f-note" id="emodeNear" hidden>Trims only colours close to the knock-out colour where they touch the outside. Further in, the same colour stays: black tyres keep their ink, and only their outer rim and the dark fringe go. If Knock out is taking the tyres too, choose Quick start “Fix soft edges” (no knock-out).</p>
+          <p class="f-note" id="emodeNear" hidden>Trims only colours close to the knock-out colour where they touch the outside. Further in, the same colour stays: black tyres keep their ink, and only their outer rim and the dark fringe go. If Knock out is taking the tyres too, choose the Quick start with no knock-out (Fix soft edges, or Clean up only for Clean cut).</p>
         </div>
         <div class="field" id="etolField" hidden>
           <div class="f-head"><label for="etol">Colour tolerance</label><output id="etolOut" for="etol">30%</output></div>
@@ -691,9 +697,10 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Open several designs at once: each opens in its own tab (+ or Open art, or drop several files) with its own settings, touch-ups and history. A dot on a tab means it isn’t saved yet.</li>
             <li>Touch up brushes: Eraser clears stray pixels, Paint fills gaps in a colour Alt-clicked from the art, Restore brings the original back. [ and ] change the size, hold Space to move.</li>
             <li>For a crisp outline on a dark tee, tick Hard edge and add a little Trim the edge in the Edge step. Any colour trims a background-removal fringe; Only near the knock-out colour keeps dark parts like tyres.</li>
-            <li>For a quick black-shirt clean-up with no halftone, use Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
+            <li>For a quick black-shirt clean-up with no halftone, choose Clean cut, then Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
+            <li>To halftone most of a design but keep one part free of dots (a grey skull in red smoke), add a colour range in Select, choose Greys or pick the part’s colours, then No dots.</li>
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
-            <li>Work down the numbered steps. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
+            <li>Choose Halftone or Clean cut at the top first: only the tools for that style show. Then work down the numbered steps. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
             <li>Sections start folded: click a title to open it, or Expand all. Hover over anything for a short tip.</li>
             <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
@@ -866,7 +873,11 @@ function engine(){
       }
       s = R.samples.length ? 1 - Math.sqrt(best)/765/R.reach : 0;
     } else {
-      const off = R.type === 'shadows' ? L - R.band : R.type === 'highlights' ? (1 - R.band) - L : Math.abs(L - 0.5) - R.band;
+      let off;
+      if (R.type === 'greys'){ // by saturation, as in HSV, so dark reds stay colours while greys of any brightness are picked
+        const mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+        off = (mx ? (mx - mn)/mx : 0) - R.band;
+      } else off = R.type === 'shadows' ? L - R.band : R.type === 'highlights' ? (1 - R.band) - L : Math.abs(L - 0.5) - R.band;
       s = off <= 0 ? 1 : 1 - off/R.soft;
     }
     s = s < 0 ? 0 : s > 1 ? 1 : s;
@@ -915,6 +926,7 @@ function engine(){
     // Recolour ranges run first, before the knock-out, so a recoloured part is judged by its new colour.
     const rules = p.rules || [], nr = rules.length, selOut = p.selOut;
     const recol = rules.map((R, k) => R.action === 'recolour' ? k : -1).filter(k => k >= 0), nc = nr - recol.length; // nc: ranges that change the ink
+    const nodr = rules.map((R, k) => R.action === 'nodots' ? k : -1).filter(k => k >= 0); // No dots ranges: these parts are a clean cut inside a halftone
     const sel = selOut >= 0 && selOut < nr ? new Uint8Array(w*h) : null;
     let on = 0;
     for (let y = 0; y < h; y++){
@@ -935,12 +947,21 @@ function engine(){
             if (s > 0){ r += (R.to[0] - r)*s; g += (R.to[1] - g)*s; b += (R.to[2] - b)*s; }
           }
         }
+        let nd = 0; // when set: this pixel gets no dots, and prints solid if at least this solid
+        if (nodr.length){
+          const L1 = (0.299*r + 0.587*g + 0.114*b)/255;
+          for (const k of nodr){
+            const s = selectWeight(rules[k], r, g, b, L1);
+            if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0;
+            if (s >= 0.5 && !nd && !cut) nd = rules[k].cut;
+          }
+        }
         if (tone){
           let m;
           if (lum){ m = 0.299*r + 0.587*g + 0.114*b - kl; if (m < 0) m = -m; }
           else { m = r > kr ? r - kr : kr - r; const dg = g > kg ? g - kg : kg - g; if (dg > m) m = dg; const db = b > kb ? b - kb : kb - b; if (db > m) m = db; }
           const dn = m/far;
-          if (cut){ // clean cut: a hard knock-out of the knock-out colour only, so nearby colours keep full ink
+          if (cut || nd){ // clean cut (or a No dots part): a hard knock-out of the knock-out colour only, so nearby colours keep full ink
             if (dn <= ktol){ if (!nc){ cls[i >> 2] = 1; continue; } c = 0; }
           } else {
             const q = (dn - k0)/ks;
@@ -951,7 +972,7 @@ function engine(){
         if (nc){
           const L = (0.299*r + 0.587*g + 0.114*b)/255;
           for (let k = 0; k < nr; k++){
-            if (rules[k].action === 'recolour') continue;
+            if (rules[k].action === 'recolour' || rules[k].action === 'nodots') continue;
             const R = rules[k], s = selectWeight(R, r, g, b, L);
             if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0;
             if (s <= 0) continue;
@@ -961,7 +982,8 @@ function engine(){
           }
           if (c <= 0){ cls[i >> 2] = 1; continue; }
         }
-        c = lut[(c*1024) | 0];
+        if (nd){ if (c < nd){ cls[i >> 2] = 1; continue; } c = 1; } // No dots: solid or removed, never screened
+        else c = lut[(c*1024) | 0];
         if (c <= 0 || c < cut){ cls[i >> 2] = 1; continue; }
         if (c < 1 && !cut){
           const u = fx - Math.floor(fx), v = fy - Math.floor(fy);
@@ -1077,6 +1099,19 @@ const LOOKS = {
   knock: {k0: 10, k1: 70,  mid: 0, con: 0, drop: 15, solid: 92},
   full:  {k0: 0,  k1: 100, mid: 0, con: 0, drop: 15, solid: 96}
 };
+/* The two print styles (routes). Each offers its own Quick starts, in this order; the same look can mean a little
+   different thing in each (Knock out in Clean cut is a hard knock-out at the tolerance, with no dots). */
+const ROUTE_LOOKS = {dots: ['edges', 'knock', 'full'], cut: ['shadows', 'knock', 'edges']};
+const LOOK_TEXT = {
+  dots: {edges: ['Fix soft edges', 'Shadows, glows and fades become solid dots. Solid parts stay solid.'],
+         knock: ['Shirt shows through', 'Colours close to the shirt drop out. Shading turns into dots.'],
+         full: ['Full halftone', 'The whole design becomes dots for a soft, vintage print.']},
+  cut: {shadows: ['Remove shadows', 'Quick clean-up for dark shirts. Shadows drop out and the rest prints solid.'],
+        knock: ['Knock out the shirt colour', 'Colours close to the shirt drop out. Everything else prints solid.'],
+        edges: ['Clean up only', 'Nothing is knocked out. Glows, fades and soft edges print solid or are removed at the threshold.']}
+};
+const routeOf = f => f === 'cut' ? 'cut' : 'dots';
+function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[routeOf(finish || st.finish)][look] || LOOK_TEXT.dots[look] || LOOK_TEXT.cut[look]; return t ? t[0] : look; }
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 15, solid: 92,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
@@ -1138,8 +1173,8 @@ function params(){
   return {lpi: st.lpi, angle: st.angle, shape: st.shape, dpi: DPI,
           tone: st.look === 'knock' || st.look === 'full', metric: st.look === 'full' ? 'lum' : 'max',
           k0: st.k0/100, k1: st.k1/100, ktol: st.ktol/100, knock: hexRgb(st.knock || st.shirt),
-          gamma: Math.pow(2, -st.mid/50), contrast: Math.pow(2, st.con/50),
-          drop: st.drop/100, solid: st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
+          gamma: st.finish === 'cut' ? 1 : Math.pow(2, -st.mid/50), contrast: st.finish === 'cut' ? 1 : Math.pow(2, st.con/50), // Ink density is a halftone step
+          drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
           levels: lvIdentity() ? null : {...lv}, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100};
 }
@@ -1497,7 +1532,7 @@ function syncLegend(){
   const items = [], seen = new Set();
   for (const k of kindsShown()){
     const list = k === 'origbase' ? ORIG_LEGEND : k === 'sel' ? selLegend() : k === 'clear' ? clearLegend() : k === 'origclear' ? ORIGCLEAR_LEGEND : k === 'white' ? WHITE_LEGEND : k === 'origwhite' ? ORIGWHITE_LEGEND : VIEWS[k] ? VIEWS[k].legend : [];
-    for (const it of list) if (!seen.has(it[1]) && (st.back || it[1] !== 'Shirt-colour edge')){ seen.add(it[1]); items.push(it); }
+    for (const it of list) if (!seen.has(it[1]) && (st.back || it[1] !== 'Shirt-colour edge') && (st.finish !== 'cut' || it[1] !== 'Turned into dots')){ seen.add(it[1]); items.push(it); }
   }
   const lg = $('legend');
   lg.hidden = !items.length;
@@ -1993,29 +2028,53 @@ function syncInk(){ syncChips('inkChips', 'ink', st.ink); $('inkRow').hidden = s
 $('looks').addEventListener('change', e => {
   if (e.target.name !== 'look') return;
   st.look = e.target.value; Object.assign(st, LOOKS[st.look]);
-  st.finish = st.look === 'shadows' ? 'cut' : 'dots';
+  if (st.look === 'shadows') st.finish = 'cut'; else if (st.look === 'full') st.finish = 'dots'; // each is offered in one style only
   if (st.look === 'shadows') ensureShadowRule();
   syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
 function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look !== 'knock' && st.look !== 'full'; syncStepButtons(); }
-$('finishChips').addEventListener('click', e => { const b = e.target.closest('[data-finish]'); if (!b) return; st.finish = b.dataset.finish; syncFinish(); remember(); schedule(); });
+$('finishChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-finish]'); if (!b || b.dataset.finish === st.finish) return;
+  st.finish = b.dataset.finish;
+  // a Quick start the other style doesn't offer becomes its nearest one: Full halftone → Knock out the shirt colour,
+  // Remove shadows → Fix soft edges (its shadow range stays in Select)
+  if (!ROUTE_LOOKS[routeOf(st.finish)].includes(st.look)){ st.look = st.finish === 'cut' ? 'knock' : 'edges'; syncLook(); }
+  syncFinish(); syncRules(); remember(); schedule();
+});
 function syncFinish(){
   syncChips('finishChips', 'finish', st.finish);
-  const cut = st.finish === 'cut';
+  const cut = st.finish === 'cut', r = routeOf(st.finish), list = ROUTE_LOOKS[r];
   for (const el of document.querySelectorAll('.dotf, .dotk')) el.hidden = cut;
   $('cutField').hidden = !cut; $('ktolField').hidden = !cut;
-  $('hardField').hidden = cut; $('hardCut').hidden = !cut;
-  updateChecks();
+  $('hardField').hidden = cut;
+  $('toneGroup').hidden = cut; // Ink density: dots only
+  for (const lab of $('looks').querySelectorAll('.look')){ // this style's Quick starts, in its order
+    const v = lab.querySelector('input').value, i = list.indexOf(v);
+    lab.hidden = i < 0; lab.style.order = i;
+    if (i >= 0){ lab.querySelector('.look-t').textContent = LOOK_TEXT[r][v][0]; lab.querySelector('.look-d').textContent = LOOK_TEXT[r][v][1]; }
+  }
+  nameGroup('finishGroup', cut ? 'Threshold' : 'Halftone dots',
+    cut ? 'How solid a pixel must be to print. Anything less solid is removed, so the film has no haze.'
+        : 'How fine the dots are (lines per inch), their angle and their shape. 30 lpi suits most tees.');
+  syncLegend(); updateChecks();
+  if (resetsReady) keepChosenPreset(); // the preset list shows this style's
+}
+function nameGroup(id, name, tip){ // a step's title, its fold button and the "Done · next" buttons that name it
+  const g = $(id), b = g.querySelector('.sec-toggle');
+  g.dataset.name = name;
+  if (b){ b.lastChild.textContent = name; b.dataset.tip = tip; } else g.querySelector('h2').textContent = name;
+  if (folds.length) syncStepButtons();
 }
 
 /* ---------- colour range: like Photoshop's Select > Color Range, as cards applied top to bottom ---------- */
-const RULE_TYPES = [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights'], ['sample', 'Sampled colours']];
+const RULE_TYPES = [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights'], ['greys', 'Greys, black & white'], ['sample', 'Sampled colours']];
 const ACTION_TIPS = {remove: 'Remove the selected parts.', fade: 'Turn the selected parts into dots, keeping some of the ink.', solid: 'Print the selected parts fully solid.',
-  recolour: 'Change the selected colours to another colour, e.g. black text to white for a dark tee. Done before the knock-out.'};
-const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['solid', 'Keep solid'], ['recolour', 'Recolour']];
+  recolour: 'Change the selected colours to another colour, e.g. black text to white for a dark tee. Done before the knock-out.',
+  nodots: 'Keep the selected parts free of dots, as in Clean cut: solid ink, or removed at the threshold. The rest of the design is still halftoned.'};
+const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['solid', 'Keep solid'], ['nodots', 'No dots'], ['recolour', 'Recolour']];
 const RULE_DEFAULTS = [['shadows', 'remove'], ['highlights', 'solid'], ['midtones', 'fade'], ['sample', 'remove']];
 const MAX_RULES = 4;
-function newRule(type, action){ return {type, action, samples: [], range: 50, fuzz: 20, keep: 50, invert: false, to: '#ffffff'}; }
+function newRule(type, action){ return {type, action, samples: [], range: 50, fuzz: 20, keep: 50, cut: 50, invert: false, to: '#ffffff'}; }
 function ensureShadowRule(){
   let i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert);
   if (i < 0){ rules.unshift(newRule('shadows', 'remove')); i = 0; }
@@ -2023,12 +2082,13 @@ function ensureShadowRule(){
 }
 function ruleParams(R){
   const fz = R.fuzz/100, rg = R.range/100;
-  return {type: R.type, samples: R.samples.map(hexRgb), invert: R.invert, action: R.action, keep: R.keep/100, to: hexRgb(R.to || '#ffffff'),
-          reach: Math.max(0.01, fz*0.6), band: R.type === 'midtones' ? rg*0.25 : rg*0.5, soft: Math.max(0.01, fz*0.5)};
+  return {type: R.type, samples: R.samples.map(hexRgb), invert: R.invert, action: R.action, keep: R.keep/100, to: hexRgb(R.to || '#ffffff'), cut: Math.max(1, R.cut == null ? 50 : R.cut)/100,
+          reach: Math.max(0.01, fz*0.6), band: R.type === 'midtones' ? rg*0.25 : R.type === 'greys' ? rg*0.3 : rg*0.5, soft: Math.max(0.01, fz*0.5)};
 }
 function ruleNote(R){ // what a range picks, in brightness from 0% (black) to 100% (white)
   if (R.type === 'sample') return R.samples.length ? 'The picked colours, plus colours this close to them.' : 'Pick colours in the art to select them.';
   const q = ruleParams(R), pc = v => Math.round(Math.max(0, Math.min(1, v))*100) + '%', inv = R.invert ? ' Inverted: everything else is selected.' : '';
+  if (R.type === 'greys') return `Selects greys, black and white: colours up to ${pc(q.band)} saturated, fading out by ${pc(q.band + q.soft)}. Raise Range if tinted greys are missed; lower it if dull colours are caught.${inv}`;
   if (R.type === 'shadows') return `Selects 0–${pc(q.band)} brightness, fading out by ${pc(q.band + q.soft)}.${inv}`;
   if (R.type === 'highlights') return `Selects ${pc(1 - q.band)}–100% brightness, fading out by ${pc(1 - q.band - q.soft)}.${inv}`;
   return `Selects ${pc(0.5 - q.band)}–${pc(0.5 + q.band)} brightness, fading out by ${pc(0.5 - q.band - q.soft)} and ${pc(0.5 + q.band + q.soft)}.${inv}`;
@@ -2051,8 +2111,9 @@ function renderRules(){
       ${ruleSlider(i, 'fuzz', 'Fuzziness', R.fuzz)}
       <p class="f-note" data-note>${ruleNote(R)}</p>
       <label class="check-row" data-tip="Select everything except this."><input type="checkbox" data-k="invert"${R.invert ? ' checked' : ''}> Invert</label>
-      <div class="chips" role="group" aria-label="What happens to the selection">${RULE_ACTIONS.map(([v, t]) => `<button class="chip" type="button" data-act="action" data-v="${v}" data-tip="${ACTION_TIPS[v]}" aria-pressed="${v === R.action}">${t}</button>`).join('')}</div>
+      <div class="chips" role="group" aria-label="What happens to the selection">${RULE_ACTIONS.filter(([v]) => st.finish !== 'cut' || (v !== 'fade' && v !== 'nodots') || v === R.action).map(([v, t]) => `<button class="chip" type="button" data-act="action" data-v="${v}" data-tip="${ACTION_TIPS[v]}" aria-pressed="${v === R.action}">${t}</button>`).join('')}</div>
       ${R.action === 'fade' ? ruleSlider(i, 'keep', 'Ink kept', R.keep) : ''}
+      ${R.action === 'nodots' ? ruleSlider(i, 'cut', 'Threshold', R.cut == null ? 50 : R.cut) + `<p class="f-note">${st.finish === 'cut' ? 'Clean cut has no dots anywhere, so this changes nothing. Choose Halftone to use it.' : `No dots here: these parts print solid, or are removed where they are less solid than the threshold. Only colours within ${st.ktol}% of the knock-out colour drop out (the Knock-out tolerance), so the part keeps its shading as solid ink.`}</p>` : ''}
       ${R.action === 'recolour' ? `<div class="knock"><span class="colorbox"><input type="color" data-k="to" value="${R.to || '#ffffff'}" aria-label="New colour for colour range ${i + 1}"></span><span>The selected colours become this colour, before the knock-out.</span></div>` : ''}
     </div>`).join('');
   $('addRule').hidden = rules.length >= MAX_RULES;
@@ -2077,7 +2138,7 @@ function setActive(i){
 $('addRule').addEventListener('click', () => {
   if (rules.length >= MAX_RULES) return;
   const used = new Set(rules.map(R => R.type)), d = RULE_DEFAULTS.find(([t]) => !used.has(t)) || RULE_DEFAULTS[0];
-  rules.push(newRule(d[0], d[1])); activeRule = rules.length - 1;
+  rules.push(newRule(d[0], st.finish === 'cut' && d[1] === 'fade' ? 'remove' : d[1])); // no dots in a clean cut activeRule = rules.length - 1;
   syncRules(); schedule();
   if (d[0] === 'sample') startPick(activeRule);
 });
@@ -2665,10 +2726,10 @@ function fileName(){
 function syncFileName(){ if (art) $('nameNote').innerHTML = `Saves as <b>${esc(fileName())}</b>`; }
 $('nameSuffix').addEventListener('input', () => { syncFileName(); persistSoon(); });
 function settingsText(){
-  const look = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
+  const look = lookName();
   const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
   const ruleText = (R, i) => `range ${i + 1}: ${R.type === 'sample' ? 'colours ' + R.samples.join(' ').toUpperCase() : R.type + ' ' + R.range + '%'}` +
-    ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}${R.action === 'recolour' ? ' ' + (R.to || '#ffffff').toUpperCase() : ''}`;
+    ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}${R.action === 'nodots' ? ' at ' + (R.cut == null ? 50 : R.cut) + '%' : ''}${R.action === 'recolour' ? ' ' + (R.to || '#ffffff').toUpperCase() : ''}`;
   const levels = (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') +
     (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
@@ -2818,18 +2879,22 @@ function applyPreset(p){
 function chosen(){ const v = $('presetSel').value; if (!v) return null; const where = v[0], list = where === 's' ? shared : where === 'b' ? STARTERS : presets, p = list[+v.slice(1)]; return p ? {p, where} : null; }
 function syncPresets(selName, where){
   const opt = (p, key) => `<option value="${key}">${esc(p.name)}</option>`;
-  let html = '<option value="">Choose a preset…</option>' + `<optgroup label="Starters · 30 lpi">${STARTERS.map((p, i) => opt(p, 'b' + i)).join('')}</optgroup>`;
-  if (SYNC_URL){
-    if (shared.length) html += `<optgroup label="Shared with all computers">${shared.map((p, i) => opt(p, 's' + i)).join('')}</optgroup>`;
-    if (presets.length) html += `<optgroup label="This computer only">${presets.map((p, i) => opt(p, 'l' + i)).join('')}</optgroup>`;
-  } else if (presets.length) html += `<optgroup label="Saved on this computer">${presets.map((p, i) => opt(p, 'l' + i)).join('')}</optgroup>`;
+  const fits = p => !p.s || !p.s.finish || routeOf(p.s.finish) === routeOf(st.finish); // this print style's presets (older ones without one show in both)
+  const opts = (list, w) => list.map((p, i) => fits(p) ? opt(p, w + i) : '').join('');
+  let html = '<option value="">Choose a preset…</option>' + (st.finish === 'cut' ? '' : `<optgroup label="Starters · 30 lpi">${STARTERS.map((p, i) => opt(p, 'b' + i)).join('')}</optgroup>`), any = st.finish !== 'cut';
+  const add = (label, o) => { if (o){ html += `<optgroup label="${label}">${o}</optgroup>`; any = true; } };
+  if (SYNC_URL){ add('Shared with all computers', opts(shared, 's')); add('This computer only', opts(presets, 'l')); }
+  else add('Saved on this computer', opts(presets, 'l'));
+  if (!any) html += '<option value="" disabled>No Clean cut presets yet: Save new keeps this set-up</option>';
   $('presetSel').innerHTML = html;
   let key = '';
   if (selName != null){ const list = where === 's' ? shared : where === 'b' ? STARTERS : presets, i = list.findIndex(p => sameName(p.name, selName)); if (i >= 0) key = where + i; }
   $('presetSel').value = key;
+  if ($('presetSel').value !== key) $('presetSel').value = ''; // the chosen one is the other style's
   $('presetConfirm').hidden = true;
   syncPresetButtons(); syncSyncNote();
 }
+function keepChosenPreset(){ const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); }
 function syncPresetButtons(){
   const c = chosen();
   $('presetUpdate').disabled = $('presetDelete').disabled = !c || c.where === 'b' || syncBusy; // starters are built in
@@ -2846,7 +2911,7 @@ function syncSyncNote(){
       : syncState === 'ok' ? `Shared presets are up to date${at ? ` (checked ${at})` : ''}. <button class="link" type="button" data-act="refresh">Refresh</button>${mine}`
       : `Couldn’t reach the shared presets${at ? `, so these are from ${at}` : ''}. <button class="link" type="button" data-act="refresh">Try again</button>${mine}`;
   }
-  $('presetHelp').innerHTML = 'A preset keeps the print style and dots, the quick start, Levels, knock-out, selections, ink density, ink colour and the shirt colour. Open the art first, then choose the preset. ' +
+  $('presetHelp').innerHTML = 'Only presets for the chosen print style are listed. A preset keeps the print style and dots, the quick start, Levels, knock-out, selections, ink density, ink colour and the shirt colour. Open the art first, then choose the preset. ' +
     (SYNC_URL ? 'Shared presets are the same on every workshop computer. <button class="link" type="button" data-act="export">Export</button> saves a backup file, and <button class="link" type="button" data-act="import">Import</button> shares the presets in one.'
               : (IN_CLAUDE && SYNC_ADDRESS ? 'Shared presets work on the staff web address; here they stay in this browser. ' : 'Presets live in this browser: ') +
                 '<button class="link" type="button" data-act="export">Export</button> them to a file and <button class="link" type="button" data-act="import">Import</button> it on the other computers.');
@@ -2890,7 +2955,7 @@ function remoteProblem(d){
 }
 $('presetSel').addEventListener('change', () => { const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); if (c) applyPreset(c.where === 'b' ? starterPreset(c.p) : c.p); });
 $('presetNew').addEventListener('click', () => {
-  const look = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'}[st.look];
+  const look = lookName();
   const shirt = (SHIRTS.find(([, hex]) => hex.toLowerCase() === st.shirt.toLowerCase()) || ['custom shirt'])[0];
   $('presetName').value = `${look}, ${shirt.toLowerCase()} tee`;
   $('presetSize').checked = false;
@@ -2993,9 +3058,8 @@ $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentEleme
 
 /* ---------- history: the last 40 changes to this design, to undo or go back to ---------- */
 const HIST_MAX = 40;
-const LOOK_NAMES = {shadows: 'Remove shadows', edges: 'Fix soft edges', knock: 'Shirt shows through', full: 'Full halftone'};
 const sign = v => (v > 0 ? '+' : '') + v;
-const STEP_NAMES = {look: v => `Quick start: ${LOOK_NAMES[v]}`, finish: v => v === 'cut' ? 'Print style: clean cut' : 'Print style: halftone dots', cut: v => `Threshold ${v}%`,
+const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', look: v => `Quick start: ${lookName(v)}`, // the style first: switching it can move the Quick start too cut: v => `Threshold ${v}%`,
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, ktol: v => `Knock-out tolerance ${v}%`,
   mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
@@ -3110,19 +3174,18 @@ window.addEventListener('beforeunload', e => {
 const SECTION_TIPS = {
   presetGroup: 'Save the whole set-up under a name and use it again. Shared presets are the same on every workshop computer.',
   historyGroup: 'Every change to this design. Click a step to go back to it.',
-  lookGroup: 'A starting point that sets several steps at once. Remove shadows is the quick black-tee clean-up.',
+  lookGroup: 'A starting point that sets several steps at once, for the print style chosen at the top.',
   cropGroup: 'Trim empty margins or draw a crop. Do it first, so the print size measures the real art.',
   sizeGroup: 'The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
   bgGroup: 'Clear a plain background (a JPG’s white, a screenshot’s colour) only where it joins the outside edge, so the same colour inside the design stays.',
   sharpGroup: 'Unsharp mask on the art at print size: crisper edges and detail before the dots. Light or Medium suits most soft files.',
   levelsGroup: 'Brightness/Contrast and Levels, like Photoshop’s, on the art’s colours before anything else. Move the black point right so more of the art counts as shadow.',
   knockGroup: 'Colours close to the shirt (or the colour you set) drop out so the shirt shows through.',
-  rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights or colours, then remove, fade or keep them solid.',
+  rangeGroup: 'Like Photoshop’s Select › Colour Range: pick shadows, midtones, highlights, greys or colours, then remove, fade, keep solid, keep free of dots or recolour them.',
   toneGroup: 'How much ink goes down: lighten or darken it, add contrast, drop dots too small to hold, and join nearly solid dots.',
   inkGroup: 'Full colour prints the art’s own colours. Mono prints every dot in one colour.',
   touchGroup: 'Brush away stray pixels, paint over gaps or rough edges, or bring the original back. Every stroke is in History.',
   edgeGroup: 'Tidy the outline: a hard edge with no soft pixels, and a trim off the outside of the outline, of any colour or just the knock-out colour.',
-  finishGroup: 'The key decision: halftone dots (pick the lpi), or a clean cut with no dots where every pixel is solid or removed. Set it first so every other step shows in this style.',
   checkGroup: 'A last check that the film will print and wash well, then save the PNG.'
 };
 try { localStorage.removeItem('tsw-dtf-folded'); } catch(e){}
@@ -3134,7 +3197,7 @@ for (const id of ['finishGroup', 'bgGroup', 'sizeGroup', 'sharpGroup', 'knockGro
 }
 for (const g of document.querySelectorAll('.panel > .group')){
   const h = g.querySelector(':scope > h2, :scope > .g-head > h2');
-  if (!h) continue;
+  if (!h || g.id === 'routeGroup') continue; // Print style stays open
   const b = document.createElement('button');
   g.dataset.name = h.textContent.trim();
   b.type = 'button'; b.className = 'sec-toggle';
@@ -3179,7 +3242,7 @@ function resetToDefaults(){ // every setting back to the start, the crop and siz
   if (picking) endPick();
   endBrush();
   noteChange('Reset to defaults');
-  Object.assign(st, DEFAULTS); st.knock = null; knockFrom = 'shirt';
+  const route = st.finish; Object.assign(st, DEFAULTS); st.finish = route; st.knock = null; knockFrom = 'shirt'; // the print style stays
   st.paneA = 'orig'; st.paneB = 'shirt'; syncPaneOptions(); if (st.view === 'split'){ prepareViews(); syncLegend(); }
   Object.assign(lv, LV0); rules = []; activeRule = 0;
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
@@ -3198,7 +3261,8 @@ const lookVal = k => (LOOKS[st.look] && k in LOOKS[st.look] ? LOOKS[st.look] : D
 const openedWidth = () => Math.max(0.5, Math.min(art.isSample ? 25*art.w/art.fullW : art.w/(art.dpi || DPI)*2.54, maxWidthCm())); // as opened, for the current crop
 const sameRules = () => st.look === 'shadows' ? rules.length === 1 && JSON.stringify(rules[0]) === JSON.stringify(newRule('shadows', 'remove')) : !rules.length;
 const STEP_RESETS = {
-  finishGroup: {name: 'Print style', vals: () => ({finish: st.look === 'shadows' ? 'cut' : 'dots', cut: DEFAULTS.cut, lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape})},
+  finishGroup: {get name(){ return st.finish === 'cut' ? 'Threshold' : 'Halftone dots'; }, // the print style itself stays
+                vals: () => st.finish === 'cut' ? {cut: DEFAULTS.cut} : {lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape}},
   sizeGroup: {name: 'Print size', same: () => !art || (Math.abs(st.widthCm - openedWidth()) < 0.005 && !art.smooth),
               reset: () => { art.smooth = false; setWidth(openedWidth(), true); buildSrcSoon(); }},
   knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null})},
@@ -3267,8 +3331,8 @@ const TIPS = [
   ['[data-zoom="1"]', 'One file pixel per screen pixel: the true dot shapes.'],
   ['[data-zoom="2"]', 'Twice 1:1.'], ['[data-zoom="4"]', 'Four times 1:1.'],
   ['#zoomRange', 'Zoom from Fit up to 800%. Pinch, Ctrl/Cmd + scroll, or the + and − keys also zoom.'],
-  ['[data-finish="dots"]', 'Shading, fades and soft or partly removed areas become halftone dots.'],
-  ['[data-finish="cut"]', 'No dots: every pixel is either solid or removed, at the threshold. The quick black-tee clean-up.'],
+  ['[data-finish="dots"]', 'Shading, fades and soft or partly removed areas become halftone dots. Shows the halftone tools.'],
+  ['[data-finish="cut"]', 'No dots: every pixel is either solid or removed, at the threshold. Shows the clean cut tools.'],
   ['[data-angle="22.5"]', '22.5° is the usual angle for single-colour halftones.'],
   ['#lvAuto', 'Set the black and white points from the art, like Photoshop’s Auto.'], ['#lvReset', 'Put Brightness, Contrast and Levels back to normal.'], ['#bri', 'Lighten or darken the art’s midtones. Double-click for 0.'], ['#bcon', 'More or less contrast in the art’s colours. Double-click for 0.'],
   ['#pickBtn', 'Click a colour in the art to knock it out.'], ['#knockReset', 'Knock out the shirt colour again.'],
