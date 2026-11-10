@@ -576,6 +576,10 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <input type="range" id="k1" min="20" max="100" step="1" value="70">
           <p class="f-note">Colours this different from the shirt print solid. Between the two, dots.</p>
         </div>
+        <div class="field dotk">
+          <label class="check-row"><input type="checkbox" id="cleanOn"> Clean colour dots</label>
+          <p class="f-note" id="cleanNote">Dark tees: the dots in a fade print in the bright version of their colour, sized so the fade still looks like the art. No muddy dark ink at the edges of fades or in dark lettering.</p>
+        </div>
       </section>
 
       <section class="group step" id="rangeGroup">
@@ -635,7 +639,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <input type="range" id="blk" min="5" max="40" step="1" value="20">
           <div class="knock"><span class="eswatch" id="blkSwatch" aria-hidden="true"></span><span id="blkTxt">#333333</span></div>
         </div>
-        <p class="f-note" id="blkNote">DTF black ink can’t match a dyed black tee: it prints as a dark matt grey. With this on, On shirt and On white show ink no darker than this grey. On tees darker than it, colours darker than the ink can print get fewer dots (or are removed in Clean cut), so the tee’s own black does the darkest parts instead of grey patches. The saved PNG keeps the art’s colours. Set once for your printer: it’s remembered on this computer.</p>
+        <p class="f-note" id="blkNote">DTF black ink can’t match a dyed black tee: it prints as a dark matt grey, and dark colours print dull because of the black in them. With this on, On shirt and On white show ink as it prints. On tees darker than it, colours darker than the ink can print get fewer dots (or are removed in Clean cut), so the tee’s own black does the darkest parts instead of grey patches. The saved PNG keeps the art’s colours. Set once for your printer: it’s remembered on this computer.</p>
       </section>
 
       <section class="group step" id="edgeGroup">
@@ -731,6 +735,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Print style starts open; the other sections start folded: click a title to open it, or Expand all. The grey text beside a folded title says how it’s set or what’s inside (the dot controls are in Ink density). Hover over anything for a short tip.</li>
             <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z. Revert (top of Tools) goes back to the design as it was opened; Reset to defaults puts the tool’s own settings back.</li>
             <li>If the preview ever seems stuck, it restarts itself; after a few seconds “Updating…” also offers Redraw.</li>
+            <li>Fades into a black tee: keep Clean colour dots on (Knock out step). The dots print in the bright version of their colour, so fades and dark lettering don’t print as muddy maroon or grey.</li>
             <li>DTF black ink prints as a dark matt grey, never as black as a dyed black tee. Keep “Allow for DTF black ink” on (Ink colour step): the views then show the real grey, and on black tees the darkest colours become sparse dots so the tee does the black. A Shirt-colour edge on a black tee prints in that grey too, so keep it thin.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
@@ -935,6 +940,7 @@ function engine(){
     // P = max(T, pb) per channel; mixing P dots with the tee to look like T takes coverage (Y(T) - Y(tee)) / (Y(P) - Y(tee)), in
     // linear light. Only on tees darker than the ink black, only with the art's own colours (not Mono).
     const blk = p.inkBlack && p.inkBlack.ys < p.inkBlack.yb && !one ? p.inkBlack : null;
+    const clean = !!p.clean && !one && !p.cut && 0.299*p.knock[0] + 0.587*p.knock[1] + 0.114*p.knock[2] < 70; // clean colour dots: dark tees only
     const L2 = blk ? new Float32Array(256) : null;
     if (L2) for (let v = 0; v < 256; v++){ const u = v/255; L2[v] = u <= 0.04045 ? u/12.92 : Math.pow((u + 0.055)/1.055, 2.4); }
     const cut = p.cut || 0; // clean cut: no screen, pixels at least this solid print solid, the rest is removed
@@ -983,6 +989,7 @@ function engine(){
           }
         }
         let nd = 0; // when set: this pixel gets no dots, and prints solid if at least this solid
+        let boost = 0; // clean colour dots: 1/q for a dot in a knock-out fade
         let kept = false; // selected by a Keep solid range
         if (nodr.length){
           const L1 = (0.299*r + 0.587*g + 0.114*b)/255;
@@ -1002,7 +1009,7 @@ function engine(){
           } else {
             const q = (dn - k0)/ks;
             if (q <= 0){ if (!nc){ cls[i >> 2] = 1; continue; } c = 0; }
-            else if (q < 1) c *= q;
+            else if (q < 1){ c *= q; if (clean && 0.299*r + 0.587*g + 0.114*b > kl) boost = 1/q; } // only colours lighter than the tee
           }
         }
         if (nc){
@@ -1037,6 +1044,7 @@ function engine(){
           cls[i >> 2] = 3;
         } else cls[i >> 2] = 4;
         if (one){ out[i] = ir; out[i+1] = ig; out[i+2] = ib; }
+        else if (boost && c < 1){ const R1 = kr + (r - kr)*boost, G1 = kg + (g - kg)*boost, B1 = kb + (b - kb)*boost; out[i] = R1; out[i+1] = G1; out[i+2] = B1; } // a dot in its bright colour
         else { out[i] = r; out[i+1] = g; out[i+2] = b; }
         out[i+3] = 255; on++;
       }
@@ -1169,9 +1177,9 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: true}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
-const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk'];
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 try { if (!localStorage.getItem('tsw-dtf-dens1')){ if ([[15, 92], [15, 90], [15, 96]].some(([d, v]) => st.drop === d && st.solid === v)) Object.assign(st, densVals('std')); localStorage.setItem('tsw-dtf-dens1', '1'); } } catch(e){}
 function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
@@ -1181,17 +1189,16 @@ const srcCanvas = document.createElement('canvas'), srcCtx = srcCanvas.getContex
 const outCanvas = document.createElement('canvas'), outCtx = outCanvas.getContext('2d');
 const inkCanvas = document.createElement('canvas'), inkCtx = inkCanvas.getContext('2d'); // the print as it looks: ink no darker than the printed black
 let viewMips = null;
-function buildInkView(px, W, H){ // greys and near-blacks lifted to the printed black, as in the dot maths; colours left as they are
+function buildInkView(px, W, H){ // ink as it prints: no channel below the black ink's grey, scaled by how much black the colour holds
   if (!st.blkOn || !W){ viewMips = null; inkCanvas.width = inkCanvas.height = 1; return; }
   const pb = Math.round(st.blk/100*255), v = new Uint8ClampedArray(px);
   for (let i = 0; i < v.length; i += 4){
     if (!v[i+3]) continue;
     const r = v[i], g = v[i+1], b = v[i+2];
     if (r >= pb && g >= pb && b >= pb) continue;
-    const mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b), wn = 1 - (mx - mn)/255/0.15;
-    if (wn <= 0) continue;
-    const w = wn > 1 ? 1 : wn;
-    if (r < pb) v[i] = r + (pb - r)*w; if (g < pb) v[i+1] = g + (pb - g)*w; if (b < pb) v[i+2] = b + (pb - b)*w;
+    const mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+    const wn = Math.max(0, Math.min(1, 1 - (mx - mn)/255/0.15)), k = 1 - mx/255, fl = pb*(wn + (1 - wn)*k); // greys: the full grey; colours: by their black part
+    if (r < fl) v[i] = fl; if (g < fl) v[i+1] = fl; if (b < fl) v[i+2] = fl;
   }
   inkCanvas.width = W; inkCanvas.height = H; inkCtx.putImageData(new ImageData(v, W, H), 0, 0);
   viewMips = buildMips(inkCanvas);
@@ -1276,7 +1283,7 @@ function params(){
           gamma: st.finish === 'cut' ? 1 : Math.pow(2, -st.mid/50), contrast: st.finish === 'cut' ? 1 : Math.pow(2, st.con/50), // Ink density is a halftone step
           drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(ruleParams), selOut: rules.length ? activeRule : -1,
-          levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100};
+          clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100};
 }
 function schedule(){
   if (resetsReady) syncResets();
@@ -2049,7 +2056,9 @@ window.addEventListener('keydown', e => {
   if (cropping && (e.key === 'Escape' || e.key === 'Enter')){ e.preventDefault(); endCrop(e.key === 'Enter'); }
 });
 let knockFrom = 'shirt'; // where the knock-out colour came from: the shirt, the art, or typed / chosen by hand
+$('cleanOn').addEventListener('change', e => { st.clean = e.target.checked; remember(); schedule(); updateChecks(); });
 function syncKnock(){
+  $('cleanOn').checked = !!st.clean;
   const c = st.knock || st.shirt;
   $('knockPick').value = c;
   if (document.activeElement !== $('knockHex')) $('knockHex').value = c.toUpperCase();
@@ -2449,6 +2458,8 @@ function updateChecks(){
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (st.bgOn && Array.isArray(bgFound)) rows.push(['info', '✂', `Background removed (${(st.bgHex || rgbHex(bgFound[0], bgFound[1], bgFound[2])).toUpperCase()})`, `Cleared where it joins the outside edge, within ${st.bgTol}%. The same colour inside the design stays.`]);
   if (st.sharp) rows.push(['info', '↗', `Sharpened ${st.sharp}% at ${(+st.sradius).toFixed(1)} px`, 'Unsharp mask on the art at print size, before the dots.']);
+  if (st.clean && st.finish !== 'cut' && (st.look === 'knock' || st.look === 'full') && st.ink !== 'one' && linY(hexRgb(st.knock || st.shirt)) < linY([70, 70, 70]))
+    rows.push(['info', '✦', 'Clean colour dots', 'The dots in fades print in the bright version of their colour, so the fade looks like the art without muddy dark ink.']);
   if (st.blkOn) rows.push(['info', '◐', `DTF black ink allowed for (${blkHex().toUpperCase()})`, blkActs() && st.ink !== 'one'
     ? 'On this tee, colours darker than the ink can print got fewer dots, so the tee’s black does the darkest parts. The views show ink no darker than this grey.'
     : 'The views show black ink as the grey it prints. The tee is lighter than that grey, so the dots are unchanged.']);
@@ -2895,7 +2906,7 @@ function settingsText(){
     (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (st.look === 'knock' || st.look === 'full' ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
-         (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
+         (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
          (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
@@ -2984,7 +2995,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -3221,7 +3232,7 @@ $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentEleme
 const HIST_MAX = 40;
 const sign = v => (v > 0 ? '+' : '') + v;
 const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', look: v => `Quick start: ${lookName(v)}`, cut: v => `Threshold ${v}%`, // the style first: switching it can move the Quick start too
-  lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, ktol: v => `Knock-out tolerance ${v}%`,
+  lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, clean: v => v ? 'Clean colour dots on' : 'Clean colour dots off', ktol: v => `Knock-out tolerance ${v}%`,
   mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
   knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt',
@@ -3358,7 +3369,7 @@ const SUMS = { // short, so a title stays on one line
   bgGroup: () => { if (!st.bgOn) return 'Off'; const h = st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : ''); return h ? `Removing ${h.toUpperCase()}` : 'On'; },
   sharpGroup: () => st.sharp ? ({50: 'Light', 100: 'Medium', 160: 'Strong'}[st.sharp] || `${st.sharp}%`) : 'Off',
   levelsGroup: () => lvIdentity() ? 'Unchanged' : 'Adjusted',
-  knockGroup: () => `${st.knock ? st.knock.toUpperCase() : 'Shirt colour'} · ${st.finish === 'cut' ? `${st.ktol}%` : `${st.k0}–${st.k1}%`}`,
+  knockGroup: () => `${st.knock ? st.knock.toUpperCase() : 'Shirt colour'} · ${st.finish === 'cut' ? `${st.ktol}%` : `${st.k0}–${st.k1}%` + (st.clean ? ' · clean' : '')}`,
   rangeGroup: () => rules.length ? `${rules.length} range${rules.length === 1 ? '' : 's'}` : 'None',
   toneGroup: () => { const l = densLevel(); return `Dots · ${l ? DENS_NAMES[l] : `own ${st.drop}/${st.solid}%`}` + (st.mid || st.con ? ' · ink ±' : ''); },
   inkGroup: () => `${st.ink === 'one' ? 'Mono' : 'Full colour'} · black ${st.blkOn ? st.blk + '%' : 'as is'}`,
@@ -3440,7 +3451,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: true};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -3469,7 +3480,7 @@ const STEP_RESETS = {
                 vals: () => st.finish === 'cut' ? {cut: DEFAULTS.cut} : {lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape}},
   sizeGroup: {name: 'Print size', same: () => !art || (Math.abs(st.widthCm - openedWidth()) < 0.005 && !art.smooth),
               reset: () => { art.smooth = false; setWidth(openedWidth(), true); buildSrcSoon(); }},
-  knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null})},
+  knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null, clean: DEFAULTS.clean})},
   rangeGroup: {name: 'Select', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
   edgeGroup: {name: 'Edge', vals: () => ({...EDGE_KEYS})},
   bgGroup: {name: 'Background', vals: () => ({...BG_KEYS})},
