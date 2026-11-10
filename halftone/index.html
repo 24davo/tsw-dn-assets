@@ -1239,7 +1239,7 @@ function densVals(level, lpi){
 function densLevel(lpi){ for (const k of ['fine', 'std', 'safe']){ const v = densVals(k, lpi); if (v.drop === st.drop && v.solid === st.solid) return k; } return null; }
 /* The two print styles (routes). Each offers its own Quick starts, in this order; the same look can mean a little
    different thing in each (Knock out in Clean cut is a hard knock-out at the tolerance, with no dots). */
-const ROUTE_LOOKS = {dots: ['edges', 'knock', 'deep', 'full'], cut: ['shadows', 'knock', 'edges']};
+const ROUTE_LOOKS = {dots: ['deep', 'edges', 'knock', 'full'], cut: ['shadows', 'knock', 'edges']};
 const knockLook = l => l === 'knock' || l === 'deep' || l === 'full'; // the Quick starts that knock out the shirt colour
 const LOOK_TEXT = {
   dots: {edges: ['Fix soft edges', 'Glows and fades turn into dots.', 'Shadows, glows and fades become solid dots. Solid parts stay solid.'],
@@ -1253,7 +1253,7 @@ const LOOK_TEXT = {
 const routeOf = f => f === 'cut' ? 'cut' : 'dots';
 function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[routeOf(finish || st.finish)][look] || LOOK_TEXT.dots[look] || LOOK_TEXT.cut[look]; return t ? t[0] : look; }
 const $ = id => document.getElementById(id);
-const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
+const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
             edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
@@ -1262,6 +1262,7 @@ try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null
 var cleanReset = false; // v51 had Clean colour dots on by default
 try { if (!localStorage.getItem('tsw-dtf-clean0')){ cleanReset = true; st.clean = false; localStorage.setItem('tsw-dtf-clean0', '1'); } } catch(e){}
 try { if (!localStorage.getItem('tsw-dtf-dens1')){ if ([[15, 92], [15, 90], [15, 96]].some(([d, v]) => st.drop === d && st.solid === v)) Object.assign(st, densVals('std')); localStorage.setItem('tsw-dtf-dens1', '1'); } } catch(e){}
+try { if (!localStorage.getItem('tsw-dtf-look1')){ if (st.finish !== 'cut' && st.look === 'knock' && st.k0 === 10 && st.k1 === 70) Object.assign(st, {look: 'deep'}, LOOKS.deep); localStorage.setItem('tsw-dtf-look1', '1'); } } catch(e){}
 function keepSettings(){ try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
 function remember(){ noteChange(); keepSettings(); }
 
@@ -2289,9 +2290,9 @@ function syncRouteSum(){ syncSums(); }
 $('finishChips').addEventListener('click', e => {
   const b = e.target.closest('[data-finish]'); if (!b || b.dataset.finish === st.finish) return;
   st.finish = b.dataset.finish;
-  // a Quick start the other style doesn't offer becomes its nearest one: Full halftone → Knock out the shirt colour,
-  // Remove shadows → Fix soft edges (and its untouched shadow range goes with it)
-  if (!ROUTE_LOOKS[routeOf(st.finish)].includes(st.look)){ if (st.look === 'shadows') dropShadowRule(); st.look = st.finish === 'cut' ? 'knock' : 'edges'; syncLook(); }
+  // a Quick start the other style doesn't offer becomes its nearest one: Shadows to dots and Full halftone → Knock out
+  // the shirt colour, Remove shadows → Shadows to dots (and its untouched shadow range goes with it)
+  if (!ROUTE_LOOKS[routeOf(st.finish)].includes(st.look)){ if (st.look === 'shadows') dropShadowRule(); st.look = st.finish === 'cut' ? 'knock' : 'deep'; Object.assign(st, LOOKS[st.look]); syncLook(); syncSliders(); updateNotes(); }
   syncFinish(); syncRules(); remember(); schedule();
 });
 function syncFinish(){
@@ -3656,14 +3657,15 @@ function stepDone(g){
   else savePng();
   syncFoldAll();
 }
-const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
+const DEFAULTS = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
                   ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
   endBrush();
   noteChange('Reset to defaults');
-  const route = st.finish; Object.assign(st, DEFAULTS); st.finish = route; st.knock = null; knockFrom = 'shirt'; // the print style stays
+  const route = st.finish; Object.assign(st, DEFAULTS); st.finish = route; st.knock = null;
+  if (!ROUTE_LOOKS[routeOf(route)].includes(st.look)) Object.assign(st, {look: 'knock'}, LOOKS.knock); knockFrom = 'shirt'; // the print style stays
   st.paneA = 'orig'; st.paneB = 'shirt'; syncPaneOptions(); if (st.view === 'split'){ prepareViews(); syncLegend(); }
   Object.assign(lv, LV0); rules = []; activeRule = 0;
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
