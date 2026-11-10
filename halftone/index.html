@@ -87,7 +87,8 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .sw.custom{background:conic-gradient(#ff2d55,#ffcc00,#34c759,#0a84ff,#bf5af2,#ff2d55)}
 .sw.custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
 .readout{font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink);padding:6px 10px}
-.stack{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.stack{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+#legend{position:absolute;left:0;bottom:calc(100% + 6px);width:max-content;max-width:min(560px,calc(100vw - 24px))}
 .legend{gap:4px 14px;padding:6px 10px;font-size:12px;font-weight:500;max-width:560px}
 .legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .legend i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(128,128,128,.6);flex:none}
@@ -1390,7 +1391,7 @@ function render(){
   const cw = Math.max(1, Math.round(r.width*dpr)), ch = Math.max(1, Math.round(r.height*dpr));
   if (view.width !== cw || view.height !== ch){ view.width = cw; view.height = ch; }
   if (cropping){ drawCropView(r, dpr, cw, ch); return; }
-  const topH = 12, botH = $('oBottom').offsetHeight + 12;
+  const topH = 12, botH = $('oBottom').offsetHeight + 12 + 36; // + room for the key, kept when no key shows, so the picture never jumps
   let panes;
   if (st.view !== 'split'){
     panes = [{kind: kindsShown()[0], x: 0, y: 0, w: r.width, h: r.height, top: topH + 12, bottom: botH + 12}];
