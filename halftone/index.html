@@ -3736,28 +3736,35 @@ function useShared(list){ shared = [].concat(list || []).filter(isPreset); share
    style (Quick start, fade range, rich dots, Fade the edge, and sometimes a part of its own), so flipping through them
    never leaves bits of the last one behind. The file's own fixes (Levels, its own parts, background, sharpen, touch-ups,
    crop, size) stay. Tested on Elefus (flames + grey skull), a bright boxed picture and a blue gradient, 11 Nov 2026. */
-const STARTERS = [
-  {name: 'Black tee · everyday', desc: 'Start here. Only the darkest shading turns into dots; colours stay solid and bright.',
+const STARTERS = [ // v65: tuned on the owner's example designs (sky collage, dark selfie, dog collage, glow cartoon, player on smoke)
+  {name: 'Black tee · everyday', desc: 'Start here. Only the darkest shading turns into dots; colours stay solid and bright. A photo with a dark background melts into the shirt with no box.',
    s: {look: 'deep', shirt: '#111111', k0: 8, k1: 30}},
-  {name: 'Black tee · medium fade', desc: 'Shadows and darker colours fade into the shirt through dots; bright colours stay solid.',
+  {name: 'Black tee · dark photo, brightened', desc: 'For dim phone photos. The everyday look with Brightness and Contrast lifted so faces print clearly. Fine-tune both in Levels.',
+   s: {look: 'deep', shirt: '#111111', k0: 8, k1: 30}, lv: {bri: 30, bc: 15}},
+  {name: 'Black tee · smoke fades, people stay solid', desc: 'Grey smoke, mist and shadow fade into the shirt through dots, while skin, clothing and colours stay solid. Adds a Greys part you can adjust.',
+   s: {look: 'deep', shirt: '#111111', k0: 8, k1: 30, rich: true}, rules: [{type: 'greys', action: 'ramp', k0: 5, k1: 72}]},
+  {name: 'Black tee · medium fade', desc: 'Shadows and darker colours fade into the shirt through dots; bright colours stay solid. Faces pick up some dots in their shadows.',
    s: {look: 'knock', shirt: '#111111', k0: 6, k1: 50, rich: true}},
-  {name: 'Black tee · long fade (flames, smoke, glows)', desc: 'A long, soft fade into the shirt with rich colour dots. Best for flames, smoke, glows and light effects.',
+  {name: 'Black tee · long fade (flames, smoke, glows)', desc: 'A long, soft fade into the shirt with rich colour dots. Best for flames, smoke, glows and light effects. Too dotty for faces.',
    s: {look: 'knock', shirt: '#111111', k0: 5, k1: 72, rich: true}},
   {name: 'Black tee · long fade, greys stay solid', desc: 'The long fade for colours, while greys and whites (skulls, metal, lettering) stay solid. Adds a Greys part you can adjust.',
    s: {look: 'knock', shirt: '#111111', k0: 5, k1: 72, rich: true}, rules: [{type: 'greys', action: 'ramp', k0: 10, k1: 24}]},
-  {name: 'Photo or boxed picture · soft dotted edge', desc: 'The picture stays solid and its hard outside edge fades into the shirt over 6 mm of dots. Keeps the shirt colour you have.',
-   s: {look: 'deep', k0: 8, k1: 30, fade: 6, fadeDir: 'in'}},
-  {name: 'Glows & soft shadows · any tee', desc: 'Only the soft parts (glows, drop shadows, fades) turn into dots; solid parts stay solid. Keeps the shirt colour you have.',
+  {name: 'Boxed picture · soft dotted edge', desc: 'For a picture that fills its whole rectangle. It stays solid and the hard outside edge fades into the shirt over 8 mm of dots; go longer on big prints with Fade the edge. Keeps the shirt colour you have. Not for cut-out designs or lettering.',
+   s: {look: 'deep', k0: 8, k1: 30, fade: 8, fadeDir: 'in'}},
+  {name: 'Glows & soft shadows · any tee', desc: 'Only the soft parts (glows, drop shadows, fades) turn into dots; solid parts stay solid. Keeps the shirt colour you have. Faint leftovers from a rough cut-out show up as dots too, so check the edges.',
    s: {look: 'edges', k0: 0, k1: 100, hard: 0}},
-  {name: 'White tee · everyday', desc: 'Only the palest shading turns into dots; colours stay solid.',
+  {name: 'White tee · everyday', desc: 'White in the design becomes the shirt, the palest shading turns into dots and colours stay solid. Designs made for dark tees can break up on white.',
    s: {look: 'deep', shirt: '#ffffff', k0: 8, k1: 30}},
-  {name: 'White tee · halftone fade', desc: 'White and near-white drop out to the shirt, pale shading turns into dots, solid colours stay solid.',
+  {name: 'White tee · halftone fade', desc: 'White and near-white drop out to the shirt, pale shading turns into dots, solid colours stay solid. Lighter and softer; good for skies and clouds.',
    s: {look: 'knock', shirt: '#ffffff', k0: 10, k1: 70}},
-  {name: 'Coloured tee · blend into the shirt', desc: 'Pick the shirt colour first. That colour drops out of the design and shading near it turns into dots.',
-   s: {look: 'knock', k0: 10, k1: 60}},
+  {name: 'Coloured tee · everyday', desc: 'Pick the shirt colour first. The design stays solid and bright; only the darkest shading turns into dots. The safe choice for photos and faces.',
+   s: {look: 'deep', k0: 8, k1: 30}},
+  {name: 'Coloured tee · blend into the shirt', desc: 'Pick the shirt colour first. That colour drops out of the design and shading near it turns into dots. For art drawn on that colour; in photos it can eat into faces and fur.',
+   s: {look: 'knock', k0: 8, k1: 45}},
   {name: 'Vintage full halftone · dark tee', desc: 'The whole design becomes dots by brightness, in rich colour, for a worn, vintage feel on dark tees.',
    s: {look: 'full', shirt: '#111111', k0: 0, k1: 55, rich: true, drop: 18, solid: 92}} // full ink from 55%: at 100% a dark design (Elefus) nearly vanished
 ];
+let starterLv = null; // Brightness and Contrast the last starter set, so the next starter can take them off again
 function starterPreset(b){ // a starter as a full preset: today's settings, with the starter's halftone style on top
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
   Object.assign(s, {finish: 'dots', lpi: 30, angle: 22.5, shape: 'round', ink: 'art', cut: 50, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88, hard: 50, rich: false, clean: false, crisp: true, speck: true, fade: 0, fadeDir: 'in'}, b.s);
@@ -3765,7 +3772,10 @@ function starterPreset(b){ // a starter as a full preset: today's settings, with
   // the file's own parts stay; a part the last starter brought goes, and this starter's own come in
   const own = rules.filter(R => !R.area && !R.starter).map(R => ({...R, samples: [...R.samples]}));
   const mine = (b.rules || []).map(R => ({...newRule(R.type, R.action), ...R, starter: true}));
-  return {name: b.name, desc: b.desc, v: 1, s, levels: {...lv}, rules: own.concat(mine).slice(0, MAX_RULES)};
+  // Brightness and Contrast: a starter's own lift goes when you flip to the next one (if you haven't moved it); your own stays
+  const L = {...lv}; if (starterLv && L.bri === starterLv.bri && L.bc === starterLv.bc){ L.bri = 0; L.bc = 0; }
+  if (b.lv) Object.assign(L, b.lv); starterLv = b.lv ? {bri: L.bri, bc: L.bc} : null;
+  return {name: b.name, desc: b.desc, v: 1, s, levels: L, rules: own.concat(mine).slice(0, MAX_RULES)};
 }
 function capturePreset(name, withSize){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
