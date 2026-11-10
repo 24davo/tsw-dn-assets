@@ -185,7 +185,8 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .history time{flex:none;font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
 .tip{position:fixed;z-index:40;max-width:260px;padding:7px 10px;border-radius:var(--r);background:var(--toast);color:var(--toast-ink);font-size:12px;font-weight:500;line-height:1.35;pointer-events:none}
 #zoomOut{min-width:44px;padding-right:4px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
-.busy{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none}
+.busy{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none}
+.busy.slow{pointer-events:auto}
 .hint{position:absolute;left:50%;top:16px;transform:translateX(-50%);padding:8px 14px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap}
 .drop{position:absolute;inset:12px;display:grid;place-items:center;border:2px dashed var(--accent);border-radius:var(--r);background:color-mix(in srgb,var(--panel) 88%,transparent);font-size:18px;font-weight:800;letter-spacing:-.02em;pointer-events:none}
 
@@ -344,7 +345,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       </div>
       <div class="pane-pick" id="paneA" hidden><button class="pp-btn" type="button" id="paneABtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Left side shows" data-tip="Choose what this side shows."></button><div class="pp-menu" id="paneAMenu" role="listbox" hidden></div></div>
       <div class="pane-pick" id="paneB" hidden><button class="pp-btn" type="button" id="paneBBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Right side shows" data-tip="Choose what this side shows."></button><div class="pp-menu" id="paneBMenu" role="listbox" hidden></div></div>
-      <div class="busy" id="busy" hidden>Updating…</div>
+      <div class="busy" id="busy" hidden><span id="busyTxt">Updating…</span><button class="link" type="button" id="redrawBtn" hidden>Redraw</button></div>
       <div class="tray crop-bar" id="cropBar" hidden><span id="cropTxt"></span><button class="btn small" type="button" id="cropCancel">Cancel</button><button class="btn small primary" type="button" id="cropApply">Apply crop</button></div>
       <div class="hint" id="brushHint" hidden></div>
       <div class="hint" id="pickHint" hidden>Click the colour to knock out · Esc to cancel</div>
@@ -353,7 +354,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     </div>
 
     <aside class="panel" aria-label="Halftone settings">
-      <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
+      <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="revertBtn">Revert</button><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
 
       <section class="group" id="historyGroup">
         <h2>History</h2>
@@ -702,7 +703,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
             <li>Start at step 1, Print style: choose Halftone or Clean cut (only the tools for that style show), then a Quick start. Then work down the numbered steps. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
             <li>Print style starts open; the other sections start folded: click a title to open it, or Expand all. Hover over anything for a short tip.</li>
-            <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z.</li>
+            <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z. Revert (top of Tools) goes back to the design as it was opened; Reset to defaults puts the tool’s own settings back.</li>
+            <li>If the preview ever seems stuck, it restarts itself; after a few seconds “Updating…” also offers Redraw.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
         </details>
@@ -1151,14 +1153,39 @@ function makeBus(){
   try {
     const w = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], {type: 'text/javascript'})));
     w.onmessage = e => { gotReply = true; onMsg(e.data); };
-    w.onerror = e => { e.preventDefault && e.preventDefault(); if (!gotReply){ bus = localBus(); running = false; if (art) buildSrc(); } };
-    return {post: (m, t) => w.postMessage(m, t || [])};
+    w.onerror = e => { e.preventDefault && e.preventDefault(); if (!gotReply){ bus = localBus(); running = false; if (art) buildSrc(); } else engineTrouble('crash'); };
+    return {post: (m, t) => w.postMessage(m, t || []), w};
   } catch(e){ return localBus(); }
 }
 bus = makeBus();
 
+/* A watchdog: an update normally takes a second or two. Past 6 s the Updating box offers Redraw; past 20 s (40, 80 after
+   each automatic restart, for slow computers) the preview restarts itself and runs the settings again. A crash restarts it
+   at once. After two automatic restarts in a row it stops trying and says so. */
+let watchT = 0, slowT = 0, autoRestarts = 0;
+function watchRun(){ clearTimeout(watchT); clearTimeout(slowT); slowT = setTimeout(() => setSlow(true), 6000); watchT = setTimeout(() => engineTrouble('slow'), 20000*Math.pow(2, autoRestarts)); }
+function runSettled(){ clearTimeout(watchT); clearTimeout(slowT); setSlow(false); }
+function setSlow(on){ $('busy').classList.toggle('slow', on); $('redrawBtn').hidden = !on; $('busyTxt').textContent = on ? 'Still updating…' : 'Updating…'; }
+function engineTrouble(kind){
+  if (autoRestarts >= 2){
+    if (kind === 'slow'){ setSlow(true); $('busyTxt').textContent = 'Still updating: big prints take longer on some computers.'; return; }
+    runSettled(); running = false; pending = false; $('busy').hidden = true; flushIdle();
+    toast('The preview keeps stopping. This print may be too big for this computer: try a smaller print size, then Redraw.'); return;
+  }
+  autoRestarts++;
+  restartEngine(kind === 'slow' ? 'The preview was taking too long, so it restarted and ran your settings again.' : 'The preview stopped, so it restarted and ran your settings again.');
+}
+function restartEngine(msg){ // a fresh engine, the art sent again, then the current settings
+  runSettled();
+  if (bus && bus.w) try { bus.w.terminate(); } catch(e){}
+  gotReply = false; running = false; pending = false; bus = makeBus();
+  if (art) buildSrc(); else { $('busy').hidden = true; flushIdle(); }
+  if (msg) toast(msg);
+}
+$('redrawBtn').addEventListener('click', () => { autoRestarts = 0; restartEngine('Redrawn with your settings.'); });
 function onMsg(m){
   if (m.type === 'src'){ if (m.v === srcV){ srcStats = m.stats; hist = m.stats.hist; drawHisto(); } return; }
+  runSettled(); if (m.type !== 'err') autoRestarts = 0;
   if (m.type === 'err'){ running = false; pending = false; $('busy').hidden = true; toast('That didn’t work: ' + m.msg); flushIdle(); return; }
   running = false;
   if (m.v === srcV) paint(m);
@@ -1187,6 +1214,7 @@ function schedule(){
   running = true;
   $('busy').hidden = false;
   bus.post({type: 'run', id: ++runId, v: srcV, p: params()});
+  watchRun();
 }
 
 /* ---------- sizes ---------- */
@@ -2562,7 +2590,7 @@ $('allApply').addEventListener('click', () => {
     const snap = {...d.snap, s: {...src.s}, lv: {...src.lv}, rules: src.rules.map(R => ({...R, samples: [...R.samples]}))};
     if (withSize){ const a = d.art; snap.w = Math.max(0.5, Math.min(sw, sh*a.w/a.h, maxWidthFor(a))); } // fits inside this tab's width and height
     d.steps = d.steps.slice(0, d.stepPos + 1); d.steps.push({snap, label: `Settings from ${art.name}`, at: Date.now()});
-    if (d.steps.length > HIST_MAX) d.steps.shift();
+    if (d.steps.length > HIST_MAX) d.steps.splice(1, 1);
     d.stepPos = d.steps.length - 1; d.snap = snap; d.activeRule = Math.min(d.activeRule || 0, Math.max(0, snap.rules.length - 1)); d.unsaved = true;
   }
   renderTabs();
@@ -3068,7 +3096,7 @@ $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentEleme
 /* ---------- history: the last 40 changes to this design, to undo or go back to ---------- */
 const HIST_MAX = 40;
 const sign = v => (v > 0 ? '+' : '') + v;
-const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', look: v => `Quick start: ${lookName(v)}`, // the style first: switching it can move the Quick start too cut: v => `Threshold ${v}%`,
+const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', look: v => `Quick start: ${lookName(v)}`, cut: v => `Threshold ${v}%`, // the style first: switching it can move the Quick start too
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, ktol: v => `Knock-out tolerance ${v}%`,
   mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
@@ -3107,7 +3135,7 @@ function commitStep(){
   if (JSON.stringify(snap) === JSON.stringify(cur.snap)){ stepLabel = null; return; }
   const label = stepLabel || describeStep(cur.snap, snap); stepLabel = null;
   steps = steps.slice(0, stepPos + 1); steps.push({snap, label, at: Date.now()});
-  if (steps.length > HIST_MAX) steps.shift();
+  if (steps.length > HIST_MAX) steps.splice(1, 1); // keep the first line: the design as opened
   stepPos = steps.length - 1; unsaved = true; renderSteps();
 }
 function resetSteps(label){ clearTimeout(stepTimer); stepLabel = null; steps = [{snap: snapshot(), label, at: Date.now()}]; stepPos = 0; unsaved = false; renderSteps(); }
@@ -3125,6 +3153,21 @@ function applySnap(snap){
   remember(); schedule(); updateChecks();
   restoring = false;
 }
+function revertToOpened(){ // back to History's first line, as a new step, so Undo brings the work back
+  if (!art || !steps.length) return;
+  if (cropping) endCrop(false);
+  if (picking) endPick();
+  endBrush(); commitStep();
+  const first = steps[0].snap;
+  if (JSON.stringify(snapshot()) === JSON.stringify(first)){ toast('This design is already as it was opened.'); return; }
+  applySnap(first);
+  steps = steps.slice(0, stepPos + 1); steps.push({snap: JSON.parse(JSON.stringify(first)), label: 'Reverted to as opened', at: Date.now()});
+  if (steps.length > HIST_MAX) steps.splice(1, 1);
+  stepPos = steps.length - 1; unsaved = true; renderSteps();
+  clearDoneMarks(); openStart();
+  toast('Back to the design as it was opened. Undo (Cmd/Ctrl+Z) brings your changes back.');
+}
+$('revertBtn').addEventListener('click', revertToOpened);
 function goStep(i){ if (i < 0 || i >= steps.length || i === stepPos) return; stepPos = i; applySnap(steps[i].snap); unsaved = true; renderSteps(); }
 function undo(){ commitStep(); goStep(stepPos - 1); }
 function redo(){ commitStep(); goStep(stepPos + 1); }
@@ -3315,6 +3358,7 @@ const TIPS = [
   ['#nameSuffix', 'Added to the end of the saved name, e.g. an order number or the print area.'],
   ['#foldAll', 'Open or close every section.'],
   ['#resetAll', 'Put every setting back to the tool’s defaults and remove the crop. Undo brings them back.'],
+  ['#revertBtn', 'Back to this design as it was opened: its settings, crop, size and touch-ups. Undo brings your changes back.'],
   ['.step-reset', 'Put just this step back to its defaults. Undo brings yours back.'],
   ['#edge', 'How far in from the outside of the outline to trim. Off leaves the edge as it is.'],
   ['[data-emode="any"]', 'Trim every colour: shrinks the whole outline, like Photoshop’s Contract.'],
