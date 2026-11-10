@@ -208,6 +208,8 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .route{gap:10px}
 .route .choice{padding:14px 12px}
 .route .choice-t{font-size:17px}
+.sec-sum{margin-left:auto;font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink);text-align:right}
+.group:not(.folded) .sec-sum{display:none}
 .field{display:grid;gap:6px}
 .f-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .f-head label,.f-head span{font-weight:600;font-size:13px}
@@ -353,13 +355,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
 
-      <section class="group route" id="routeGroup">
-        <h2>Print style</h2>
-        <div class="choices" id="finishChips" role="group" aria-label="Print style">
-          <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone</span><span class="choice-d">Shading, fades and soft edges turn into dots.</span></button>
-          <button class="choice" type="button" data-finish="cut"><span class="choice-t">Clean cut</span><span class="choice-d">No dots. Every pixel prints solid or is removed.</span></button>
-        </div>
-        <p class="f-note">Choose this first. The tools below change to suit it; the ones both styles use stay.</p>
+      <section class="group" id="historyGroup">
+        <h2>History</h2>
+        <div class="preset-actions"><button class="chip" type="button" id="histUndo" disabled>Undo</button><button class="chip" type="button" id="histRedo" disabled>Redo</button></div>
+        <ol class="history" id="historyList"></ol>
+        <p class="f-note">The last 40 changes to this design. Click a step to go back to it. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes. History starts again when you open new art.</p>
       </section>
 
       <section class="group" id="presetGroup">
@@ -388,15 +388,15 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <input type="file" id="presetFile" accept=".json,application/json" hidden>
       </section>
 
-      <section class="group" id="historyGroup">
-        <h2>History</h2>
-        <div class="preset-actions"><button class="chip" type="button" id="histUndo" disabled>Undo</button><button class="chip" type="button" id="histRedo" disabled>Redo</button></div>
-        <ol class="history" id="historyList"></ol>
-        <p class="f-note">The last 40 changes to this design. Click a step to go back to it. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes. History starts again when you open new art.</p>
-      </section>
-
-      <section class="group" id="lookGroup">
-        <h2>Quick start</h2>
+      <section class="group step route" id="routeGroup">
+        <h2>Print style</h2>
+        <div class="choices" id="finishChips" role="group" aria-label="Print style">
+          <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone</span><span class="choice-d">Shading, fades and soft edges turn into dots.</span></button>
+          <button class="choice" type="button" data-finish="cut"><span class="choice-t">Clean cut</span><span class="choice-d">No dots. Every pixel prints solid or is removed.</span></button>
+        </div>
+        <p class="f-note">Choose this first. The steps below change to suit it; tools both styles use stay.</p>
+        <div class="lv-sub">Quick start</div>
+        <p class="f-note">Then pick a starting point. It sets several steps at once, ready to fine-tune below.</p>
         <div class="looks" id="looks">
           <label class="look"><input type="radio" name="look" id="lookShadows" value="shadows"><span class="look-t">Remove shadows</span><span class="look-d">Quick clean-up for dark shirts. Shadows drop out and the rest prints solid, with no dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookEdges" value="edges"><span class="look-t">Fix soft edges</span><span class="look-d">Shadows, glows and fades become solid dots. Solid parts stay solid.</span></label>
@@ -693,15 +693,15 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
-            <li>JPG on a white background: tick Remove the background (step 3). To change a colour, e.g. black text to white for a dark tee, add a colour range, pick the colour and choose Recolour.</li>
+            <li>JPG on a white background: tick Remove the background (step 4). To change a colour, e.g. black text to white for a dark tee, add a colour range, pick the colour and choose Recolour.</li>
             <li>Open several designs at once: each opens in its own tab (+ or Open art, or drop several files) with its own settings, touch-ups and history. A dot on a tab means it isn’t saved yet.</li>
             <li>Touch up brushes: Eraser clears stray pixels, Paint fills gaps in a colour Alt-clicked from the art, Restore brings the original back. [ and ] change the size, hold Space to move.</li>
             <li>For a crisp outline on a dark tee, tick Hard edge and add a little Trim the edge in the Edge step. Any colour trims a background-removal fringe; Only near the knock-out colour keeps dark parts like tyres.</li>
             <li>For a quick black-shirt clean-up with no halftone, choose Clean cut, then Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
             <li>To halftone most of a design but keep one part free of dots (a grey skull in red smoke), add a colour range in Select, choose Greys or pick the part’s colours, then No dots.</li>
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
-            <li>Choose Halftone or Clean cut at the top first: only the tools for that style show. Then work down the numbered steps. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
-            <li>Sections start folded: click a title to open it, or Expand all. Hover over anything for a short tip.</li>
+            <li>Start at step 1, Print style: choose Halftone or Clean cut (only the tools for that style show), then a Quick start. Then work down the numbered steps. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
+            <li>Print style starts open; the other sections start folded: click a title to open it, or Expand all. Hover over anything for a short tip.</li>
             <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
@@ -2027,18 +2027,21 @@ $('inkPick').addEventListener('input', e => { st.inkHex = e.target.value; rememb
 function syncInk(){ syncChips('inkChips', 'ink', st.ink); $('inkRow').hidden = st.ink !== 'one'; $('inkPick').value = st.inkHex; }
 $('looks').addEventListener('change', e => {
   if (e.target.name !== 'look') return;
+  const was = st.look;
   st.look = e.target.value; Object.assign(st, LOOKS[st.look]);
+  if (was === 'shadows' && st.look !== 'shadows') dropShadowRule(); // leaving Remove shadows takes its own range with it
   if (st.look === 'shadows') st.finish = 'cut'; else if (st.look === 'full') st.finish = 'dots'; // each is offered in one style only
   if (st.look === 'shadows') ensureShadowRule();
   syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
-function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look !== 'knock' && st.look !== 'full'; syncStepButtons(); }
+function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = st.look !== 'knock' && st.look !== 'full'; syncStepButtons(); syncRouteSum(); }
+function syncRouteSum(){ const el = $('routeSum'); if (el) el.textContent = `${st.finish === 'cut' ? 'Clean cut' : 'Halftone'} · ${lookName()}`; }
 $('finishChips').addEventListener('click', e => {
   const b = e.target.closest('[data-finish]'); if (!b || b.dataset.finish === st.finish) return;
   st.finish = b.dataset.finish;
   // a Quick start the other style doesn't offer becomes its nearest one: Full halftone → Knock out the shirt colour,
-  // Remove shadows → Fix soft edges (its shadow range stays in Select)
-  if (!ROUTE_LOOKS[routeOf(st.finish)].includes(st.look)){ st.look = st.finish === 'cut' ? 'knock' : 'edges'; syncLook(); }
+  // Remove shadows → Fix soft edges (and its untouched shadow range goes with it)
+  if (!ROUTE_LOOKS[routeOf(st.finish)].includes(st.look)){ if (st.look === 'shadows') dropShadowRule(); st.look = st.finish === 'cut' ? 'knock' : 'edges'; syncLook(); }
   syncFinish(); syncRules(); remember(); schedule();
 });
 function syncFinish(){
@@ -2056,13 +2059,13 @@ function syncFinish(){
   nameGroup('finishGroup', cut ? 'Threshold' : 'Halftone dots',
     cut ? 'How solid a pixel must be to print. Anything less solid is removed, so the film has no haze.'
         : 'How fine the dots are (lines per inch), their angle and their shape. 30 lpi suits most tees.');
-  syncLegend(); updateChecks();
+  syncLegend(); updateChecks(); syncRouteSum();
   if (resetsReady) keepChosenPreset(); // the preset list shows this style's
 }
 function nameGroup(id, name, tip){ // a step's title, its fold button and the "Done · next" buttons that name it
   const g = $(id), b = g.querySelector('.sec-toggle');
   g.dataset.name = name;
-  if (b){ b.lastChild.textContent = name; b.dataset.tip = tip; } else g.querySelector('h2').textContent = name;
+  if (b){ [...b.childNodes].find(n => n.nodeType === 3).textContent = name; b.dataset.tip = tip; } else g.querySelector('h2').textContent = name;
   if (folds.length) syncStepButtons();
 }
 
@@ -2075,6 +2078,11 @@ const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['solid', 
 const RULE_DEFAULTS = [['shadows', 'remove'], ['highlights', 'solid'], ['midtones', 'fade'], ['sample', 'remove']];
 const MAX_RULES = 4;
 function newRule(type, action){ return {type, action, samples: [], range: 50, fuzz: 20, keep: 50, cut: 50, invert: false, to: '#ffffff'}; }
+function dropShadowRule(){ // the range Remove shadows added, if it's still as it was added (a changed one is the user's now)
+  const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && R.range === 50 && R.fuzz === 20);
+  if (i < 0) return;
+  rules.splice(i, 1); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1)); syncRules();
+}
 function ensureShadowRule(){
   let i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert);
   if (i < 0){ rules.unshift(newRule('shadows', 'remove')); i = 0; }
@@ -2438,7 +2446,7 @@ function setArt(el, w, h, name, isSample, dpi, kind){
   if (cropping) endCrop(false);
   endBrush(); shownStrokes = [];
   art = makeArt(el, w, h, name, isSample, dpi, kind);
-  syncCrop(); clearDoneMarks();
+  syncCrop(); clearDoneMarks(); if (folds.length) openStart();
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
   $('nameSuffix').value = ''; // a suffix belongs to one piece of art
   syncFileInfo();
@@ -3174,7 +3182,7 @@ window.addEventListener('beforeunload', e => {
 const SECTION_TIPS = {
   presetGroup: 'Save the whole set-up under a name and use it again. Shared presets are the same on every workshop computer.',
   historyGroup: 'Every change to this design. Click a step to go back to it.',
-  lookGroup: 'A starting point that sets several steps at once, for the print style chosen at the top.',
+  routeGroup: 'Where every design starts: halftone or clean cut, then a quick start. The steps below change to suit it.',
   cropGroup: 'Trim empty margins or draw a crop. Do it first, so the print size measures the real art.',
   sizeGroup: 'The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
   bgGroup: 'Clear a plain background (a JPG’s white, a screenshot’s colour) only where it joins the outside edge, so the same colour inside the design stays.',
@@ -3197,12 +3205,13 @@ for (const id of ['finishGroup', 'bgGroup', 'sizeGroup', 'sharpGroup', 'knockGro
 }
 for (const g of document.querySelectorAll('.panel > .group')){
   const h = g.querySelector(':scope > h2, :scope > .g-head > h2');
-  if (!h || g.id === 'routeGroup') continue; // Print style stays open
+  if (!h) continue;
   const b = document.createElement('button');
   g.dataset.name = h.textContent.trim();
   b.type = 'button'; b.className = 'sec-toggle';
   if (g.classList.contains('step')){ const n = document.createElement('span'); n.className = 'step-n'; n.setAttribute('aria-hidden', 'true'); b.appendChild(n); }
   b.appendChild(document.createTextNode(h.textContent));
+  if (g.id === 'routeGroup') b.insertAdjacentHTML('beforeend', '<span class="sec-sum" id="routeSum"></span>'); // the choice, shown while folded
   if (SECTION_TIPS[g.id]) b.dataset.tip = SECTION_TIPS[g.id];
   h.textContent = ''; h.appendChild(b);
   const set = open => { g.classList.toggle('folded', !open); b.setAttribute('aria-expanded', String(open)); };
@@ -3215,6 +3224,8 @@ for (const g of document.querySelectorAll('.panel > .group')){
     foot.firstChild.addEventListener('click', () => stepDone(g));
   }
 }
+function openStart(){ const f = folds.find(f => f.g.id === 'routeGroup'); if (f){ f.set(true); syncFoldAll(); } } // Print style is where every design starts
+openStart();
 function visibleSteps(){ return folds.filter(f => f.g.classList.contains('step') && !f.g.hidden); } // a declaration, so syncLook can call it at start-up
 function anyFolded(){ return folds.some(f => !f.g.hidden && f.g.classList.contains('folded')); }
 function syncFoldAll(){ $('foldAll').textContent = anyFolded() ? 'Expand all' : 'Collapse all'; }
