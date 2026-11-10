@@ -283,6 +283,28 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
   .stage-bar .tray-label{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* v56: three steps, then Fine-tune */
+.tune-head{border-bottom:1px solid var(--line);background:var(--soft)}
+.tune-toggle{display:flex;align-items:center;gap:8px;width:100%;padding:13px max(20px,env(safe-area-inset-right,0px)) 13px max(20px,env(safe-area-inset-left,0px));border:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.tune-toggle::before{content:"";flex:none;width:6px;height:6px;margin:0 2px 3px 1px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
+.panel.tune-closed .tune-toggle::before{transform:rotate(-45deg);margin-bottom:0}
+.tune-t{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.tune-d{font-size:12px;color:var(--muted)}
+.tune-n{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted)}
+.panel.tune-closed > .group.tune{display:none}
+.size-ask{margin:0;padding:9px 10px;border-radius:var(--r);background:var(--warn-bg);color:var(--warn);font-size:13px;font-weight:600}
+.size-trim{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+#sizeChips{display:grid;grid-template-columns:repeat(4,1fr)}
+#sizeChips .chip{padding:0 4px}
+.fsize.ask{border-color:var(--warn);color:var(--warn)}
+.more-btn{font-size:12px}
+.route .choice{padding:10px 12px}
+.route .lv-sub{margin-top:0}
+.looks{gap:6px}
+.look{padding:8px 12px;gap:0 10px}
+.look-t{font-size:14px}
+.look-d{display:none;font-size:12px}
+.look:has(input:checked) .look-d{display:block}
 </style>
 </head>
 <body>
@@ -368,7 +390,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <h2>History</h2>
         <div class="preset-actions"><button class="chip" type="button" id="histUndo" disabled>Undo</button><button class="chip" type="button" id="histRedo" disabled>Redo</button></div>
         <ol class="history" id="historyList"></ol>
-        <p class="f-note">The last 40 changes to this design. Click a step to go back to it. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes. History starts again when you open new art.</p>
+        <p class="f-note"><span>Click a step to go back to it.</span><span class="more-x" hidden> The last 40 changes to this design. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes. History starts again when you open new art.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
       </section>
 
       <section class="group" id="presetGroup">
@@ -397,15 +419,34 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <input type="file" id="presetFile" accept=".json,application/json" hidden>
       </section>
 
+      <section class="group step" id="sizeGroup">
+        <h2>Print size</h2>
+        <p class="size-ask" id="sizeAsk" hidden>No size is saved in this file. Choose the print width.</p>
+        <div class="chips" id="sizeChips">
+          <button class="chip" type="button" data-w="90" data-tip="90 mm wide: a chest logo.">Chest 90</button>
+          <button class="chip" type="button" data-w="280" data-tip="280 mm wide: a full front print.">Front 280</button>
+          <button class="chip" type="button" data-w="330" data-tip="330 mm wide: a full back print.">Back 330</button>
+          <button class="chip" type="button" data-w="max">Largest</button>
+        </div>
+        <div class="size">
+          <div class="num"><input type="number" id="wcm" min="5" max="500" step="1" value="250" aria-label="Print width in millimetres"><span>mm wide</span></div>
+          <span class="by">×</span>
+          <div class="num"><input type="number" id="hcm" min="5" max="500" step="1" value="250" aria-label="Print height in millimetres"><span>mm high</span></div>
+        </div>
+        <div class="size-trim" id="sizeTrim" hidden><span>There’s empty space around the art.</span><button class="chip" type="button" id="sizeTrimBtn">Trim to the art</button></div>
+        <div class="check q-note" id="qualityNote" hidden></div>
+        <label class="check-row" id="smoothRow" hidden data-tip="Redraws the art from its real pixels with smooth edges, so the blocks don’t print as steps. Leave it off for pixel-art designs."><input type="checkbox" id="smoothBtn"> Smooth the enlarged pixels</label>
+        <p class="f-note"><span id="sizeNote">Saved at 300 dpi.</span><span class="more-x" hidden> Type either box and the other follows. Largest print is 400 × 500 mm either way round. The art is resized to this first, then everything else is worked out at this size, so the dots are true to the print.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        <p class="f-note" id="lifeNote"></p>
+      </section>
+
       <section class="group step route" id="routeGroup">
         <h2>Print style</h2>
         <div class="choices" id="finishChips" role="group" aria-label="Print style">
-          <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone</span><span class="choice-d">Shading, fades and soft edges turn into dots.</span></button>
-          <button class="choice" type="button" data-finish="cut"><span class="choice-t">Clean cut</span><span class="choice-d">No dots. Every pixel prints solid or is removed.</span></button>
+          <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone</span><span class="choice-d">Shading becomes dots.</span></button>
+          <button class="choice" type="button" data-finish="cut"><span class="choice-t">Clean cut</span><span class="choice-d">Solid ink, no dots.</span></button>
         </div>
-        <p class="f-note">Choose this first. The steps below change to suit it; tools both styles use stay.</p>
         <div class="lv-sub">Quick start</div>
-        <p class="f-note">Then pick a starting point. It sets several steps at once, ready to fine-tune below.</p>
         <div class="looks" id="looks">
           <label class="look"><input type="radio" name="look" id="lookShadows" value="shadows"><span class="look-t">Remove shadows</span><span class="look-d">Quick clean-up for dark shirts. Shadows drop out and the rest prints solid, with no dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookEdges" value="edges"><span class="look-t">Fix soft edges</span><span class="look-d">Shadows, glows and fades become solid dots. Solid parts stay solid.</span></label>
@@ -415,7 +456,9 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group step" id="cropGroup">
+      <div class="tune-head" id="tuneHead"><button class="tune-toggle" type="button" id="tuneToggle" aria-expanded="false"><span class="tune-t">Fine-tune</span><span class="tune-d">only if needed</span><span class="tune-n" id="tuneSum"></span></button></div>
+
+      <section class="group tune" id="cropGroup">
         <h2>Crop</h2>
         <div class="preset-actions">
           <button class="chip" type="button" id="cropTrim">Trim to the art</button>
@@ -425,32 +468,12 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <p class="f-note" id="cropNote">No crop: the whole file is used.</p>
       </section>
 
-      <section class="group step" id="sizeGroup">
-        <h2>Print size</h2>
-        <div class="size">
-          <div class="num"><input type="number" id="wcm" min="5" max="500" step="1" value="250" aria-label="Print width in millimetres"><span>mm wide</span></div>
-          <span class="by">×</span>
-          <div class="num"><input type="number" id="hcm" min="5" max="500" step="1" value="250" aria-label="Print height in millimetres"><span>mm high</span></div>
-        </div>
-        <div class="chips" id="sizeChips">
-          <button class="chip" type="button" data-w="90">Chest 90 mm</button>
-          <button class="chip" type="button" data-w="280">Front 280 mm</button>
-          <button class="chip" type="button" data-w="330">Back 330 mm</button>
-          <button class="chip" type="button" data-w="max">Largest</button>
-        </div>
-        <div class="check q-note" id="qualityNote" hidden></div>
-        <label class="check-row" id="smoothRow" hidden data-tip="Redraws the art from its real pixels with smooth edges, so the blocks don’t print as steps. Leave it off for pixel-art designs."><input type="checkbox" id="smoothBtn"> Smooth the enlarged pixels</label>
-        <p class="f-note" id="sizeNote">Saved at 300 dpi. Largest print is 400 × 500 mm either way round.</p>
-        <p class="f-note">Type either side and the other follows. The original art is resized to this first, then Levels, colour ranges and dots are worked out at this size, so the dots are true to the print.</p>
-        <p class="f-note" id="lifeNote"></p>
-      </section>
-
-      <section class="group step" id="finishGroup">
+      <section class="group tune" id="finishGroup">
         <h2>Halftone dots</h2>
         <div class="field" id="cutField" hidden>
           <div class="f-head"><label for="cut">Threshold</label><output id="cutOut" for="cut">50%</output></div>
           <input type="range" id="cut" min="5" max="95" step="1" value="50">
-          <p class="f-note">Cleans up see-through pixels: soft edges, glows and fades less solid than this are removed, everything else prints fully solid. Colours themselves are kept. The knock-out has its own tolerance.</p>
+          <p class="f-note"><span>Pixels less solid than this are removed. The rest prints fully solid.</span><span class="more-x" hidden> It cleans up see-through pixels: soft edges, glows and fades. Colours themselves are kept. The knock-out has its own tolerance.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
         <div class="field dotf">
           <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">30 lpi</output></div>
@@ -478,9 +501,9 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group step" id="bgGroup">
+      <section class="group tune" id="bgGroup">
         <h2>Background</h2>
-        <p class="f-note">For JPGs and screenshots on a plain background. The background colour is cleared only where it joins the outside edge, so the same colour inside the design (white text, eyes, highlights) stays. Spots of it shut inside a letter (the middle of an O) stay too: brush them away with the Eraser in Touch up.</p>
+        <p class="f-note"><span>For JPGs and screenshots on a plain background.</span><span class="more-x" hidden> The background colour is cleared only where it joins the outside edge, so the same colour inside the design (white text, eyes, highlights) stays. Spots of it shut inside a letter (the middle of an O) stay too: brush them away with the Eraser in Touch up.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <label class="check-row"><input type="checkbox" id="bgOn"> Remove the background</label>
         <div class="trace-body" id="bgBody" hidden>
           <div class="knock"><span class="eswatch bgsw" id="bgSwatch" aria-hidden="true"></span><span id="bgTxt">Looking at the edge…</span></div>
@@ -488,14 +511,14 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <div class="field">
             <div class="f-head"><label for="bgTol">Tolerance</label><output id="bgTolOut" for="bgTol">12%</output></div>
             <input type="range" id="bgTol" min="1" max="40" step="1" value="12">
-            <p class="f-note">How close a colour must be to the background to go. Raise it for noisy JPGs; lower it if parts of the design start to go too.</p>
+            <p class="f-note"><span>How close a colour must be to the background to go.</span><span class="more-x" hidden> Raise it for noisy JPGs; lower it if parts of the design start to go too.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
           </div>
         </div>
       </section>
 
-      <section class="group step" id="sharpGroup">
+      <section class="group tune" id="sharpGroup">
         <h2>Sharpen</h2>
-        <p class="f-note">Like Photoshop’s Unsharp Mask, on the art at print size, before the dots. Brings back crispness lost in resizing or a soft file. Too much leaves bright and dark halos along edges.</p>
+        <p class="f-note"><span>Brings back crispness lost in resizing or a soft file.</span><span class="more-x" hidden> Like Photoshop’s Unsharp Mask, on the art at print size, before the dots. Too much leaves bright and dark halos along edges.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="chips" id="sharpChips" role="group" aria-label="Sharpen">
           <button class="chip" type="button" data-sharp="0" data-sr="1" aria-pressed="true">Off</button>
           <button class="chip" type="button" data-sharp="50" data-sr="0.8" aria-pressed="false">Light</button>
@@ -509,11 +532,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <div class="field" id="sradiusField" hidden>
           <div class="f-head"><label for="sradius">Radius</label><output id="sradiusOut" for="sradius">1.0 px</output></div>
           <input type="range" id="sradius" min="0.3" max="2" step="0.1" value="1">
-          <p class="f-note">How wide a band along each edge it works on. 1 px suits most art at 300 dpi; go smaller for fine detail.</p>
+          <p class="f-note"><span>How wide a band along each edge it works on.</span><span class="more-x" hidden> 1 px suits most art at 300 dpi; go smaller for fine detail.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
       </section>
 
-      <section class="group step" id="levelsGroup">
+      <section class="group tune" id="levelsGroup">
         <div class="g-head"><h2>Brightness &amp; levels</h2><div class="g-actions"><button class="link" type="button" id="lvAuto">Auto</button><button class="link" type="button" id="lvReset" hidden>Reset</button></div></div>
         <div class="field">
           <div class="f-head"><label for="bri">Brightness</label><output id="briOut" for="bri">0</output></div>
@@ -524,9 +547,9 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <input type="range" id="bcon" min="-100" max="100" step="1" value="0">
         </div>
         <label class="check-row" data-tip="Like using Brightness/Contrast in Luminosity blend mode in Photoshop: lighter or darker, with colours as strong as before."><input type="checkbox" id="bcLum" checked> Keep colour strength</label>
-        <p class="f-note">Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes them apart (or together). With Keep colour strength on, only lightness changes, so colours don’t turn grey or pastel. Untick it to work on each colour channel, as Photoshop does. Double-click a slider to put it back to 0.</p>
+        <p class="f-note"><span>Lighter or darker, and more or less contrast, before the dots.</span><span class="more-x" hidden> Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes them apart (or together). With Keep colour strength on, only lightness changes, so colours don’t turn grey or pastel. Untick it to work on each colour channel, as Photoshop does. Double-click a slider to put it back to 0.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="lv-sub">Levels</div>
-        <p class="f-note">Like Photoshop’s Levels. Drag the black point right to turn more dark detail into shadow, or the white point left for more highlights. All of this runs first, on the art’s colours, and the adjusted colours are what prints.</p>
+        <p class="f-note"><span>Drag the black point right for more shadow, or the white point left for more highlights.</span><span class="more-x" hidden> Like Photoshop’s Levels. All of this runs first, on the art’s colours, and the adjusted colours are what prints.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="levels">
           <canvas id="histo" role="img" aria-label="Brightness histogram of the art"></canvas>
           <div class="lv-track" id="lvTrack">
@@ -552,7 +575,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group step" id="knockGroup">
+      <section class="group tune" id="knockGroup">
         <h2>Knock out</h2>
         <div class="knock">
           <span class="colorbox" title="Choose the knock-out colour"><input type="color" id="knockPick" value="#111111" aria-label="Knock-out colour"></span>
@@ -566,7 +589,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <div class="field" id="ktolField" hidden>
           <div class="f-head"><label for="ktol">Knock-out tolerance</label><output id="ktolOut" for="ktol">8%</output></div>
           <input type="range" id="ktol" min="0" max="40" step="1" value="8">
-          <p class="f-note">Clean cut removes only the knock-out colour and colours this close to it. Every other colour stays fully solid. Keep it small so nearby colours aren’t lost.</p>
+          <p class="f-note"><span>Colours this close to the knock-out colour are removed.</span><span class="more-x" hidden> Every other colour stays fully solid. Keep it small so nearby colours aren’t lost.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
         <div class="field dotk">
           <div class="f-head"><label for="k0">Shirt shows through up to</label><output id="k0Out" for="k0">10%</output></div>
@@ -580,20 +603,20 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
         <div class="field dotk">
           <label class="check-row"><input type="checkbox" id="cleanOn"> Clean colour dots</label>
-          <p class="f-note" id="cleanNote">Off by default. Dark tees: the dots in a fade print in the bright version of their colour, sized so the fade still looks like the art. No muddy dark ink at the edges of fades or in dark lettering, but a bolder, more graphic look.</p>
+          <p class="f-note" id="cleanNote"><span>For dark tees: fades print in bright dots, with no muddy dark ink.</span><span class="more-x" hidden> The dots in a fade print in the bright version of their colour, sized so the fade still looks like the art. It gives a bolder, more graphic look, so it is off by default.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
       </section>
 
-      <section class="group step" id="rangeGroup">
+      <section class="group tune" id="rangeGroup">
         <h2>Select (colour range)</h2>
-        <p class="f-note">Like Photoshop’s Select › Colour Range. Select shadows, midtones, highlights or colours picked from the art, then choose what happens to them. Show displays the selection: white is selected.</p>
+        <p class="f-note"><span>Select shadows, highlights or picked colours, then choose what happens to them.</span><span class="more-x" hidden> Like Photoshop’s Select › Colour Range. Show displays the selection: white is selected.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="rules" id="rules"></div>
         <button class="btn small" type="button" id="addRule">Add a colour range</button>
       </section>
 
-      <section class="group step" id="toneGroup">
+      <section class="group tune" id="toneGroup">
         <h2>Ink density</h2>
-        <p class="f-note">The dots’ limits first: the smallest dot that holds, and when big dots join into solid. Then how much ink goes down overall.</p>
+        <p class="f-note"><span>Dot limits first, then how much ink goes down overall.</span><span class="more-x" hidden> Dot limits are the smallest dot that holds, and when big dots join into solid.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="field dotf">
           <div class="f-head"><span>Dot limits</span></div>
           <div class="chips" id="densChips" role="group" aria-label="Dot limits">
@@ -615,7 +638,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
         <div class="field dotf" id="hlvField">
           <div class="g-head"><div class="lv-sub">Halftone levels</div><div class="g-actions"><button class="link" type="button" id="hlvReset" hidden>Reset</button></div></div>
-          <p class="f-note">Like the halftone Levels in Lightning DTF Prep: they change how much ink each part gets, so where and how far the dots spread. The colours stay the art’s own. The chart shows how much of the print gets each amount of ink, from none (left) to solid (right).</p>
+          <p class="f-note"><span>Changes how much ink each part gets, so where the dots spread. Colours stay the art’s own.</span><span class="more-x" hidden> Like the halftone Levels in Lightning DTF Prep. The chart shows how much of the print gets each amount of ink, from none (left) to solid (right).</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
           <div class="levels" id="hlv">
             <canvas id="hhisto" role="img" aria-label="How much of the print gets each amount of ink"></canvas>
             <div class="lv-track" id="hlvTrack">
@@ -639,7 +662,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
               <input type="number" id="hlvOW" min="0" max="100" step="1" value="100" aria-label="Halftone output white">
             </div>
           </div>
-          <p class="f-note">Black point: parts with less ink than this drop out. White point: parts with more print solid. Midtones: left gives more ink in between, right less. Output black gives every inked part at least this much, so small dots reach further into fades. Output white caps the ink.</p>
+          <p class="f-note"><span>Black point drops light ink out. White point makes heavy ink solid.</span><span class="more-x" hidden> Midtones: left gives more ink in between, right less. Output black gives every inked part at least this much, so small dots reach further into fades. Output white caps the ink.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
           <p class="f-note" id="hlvForce" hidden>Output white is below Solid above, so nothing prints solid: the dots run through every area.</p>
         </div>
         <div class="lv-sub">Overall ink</div>
@@ -653,7 +676,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         </div>
       </section>
 
-      <section class="group step" id="inkGroup">
+      <section class="group tune" id="inkGroup">
         <h2>Ink colour</h2>
         <div class="chips" id="inkChips">
           <button class="chip" type="button" data-ink="art">Full colour</button>
@@ -670,19 +693,19 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <input type="range" id="blk" min="5" max="40" step="1" value="20">
           <div class="knock"><span class="eswatch" id="blkSwatch" aria-hidden="true"></span><span id="blkTxt">#333333</span></div>
         </div>
-        <p class="f-note" id="blkNote">DTF black ink can’t match a dyed black tee: it prints as a dark matt grey, and dark colours print dull because of the black in them. With this on, On shirt and On white show ink as it prints. On tees darker than it, colours darker than the ink can print get fewer dots (or are removed in Clean cut), so the tee’s own black does the darkest parts instead of grey patches. The saved PNG keeps the art’s colours. Set once for your printer: it’s remembered on this computer.</p>
+        <p class="f-note" id="blkNote"><span>DTF black prints as a dark matt grey, not a true black. This shows and allows for it.</span><span class="more-x" hidden> Dark colours print dull because of the black in them. With this on, On shirt and On white show ink as it prints. On tees darker than it, colours darker than the ink can print get fewer dots (or are removed in Clean cut), so the tee’s own black does the darkest parts instead of grey patches. The saved PNG keeps the art’s colours. Set once for your printer: it’s remembered on this computer.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
       </section>
 
-      <section class="group step" id="edgeGroup">
+      <section class="group tune" id="edgeGroup">
         <h2>Edge</h2>
-        <p class="f-note">Tidy the outline for the film. Trim the edge works in from the outside of the outline (and the edges of any holes), so the rest of the design is untouched.</p>
+        <p class="f-note"><span>Tidy the outline for the film.</span><span class="more-x" hidden> Trim the edge works in from the outside of the outline (and the edges of any holes), so the rest of the design is untouched.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="field" id="hardField">
           <label class="check-row"><input type="checkbox" id="hardOn"> Hard edge</label>
           <div class="field" id="hardT" hidden>
             <div class="f-head"><label for="hard">Threshold</label><output id="hardOut" for="hard">50%</output></div>
             <input type="range" id="hard" min="1" max="99" step="1" value="50">
           </div>
-          <p class="f-note">Like a Threshold action on the transparency. The film never has half see-through pixels (they’d print as a white haze), but with dots, soft edges and glows turn into dots. Hard edge makes them fully solid or removes them instead, for a crisp outline. Pixels at least this solid stay.</p>
+          <p class="f-note"><span>Soft edges and glows print fully solid or are removed, for a crisp outline.</span><span class="more-x" hidden> Like a Threshold action on the transparency. The film never has half see-through pixels (they’d print as a white haze), but with dots, soft edges and glows turn into dots. Pixels at least this solid stay.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
         <div class="field">
           <div class="f-head"><label for="edge">Trim the edge</label><output id="edgeOut" for="edge">Off</output></div>
@@ -691,13 +714,13 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <button class="chip" type="button" data-emode="any">Any colour</button>
             <button class="chip" type="button" data-emode="near">Only near <span class="eswatch" id="edgeSwatch" aria-hidden="true"></span> <span id="edgeHex">#111111</span></button>
           </div>
-          <p class="f-note" id="emodeAny">Trims every colour off the outline, up to this far in, like Photoshop’s Select › Modify › Contract. The print is then ready for any shirt colour: good for the leftover fringe after a background removal. 1 px is 0.08 mm.</p>
-          <p class="f-note" id="emodeNear" hidden>Trims only colours close to the knock-out colour where they touch the outside. Further in, the same colour stays: black tyres keep their ink, and only their outer rim and the dark fringe go. If Knock out is taking the tyres too, choose the Quick start with no knock-out (Fix soft edges, or Clean up only for Clean cut).</p>
+          <p class="f-note" id="emodeAny"><span>Trims every colour off the outline, up to this far in. 1 px is 0.08 mm.</span><span class="more-x" hidden> Like Photoshop’s Select › Modify › Contract. The print is then ready for any shirt colour: good for the leftover fringe after a background removal.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+          <p class="f-note" id="emodeNear" hidden><span>Trims only colours close to the knock-out colour where they touch the outside.</span><span class="more-x" hidden> Further in, the same colour stays: black tyres keep their ink, and only their outer rim and the dark fringe go. If Knock out is taking the tyres too, choose the Quick start with no knock-out (Fix soft edges, or Clean up only for Clean cut).</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
         <div class="field" id="etolField" hidden>
           <div class="f-head"><label for="etol">Colour tolerance</label><output id="etolOut" for="etol">30%</output></div>
           <input type="range" id="etol" min="2" max="60" step="1" value="30">
-          <p class="f-note">How close to the knock-out colour a pixel must be to be trimmed. Higher takes more of a soft, dark fringe.</p>
+          <p class="f-note"><span>How close to the knock-out colour a pixel must be to be trimmed.</span><span class="more-x" hidden> Higher takes more of a soft, dark fringe.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
         <div class="field">
           <label class="check-row"><input type="checkbox" id="backOn"> Shirt-colour edge</label>
@@ -708,13 +731,13 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             </div>
             <div class="knock"><span class="colorbox"><input type="color" id="backPick" value="#111111" aria-label="Edge colour"></span><span id="backTxt">Follows the shirt colour</span><button class="link" type="button" id="backFollow" hidden>Use the shirt colour</button></div>
           </div>
-          <p class="f-note">Adds a thin edge in the shirt colour around the design, and fills gaps narrower than twice the width, like Photoshop’s Expand selection with a fill layer behind. It holds fine or broken detail together, and on the tee it blends in. Check it on White base, On white or the Ink map.</p>
+          <p class="f-note"><span>Adds a thin edge in the shirt colour around the design, and fills narrow gaps.</span><span class="more-x" hidden> Like Photoshop’s Expand selection with a fill layer behind. Gaps narrower than twice the width are filled. It holds fine or broken detail together, and on the tee it blends in. Check it on White base, On white or the Ink map.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
       </section>
 
-      <section class="group step" id="touchGroup">
+      <section class="group tune" id="touchGroup">
         <h2>Touch up</h2>
-        <p class="f-note">Brush away stray pixels and rough edges, paint over gaps, or bring the original back. Brushes work on the art itself, before every other step, and every stroke is in History.</p>
+        <p class="f-note"><span>Brush away stray pixels, paint over gaps, or bring the original back.</span><span class="more-x" hidden> Brushes work on the art itself, before every other step, and every stroke is in History.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="chips" id="brushChips" role="group" aria-label="Brush">
           <button class="chip" type="button" data-brush="erase" aria-pressed="false">Eraser</button>
           <button class="chip" type="button" data-brush="paint" aria-pressed="false">Paint</button>
@@ -729,7 +752,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <button class="chip" type="button" id="paintFromArt">Pick from art</button>
           <span class="f-note">or Alt-click the art</span>
         </div>
-        <p class="f-note">Choose a brush, then drag on the preview. [ and ] change the size, hold Space to move around, Esc puts the brush down.</p>
+        <p class="f-note"><span>Choose a brush, then drag on the preview.</span><span class="more-x" hidden> [ and ] change the size, hold Space to move around, Esc puts the brush down.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
       </section>
 
       <section class="group step" id="checkGroup">
@@ -756,20 +779,22 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <li>Check at 1:1 before saving. The Fit view can show patterns that aren’t in the file.</li>
             <li>Use Levels first, as in Photoshop: push the black point right so more dark detail counts as shadow, then Remove shadows or Colour range takes it out.</li>
             <li>Zoom with the slider, by pinching a trackpad, with Ctrl/Cmd + scroll, or with the + − 0 keys. Life size shows the real print size once it’s set up with a bank card.</li>
-            <li>JPG on a white background: tick Remove the background (step 5). To change a colour, e.g. black text to white for a dark tee, add a colour range, pick the colour and choose Recolour.</li>
+            <li>JPG on a white background: tick Remove the background (in Background, under Fine-tune). To change a colour, e.g. black text to white for a dark tee, add a colour range, pick the colour and choose Recolour.</li>
             <li>Open several designs at once: each opens in its own tab (+ or Open art, or drop several files) with its own settings, touch-ups and history. A dot on a tab means it isn’t saved yet.</li>
             <li>Touch up brushes: Eraser clears stray pixels, Paint fills gaps in a colour Alt-clicked from the art, Restore brings the original back. [ and ] change the size, hold Space to move.</li>
             <li>For a crisp outline on a dark tee, tick Hard edge and add a little Trim the edge in the Edge step. Any colour trims a background-removal fringe; Only near the knock-out colour keeps dark parts like tyres.</li>
             <li>For a quick black-shirt clean-up with no halftone, choose Clean cut, then Remove shadows. Range sets how dark counts as shadow. Keep Fuzziness low, and the threshold makes every pixel solid or clear.</li>
             <li>To halftone most of a design but keep one part free of dots (a grey skull in red smoke), add a colour range in Select, choose Greys or pick the part’s colours, then No dots.</li>
             <li>Save your usual set-ups as Presets, and export them to share with the other computers.</li>
-            <li>Start at step 1, Print style: choose Halftone or Clean cut (only the tools for that style show), then a Quick start. Then work down the numbered steps. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
-            <li>Print style starts open; the other sections start folded: click a title to open it, or Expand all. The grey text beside a folded title says how it’s set or what’s inside (the dot controls are in Ink density). Hover over anything for a short tip.</li>
+            <li>Three steps: 1 Print size, 2 Print style (Halftone or Clean cut, then a Quick start), 3 Check &amp; save. “Done · next” ticks a step and opens the next one; the last one saves the PNG.</li>
+            <li>Every other tool is under Fine-tune, only if a design needs it. The number beside it says how many sections this design has changed.</li>
+            <li>Click a title to open a section, or Expand all. The grey text beside a folded title says how it’s set. Hover over anything for a short tip; More opens the longer note.</li>
             <li>History keeps the last 40 changes. Click a step to go back, or press Cmd/Ctrl+Z. Revert (top of Tools) goes back to the design as it was opened; Reset to defaults puts the tool’s own settings back.</li>
             <li>If the preview ever seems stuck, it restarts itself; after a few seconds “Updating…” also offers Redraw.</li>
             <li>To keep the art’s contrast and colour (smoke, glows, a grey skull) and halftone only the deep shadows, use Quick start “Shadows to dots”, then refine with Halftone levels.</li>
             <li>Fades into a black tee printing with a muddy maroon or grey edge: first push the Levels black point to about 40, then if needed try Clean colour dots (Knock out step). It prints the dots in the bright version of their colour: cleaner, but a bolder, more graphic look.</li>
             <li>DTF black ink prints as a dark matt grey, never as black as a dyed black tee. Keep “Allow for DTF black ink” on (Ink colour step): the views then show the real grey, and on black tees the darkest colours become sparse dots so the tee does the black. A Shirt-colour edge on a black tee prints in that grey too, so keep it thin.</li>
+            <li>Each new design starts clean: ink amount, halftone levels, knock out, colour ranges, edge, sharpen and background go back to the start. Your print style, Quick start, dot settings, black ink and shirt colour stay. To repeat a set-up, save a preset or use Copy settings to all.</li>
             <li>Nothing is uploaded. The art stays on this computer.</li>
           </ul>
         </details>
@@ -1217,13 +1242,13 @@ function densLevel(lpi){ for (const k of ['fine', 'std', 'safe']){ const v = den
 const ROUTE_LOOKS = {dots: ['edges', 'knock', 'deep', 'full'], cut: ['shadows', 'knock', 'edges']};
 const knockLook = l => l === 'knock' || l === 'deep' || l === 'full'; // the Quick starts that knock out the shirt colour
 const LOOK_TEXT = {
-  dots: {edges: ['Fix soft edges', 'Shadows, glows and fades become solid dots. Solid parts stay solid.'],
-         knock: ['Shirt shows through', 'Colours close to the shirt drop out. Shading turns into dots.'],
-         deep: ['Shadows to dots', 'Only the deepest shadows turn into dots and fade into the shirt. Colours, greys and contrast keep their strength. Refine with Halftone levels.'],
-         full: ['Full halftone', 'The whole design becomes dots for a soft, vintage print.']},
-  cut: {shadows: ['Remove shadows', 'Quick clean-up for dark shirts. Shadows drop out and the rest prints solid.'],
-        knock: ['Knock out the shirt colour', 'Colours close to the shirt drop out. Everything else prints solid.'],
-        edges: ['Clean up only', 'Nothing is knocked out. Glows, fades and soft edges print solid or are removed at the threshold.']}
+  dots: {edges: ['Fix soft edges', 'Glows and fades turn into dots.', 'Shadows, glows and fades become solid dots. Solid parts stay solid.'],
+         knock: ['Shirt shows through', 'Colours near the shirt colour drop out.', 'Colours close to the shirt drop out. Shading turns into dots.'],
+         deep: ['Shadows to dots', 'Only the deepest shadows turn into dots.', 'Only the deepest shadows turn into dots and fade into the shirt. Colours, greys and contrast keep their strength. Refine with Halftone levels.'],
+         full: ['Full halftone', 'All dots, for a soft vintage print.', 'The whole design becomes dots for a soft, vintage print.']},
+  cut: {shadows: ['Remove shadows', 'Shadows drop out. The rest prints solid.', 'Quick clean-up for dark shirts. Shadows drop out and the rest prints solid.'],
+        knock: ['Knock out the shirt colour', 'Colours near the shirt colour drop out.', 'Colours close to the shirt drop out. Everything else prints solid.'],
+        edges: ['Clean up only', 'Soft edges print solid or are removed.', 'Nothing is knocked out. Glows, fades and soft edges print solid or are removed at the threshold.']}
 };
 const routeOf = f => f === 'cut' ? 'cut' : 'dots';
 function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[routeOf(finish || st.finish)][look] || LOOK_TEXT.dots[look] || LOOK_TEXT.cut[look]; return t ? t[0] : look; }
@@ -1237,7 +1262,8 @@ try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null
 var cleanReset = false; // v51 had Clean colour dots on by default
 try { if (!localStorage.getItem('tsw-dtf-clean0')){ cleanReset = true; st.clean = false; localStorage.setItem('tsw-dtf-clean0', '1'); } } catch(e){}
 try { if (!localStorage.getItem('tsw-dtf-dens1')){ if ([[15, 92], [15, 90], [15, 96]].some(([d, v]) => st.drop === d && st.solid === v)) Object.assign(st, densVals('std')); localStorage.setItem('tsw-dtf-dens1', '1'); } } catch(e){}
-function remember(){ noteChange(); try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
+function keepSettings(){ try { const o = {}; for (const k of KEEP) o[k] = st[k]; localStorage.setItem('tsw-dtf-halftone', JSON.stringify(o)); } catch(e){} }
+function remember(){ noteChange(); keepSettings(); }
 
 const stage = $('stage'), view = $('view'), vctx = view.getContext('2d');
 const srcCanvas = document.createElement('canvas'), srcCtx = srcCanvas.getContext('2d', {willReadFrequently: true});
@@ -1265,6 +1291,8 @@ let lastCls = null, paintN = 0, origFor = 0, origMips = null;
 let steps = [], stepPos = -1, stepTimer = 0, stepLabel = null, restoring = false, unsaved = false;
 let cropping = null; // while drawing a crop: {prev, F, rect: [x0, y0, x1, y1] in file pixels, drag, geo}
 let folds = [];      // the panel's sections, filled once their titles become fold buttons
+let tuneOpen = false; // the Fine-tune block (every section but the three numbered steps), remembered on this computer
+try { tuneOpen = localStorage.getItem('tsw-dtf-tune') === 'open'; } catch(e){}
 let showEdge = true; // the dashed print-area edge on the shirt views
 let resetsReady = false; // each step's Reset link, set up near the end
 // tabs: every open design, each with its own art, settings, crop, touch-ups and history; cur is the one on screen
@@ -1366,12 +1394,24 @@ function setWidth(cm, quiet, typing){
   st.widthCm = w;
   if (typing !== $('wcm')) $('wcm').value = toMm(w);
   if (typing !== $('hcm')) $('hcm').value = toMm(h);
-  $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px, saved at 300 dpi. Largest print is 400 × 500 mm either way round.`;
+  $('sizeNote').textContent = `${outW().toLocaleString()} × ${outH().toLocaleString()} px at 300 dpi.`;
   $('sizeRead').textContent = `${toMm(w)} × ${toMm(h)} mm · ${outW()} × ${outH()} px`;
   if ($('fileSize')) $('fileSize').textContent = `${toMm(w)} × ${toMm(h)} mm`;
   syncSums();
   syncQuality();
+  syncSizeAsk();
   if (resetsReady) syncResets();
+}
+// A file with no size saved in it opens at a guess (its pixels at 300 dpi). art.sizeFrom: 'file' (the size is the file's own, or the
+// sample), 'guess' (nobody has chosen yet: Print size opens and asks), 'user' (chosen here).
+const sizeAsOpened = a => a.isSample || a.dpi ? 'file' : 'guess';
+function syncSizeAsk(){
+  if (!art) return;
+  const guess = art.sizeFrom === 'guess', c = art.crop, whole = c.x === 0 && c.y === 0 && c.w === art.fullW && c.h === art.fullH;
+  $('sizeAsk').hidden = !guess;
+  $('sizeTrim').hidden = !(art.trim && whole);
+  const b = $('fileSize');
+  if (b){ b.classList.toggle('ask', guess); b.dataset.tip = guess ? 'No size is saved in this file. Click to choose the print width.' : 'The print size. Click to change it.'; }
 }
 
 /* Draw big images down in halves first so the result stays clean in every browser. */
@@ -1781,7 +1821,7 @@ window.addEventListener('keydown', e => {
 function syncCrop(){
   if (!art) return;
   const c = art.crop, whole = c.x === 0 && c.y === 0 && c.w === art.fullW && c.h === art.fullH;
-  $('cropReset').hidden = whole;
+  $('cropReset').hidden = whole; syncSizeAsk();
   $('cropNote').textContent = whole ? 'No crop: the whole file is used.'
     : `Cropped to ${c.w.toLocaleString()} × ${c.h.toLocaleString()} px of ${art.fullW.toLocaleString()} × ${art.fullH.toLocaleString()}. The print keeps its scale.`;
 }
@@ -1793,10 +1833,10 @@ function setCrop(c){ // c in file pixels; keeps the cm-per-pixel scale
   setWidth(st.widthCm*art.w/before, false);
   syncCrop(); buildSrc(); setZoom('fit'); updateChecks();
 }
-function findTrim(){ // the art's own edges: clear margins, or margins the colour of the top-left corner (a JPG's background)
-  const F = Math.min(1, 2000/Math.max(art.fullW, art.fullH)), w = Math.max(1, Math.round(art.fullW*F)), h = Math.max(1, Math.round(art.fullH*F));
+function findTrim(A = art){ // the art's own edges: clear margins, or margins the colour of the top-left corner (a JPG's background)
+  const F = Math.min(1, 2000/Math.max(A.fullW, A.fullH)), w = Math.max(1, Math.round(A.fullW*F)), h = Math.max(1, Math.round(A.fullH*F));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(art.el, 0, 0, w, h);
+  const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(A.el, 0, 0, w, h);
   const d = x.getImageData(0, 0, w, h).data;
   let clear = false; for (let i = 3; i < d.length; i += 4) if (d[i] < 8){ clear = true; break; }
   const bg = [d[0], d[1], d[2]], keep = i => clear ? d[i+3] >= 8 : Math.abs(d[i] - bg[0]) > 14 || Math.abs(d[i+1] - bg[1]) > 14 || Math.abs(d[i+2] - bg[2]) > 14;
@@ -1804,18 +1844,22 @@ function findTrim(){ // the art's own edges: clear margins, or margins the colou
   for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (keep((yy*w + xx)*4)){ if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
   if (x1 < 0) return null;
   const X0 = Math.max(0, Math.floor((x0 - 1)/F)), Y0 = Math.max(0, Math.floor((y0 - 1)/F)); // one preview pixel spare all round, so no art is lost
-  const X1 = Math.min(art.fullW, Math.ceil((x1 + 2)/F)), Y1 = Math.min(art.fullH, Math.ceil((y1 + 2)/F));
+  const X1 = Math.min(A.fullW, Math.ceil((x1 + 2)/F)), Y1 = Math.min(A.fullH, Math.ceil((y1 + 2)/F));
   return {x: X0, y: Y0, w: X1 - X0, h: Y1 - Y0, byColour: !clear};
 }
-$('cropTrim').addEventListener('click', () => {
+function trimToArt(keepWidth){ // keepWidth: a print width already chosen stays, so the art fills it; otherwise the print keeps its scale
   if (!art) return;
   const t = findTrim();
   if (!t){ toast('There’s no art to trim to.'); return; }
   if (t.x === 0 && t.y === 0 && t.w >= art.fullW && t.h >= art.fullH){ toast('Nothing to trim: the art already reaches the edges.'); return; }
   if (cropping) endCrop(false);
+  const w = st.widthCm;
   noteChange('Trim to the art'); setCrop(t);
+  if (keepWidth){ setWidth(w, true); buildSrcSoon(); updateChecks(); }
   toast(t.byColour ? 'Trimmed the plain background around the art.' : 'Trimmed the clear margin around the art.');
-});
+}
+$('cropTrim').addEventListener('click', () => trimToArt(false));
+$('sizeTrimBtn').addEventListener('click', () => trimToArt(!!art && art.sizeFrom === 'user'));
 $('cropReset').addEventListener('click', () => { if (!art) return; if (cropping) endCrop(false); noteChange('Reset crop'); setCrop({x: 0, y: 0, w: art.fullW, h: art.fullH}); });
 $('cropDraw').addEventListener('click', () => cropping ? endCrop(false) : startCrop());
 $('cropApply').addEventListener('click', () => endCrop(true));
@@ -2260,7 +2304,7 @@ function syncFinish(){
   for (const lab of $('looks').querySelectorAll('.look')){ // this style's Quick starts, in its order
     const v = lab.querySelector('input').value, i = list.indexOf(v);
     lab.hidden = i < 0; lab.style.order = i;
-    if (i >= 0){ lab.querySelector('.look-t').textContent = LOOK_TEXT[r][v][0]; lab.querySelector('.look-d').textContent = LOOK_TEXT[r][v][1]; }
+    if (i >= 0){ lab.querySelector('.look-t').textContent = LOOK_TEXT[r][v][0]; lab.querySelector('.look-d').textContent = LOOK_TEXT[r][v][1]; lab.dataset.tip = LOOK_TEXT[r][v][2]; }
   }
   nameGroup('finishGroup', cut ? 'Threshold' : 'Halftone dots',
     cut ? 'How solid a pixel must be to print. Anything less solid is removed, so the film has no haze.'
@@ -2544,10 +2588,10 @@ let wTimer = 0;
 // width or height: type either one, the other follows the art's shape
 const fromBox = (id, mm) => (id === 'hcm' ? mm*art.w/art.h : mm)/10; // a typed mm box, as the print width in cm
 for (const id of ['wcm', 'hcm']){
-  $(id).addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0) || !art) return; clearTimeout(wTimer); wTimer = setTimeout(() => { setWidth(fromBox(id, v), false, e.target); buildSrcSoon(); updateChecks(); }, 450); });
-  $(id).addEventListener('change', e => { const v = parseFloat(e.target.value); clearTimeout(wTimer); if (!art) return; setWidth(v > 0 ? fromBox(id, v) : st.widthCm); buildSrcSoon(); updateChecks(); });
+  $(id).addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0) || !art) return; clearTimeout(wTimer); wTimer = setTimeout(() => { art.sizeFrom = 'user'; setWidth(fromBox(id, v), false, e.target); buildSrcSoon(); updateChecks(); }, 450); });
+  $(id).addEventListener('change', e => { const v = parseFloat(e.target.value); clearTimeout(wTimer); if (!art) return; if (v > 0) art.sizeFrom = 'user'; setWidth(v > 0 ? fromBox(id, v) : st.widthCm); buildSrcSoon(); updateChecks(); });
 }
-$('sizeChips').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b || !art) return; setWidth(b.dataset.w === 'max' ? maxWidthCm() : +b.dataset.w/10, b.dataset.w === 'max'); buildSrcSoon(); updateChecks(); });
+$('sizeChips').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b || !art) return; art.sizeFrom = 'user'; setWidth(b.dataset.w === 'max' ? maxWidthCm() : +b.dataset.w/10, b.dataset.w === 'max'); buildSrcSoon(); updateChecks(); });
 
 /* ---------- notes and the film check ---------- */
 function updateNotes(){
@@ -2562,6 +2606,7 @@ function minDotMm(){ const cellMm = 25.4/st.lpi; return st.drop > 0 ? cellMm*Mat
 function updateChecks(){
   if (!art) return;
   const rows = [];
+  if (art.sizeFrom === 'guess') rows.push(['warn', '!', 'Print size not chosen', `No size is saved in this file, so it opened at ${toMm(st.widthCm)} mm wide. Choose the print width in step 1.`]);
   const s = srcStats;
   const softPct = s && s.vis ? Math.round(s.soft/s.vis*100) : null;
   rows.push(['good', '✓', 'No see-through pixels',
@@ -2619,8 +2664,9 @@ function analyseArt(a){
     else if (e >= 4.8){ a.q.scale = Math.round(e/1.4*10)/10; a.q.kind = 'soft'; } // soft photos reach 3 to 4.5 on their own
   } catch(err){}
   a.q.done = true;
+  try { const t = findTrim(a); a.trim = t && (t.w < a.fullW*0.92 || t.h < a.fullH*0.92) ? t : null; } catch(err){ a.trim = null; } // margins worth trimming
   if (art !== a) return;
-  syncQuality(); updateChecks();
+  syncQuality(); syncSizeAsk(); updateChecks();
   if (a.quiet) return; // reopened after a refresh: it was said the first time
   if (a.q.kind) toast(`This file looks already enlarged ${a.q.scale}×: its real detail is about ${Math.round(a.w/a.q.scale).toLocaleString()} px wide. Details in Print size.`);
   else if (a.jpegQ && a.jpegQ < 60) toast(`This JPEG was saved at low quality (${a.jpegQ} of 100). Details in Print size.`);
@@ -2728,6 +2774,12 @@ $('fileInfo').addEventListener('click', e => {
 $('smoothBtn').addEventListener('change', e => { if (!art) return; art.smooth = e.target.checked; buildSrcSoon(); syncQuality(); updateChecks(); });
 
 /* ---------- opening art ---------- */
+function cleanStart(){ // a new design starts clean: fixes made for the last design don't follow it. The workshop's own settings stay
+  // (print style, Quick start, lpi, angle, dot shape, dot limits, threshold, black ink, shirt colour).
+  const L = LOOKS[st.look] || LOOKS.knock;
+  Object.assign(st, {k0: L.k0, k1: L.k1, mid: L.mid, con: L.con, ktol: DEFAULTS.ktol, clean: DEFAULTS.clean, ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex}, HLV0, EDGE_KEYS, SHARP_KEYS, BG_KEYS);
+  rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule();
+}
 function setArt(el, w, h, name, isSample, dpi, kind){
   if (cropping) endCrop(false);
   endBrush(); shownStrokes = [];
@@ -2736,9 +2788,11 @@ function setArt(el, w, h, name, isSample, dpi, kind){
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
   $('nameSuffix').value = ''; // a suffix belongs to one piece of art
   syncFileInfo();
-  st.knock = null; syncKnock();
+  cleanStart();
+  st.knock = null; knockFrom = 'shirt'; syncKnock();
   st.bgHex = null; bgFound = null; syncBg(); // the background colour belongs to one piece of art
   Object.assign(lv, LV0); hist = null; syncLevels(); drawHisto(); // Levels belong to one piece of art
+  syncLook(); syncFinish(); syncSliders(); syncInk(); updateNotes(); syncRules(); keepSettings(); // show the clean start
   setWidth(isSample ? 25 : w/(dpi || DPI)*2.54, true);
   setZoom('fit');
   buildSrc(); render(); updateChecks();
@@ -2750,6 +2804,7 @@ function setArt(el, w, h, name, isSample, dpi, kind){
 function makeArt(el, w, h, name, isSample, dpi, kind){
   return {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}, // w and h follow the crop
           isVector: !!(kind && kind.vector), jpegQ: kind && kind.jpegQ || null, smooth: false, q: null,
+          sizeFrom: isSample || dpi ? 'file' : 'guess', trim: null, // trim: empty margins found around the art, offered in Print size
           id: ++artSeq, strokes: [], strokesN: 0, file: null}; // strokes: touch-ups, in the file's pixels; file: the opened file, kept for a refresh
 }
 function syncFileInfo(){
@@ -2887,7 +2942,7 @@ const idbGet = (db, store, key) => new Promise(res => { try { const r = db.trans
 const idbDone = tx => new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => rej(tx.error); });
 function docRecord(d){
   const live = d === cur, a = live ? art : d.art;
-  return {name: a.name, dpi: a.dpi, jpegQ: a.jpegQ, isVector: a.isVector, fullW: a.fullW, fullH: a.fullH, smooth: !!a.smooth,
+  return {name: a.name, dpi: a.dpi, jpegQ: a.jpegQ, isVector: a.isVector, fullW: a.fullW, fullH: a.fullH, smooth: !!a.smooth, sizeFrom: a.sizeFrom,
     strokes: a.strokes, strokesN: a.strokesN, snap: live ? snapshot() : d.snap, activeRule: live ? activeRule : d.activeRule,
     steps: live ? steps : d.steps, stepPos: live ? stepPos : d.stepPos, unsaved: live ? unsaved : d.unsaved,
     zoom: live ? st.zoom : d.zoom, cx: live ? st.cx : d.cx, cy: live ? st.cy : d.cy, suffix: live ? $('nameSuffix').value : d.suffix,
@@ -2928,7 +2983,7 @@ async function restoreDocs(){ // answers how many designs came back
       const im = new Image(); im.decoding = 'async'; im.src = URL.createObjectURL(file);
       try { await im.decode(); } catch(e){ continue; }
       const a = makeArt(im, rec.fullW, rec.fullH, rec.name, false, rec.dpi, {vector: rec.isVector, jpegQ: rec.jpegQ});
-      Object.assign(a, {file, quiet: true, smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0});
+      Object.assign(a, {file, quiet: true, sizeFrom: rec.sizeFrom || 'user', smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0});
       if (rec.snap.crop){ a.crop = {...rec.snap.crop}; a.w = a.crop.w; a.h = a.crop.h; }
       if (cleanReset){ for (const x of [rec.snap, ...(rec.steps || []).map(t => t.snap)]) if (x && x.s) x.s.clean = false; }
       if (a.strokesN) rebuildEdits(a);
@@ -3166,7 +3221,7 @@ function applyPreset(p){
   activeRule = 0;
   syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
   syncInk(); syncLevels(); updateNotes(); syncRules();
-  if (p.size && art){ setWidth(Math.min(p.size.w, p.size.h*art.w/art.h), true); buildSrcSoon(); } // fits inside the saved width and height
+  if (p.size && art){ art.sizeFrom = 'user'; setWidth(Math.min(p.size.w, p.size.h*art.w/art.h), true); buildSrcSoon(); } // fits inside the saved width and height
   remember(); schedule(); updateChecks();
   noteChange(`Preset “${p.name}”`);
   toast(p.desc ? `${p.name}: ${p.desc}` : `Applied “${p.name}”.`);
@@ -3410,6 +3465,7 @@ function applySnap(snap){
   syncInk(); syncLevels(); updateNotes(); syncRules();
   if (art && snap.crop && JSON.stringify(snap.crop) !== JSON.stringify(art.crop)){ art.crop = {...snap.crop}; art.w = art.crop.w; art.h = art.crop.h; syncCrop(); setWidth(snap.w, true); buildSrcSoon(); }
   else if (art && Math.abs(snap.w - st.widthCm) > 1e-6){ setWidth(snap.w, true); buildSrcSoon(); }
+  if (art && art.sizeFrom === 'guess' && Math.abs(st.widthCm - openedWidth()) > 0.005){ art.sizeFrom = 'user'; syncSizeAsk(); }
   remember(); schedule(); updateChecks();
   restoring = false;
 }
@@ -3421,6 +3477,7 @@ function revertToOpened(){ // back to History's first line, as a new step, so Un
   const first = steps[0].snap;
   if (JSON.stringify(snapshot()) === JSON.stringify(first)){ toast('This design is already as it was opened.'); return; }
   applySnap(first);
+  art.sizeFrom = sizeAsOpened(art); syncSizeAsk(); updateChecks();
   steps = steps.slice(0, stepPos + 1); steps.push({snap: JSON.parse(JSON.stringify(first)), label: 'Reverted to as opened', at: Date.now()});
   if (steps.length > HIST_MAX) steps.splice(1, 1);
   stepPos = steps.length - 1; unsaved = true; renderSteps();
@@ -3505,14 +3562,15 @@ const SUMS = { // short, so a title stays on one line
 function syncSums(){
   if (!folds.length) return;
   for (const id in SUMS){ const el = $('sum-' + id); if (!el) continue; let t = ''; try { t = SUMS[id](); } catch(e){} if (el.textContent !== t){ el.textContent = t; el.title = t; } }
+  syncTune();
 }
 /* ---------- sections start folded; Expand all opens every one ---------- */
 const SECTION_TIPS = {
   presetGroup: 'Save the whole set-up under a name and use it again. Shared presets are the same on every workshop computer.',
   historyGroup: 'Every change to this design. Click a step to go back to it.',
-  routeGroup: 'Where every design starts: halftone or clean cut, then a quick start. The steps below change to suit it.',
-  cropGroup: 'Trim empty margins or draw a crop. Do it first, so the print size measures the real art.',
-  sizeGroup: 'The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
+  routeGroup: 'Halftone or clean cut, then a quick start. The Fine-tune tools change to suit it.',
+  cropGroup: 'Trim empty margins or draw a crop, so the print size measures the real art.',
+  sizeGroup: 'How wide the print is. The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
   bgGroup: 'Clear a plain background (a JPG’s white, a screenshot’s colour) only where it joins the outside edge, so the same colour inside the design stays.',
   sharpGroup: 'Unsharp mask on the art at print size: crisper edges and detail before the dots. Light or Medium suits most soft files.',
   levelsGroup: 'Brightness/Contrast and Levels, like Photoshop’s, on the art’s colours before anything else. Move the black point right so more of the art counts as shadow.',
@@ -3542,7 +3600,7 @@ for (const g of document.querySelectorAll('.panel > .group')){
   if (SUMS[g.id]) b.insertAdjacentHTML('beforeend', `<span class="sec-sum" id="sum-${g.id}"></span>`); // what's inside or how it's set, shown while folded
   if (SECTION_TIPS[g.id]) b.dataset.tip = SECTION_TIPS[g.id];
   h.textContent = ''; h.appendChild(b);
-  const set = open => { g.classList.toggle('folded', !open); b.setAttribute('aria-expanded', String(open)); };
+  const set = open => { g.classList.toggle('folded', !open); b.setAttribute('aria-expanded', String(open)); if (open && g.classList.contains('tune')) setTune(true); };
   set(false); folds.push({g, set});
   b.addEventListener('click', () => { const open = g.classList.contains('folded'); set(open); syncFoldAll(); if (open) drawHisto(); });
   if (g.classList.contains('step')){
@@ -3552,11 +3610,33 @@ for (const g of document.querySelectorAll('.panel > .group')){
     foot.firstChild.addEventListener('click', () => stepDone(g));
   }
 }
-function openStart(){ const f = folds.find(f => f.g.id === 'routeGroup'); if (f){ f.set(true); syncFoldAll(); } } // Print style is where every design starts
+function setTune(open){
+  tuneOpen = !!open;
+  document.querySelector('.panel').classList.toggle('tune-closed', !tuneOpen);
+  $('tuneToggle').setAttribute('aria-expanded', String(tuneOpen));
+  try { localStorage.setItem('tsw-dtf-tune', tuneOpen ? 'open' : 'closed'); } catch(e){}
+  if (folds.length) syncFoldAll();
+}
+$('tuneToggle').addEventListener('click', () => { setTune(!tuneOpen); if (tuneOpen) drawHisto(); });
+setTune(tuneOpen);
+function syncTune(){ // how many Fine-tune sections this design has changed (the workshop's own dot settings don't count)
+  if (!resetsReady || !art) return;
+  let n = 0;
+  const c = art.crop; if (!(c.x === 0 && c.y === 0 && c.w === art.fullW && c.h === art.fullH)) n++;
+  for (const id of ['bgGroup', 'sharpGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'inkGroup', 'touchGroup']) if (!$(id).hidden && !stepIsReset(id)) n++;
+  if (!lvIdentity()) n++;
+  if (!$('toneGroup').hidden && (st.mid !== lookVal('mid') || st.con !== lookVal('con') || Object.keys(HLV0).some(k => st[k] !== HLV0[k]))) n++;
+  const t = n ? `${n} changed` : ''; if ($('tuneSum').textContent !== t) $('tuneSum').textContent = t;
+}
+function openStart(){ // every design starts at Print style; Print size opens too when the file has no size of its own
+  const f = folds.find(f => f.g.id === 'routeGroup'), z = folds.find(f => f.g.id === 'sizeGroup');
+  if (z) z.set(!!art && art.sizeFrom === 'guess');
+  if (f){ f.set(true); syncFoldAll(); }
+}
 openStart();
 syncSums();
 function visibleSteps(){ return folds.filter(f => f.g.classList.contains('step') && !f.g.hidden); } // a declaration, so syncLook can call it at start-up
-function anyFolded(){ return folds.some(f => !f.g.hidden && f.g.classList.contains('folded')); }
+function anyFolded(){ return !tuneOpen || folds.some(f => !f.g.hidden && f.g.classList.contains('folded')); }
 function syncFoldAll(){ $('foldAll').textContent = anyFolded() ? 'Expand all' : 'Collapse all'; }
 function syncStepButtons(){ // each step's button names the next step; the last one saves
   const vs = visibleSteps();
@@ -3570,8 +3650,9 @@ function syncStepButtons(){ // each step's button names the next step; the last 
 function stepDone(g){
   const vs = visibleSteps(), i = vs.findIndex(f => f.g === g), next = vs[i + 1];
   g.classList.add('done');
+  if (g.id === 'sizeGroup' && art && art.sizeFrom === 'guess'){ art.sizeFrom = 'user'; syncSizeAsk(); updateChecks(); persistSoon(); } // the size it opened at is the one wanted
   if (i >= 0) vs[i].set(false);
-  if (next){ next.set(true); next.g.scrollIntoView({block: 'start', behavior: 'smooth'}); if (next.g.id === 'levelsGroup') drawHisto(); }
+  if (next){ next.set(true); next.g.scrollIntoView({block: 'nearest', behavior: 'smooth'}); }
   else savePng();
   syncFoldAll();
 }
@@ -3590,7 +3671,7 @@ function resetToDefaults(){ // every setting back to the start, the crop and siz
   if (art){
     art.crop = {x: 0, y: 0, w: art.fullW, h: art.fullH}; art.w = art.fullW; art.h = art.fullH; syncCrop();
     art.strokesN = 0; rebuildEdits(art);
-    setWidth(art.isSample ? 25 : art.fullW/(art.dpi || DPI)*2.54, true); buildSrcSoon(); setZoom('fit');
+    art.sizeFrom = sizeAsOpened(art); setWidth(art.isSample ? 25 : art.fullW/(art.dpi || DPI)*2.54, true); buildSrcSoon(); setZoom('fit');
   }
   clearDoneMarks(); remember(); schedule(); updateChecks();
   toast('Back to the default settings. Undo (Cmd/Ctrl+Z) brings yours back.');
@@ -3604,7 +3685,7 @@ const STEP_RESETS = {
   finishGroup: {get name(){ return st.finish === 'cut' ? 'Threshold' : 'Halftone dots'; }, // the print style itself stays
                 vals: () => st.finish === 'cut' ? {cut: DEFAULTS.cut} : {lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape}},
   sizeGroup: {name: 'Print size', same: () => !art || (Math.abs(st.widthCm - openedWidth()) < 0.005 && !art.smooth),
-              reset: () => { art.smooth = false; setWidth(openedWidth(), true); buildSrcSoon(); }},
+              reset: () => { art.smooth = false; art.sizeFrom = sizeAsOpened(art); setWidth(openedWidth(), true); buildSrcSoon(); }},
   knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null, clean: DEFAULTS.clean})},
   rangeGroup: {name: 'Select', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
   edgeGroup: {name: 'Edge', vals: () => ({...EDGE_KEYS})},
@@ -3629,9 +3710,14 @@ document.querySelector('.panel').addEventListener('click', e => {
   remember(); schedule(); updateChecks(); syncResets();
   toast(`${r.name} is back to its defaults. Undo (Cmd/Ctrl+Z) brings yours back.`);
 });
-resetsReady = true; syncResets();
+resetsReady = true; syncResets(); syncTune();
+document.querySelector('.panel').addEventListener('click', e => { // More / Less on a note
+  const b = e.target.closest('.more-btn'); if (!b) return;
+  const x = b.parentNode.querySelector('.more-x'), open = x.hidden;
+  x.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? 'Less' : 'More';
+});
 function clearDoneMarks(){ for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
-$('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); syncFoldAll(); if (open) drawHisto(); });
+$('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); if (!open) setTune(false); syncFoldAll(); if (open) drawHisto(); });
 syncFoldAll(); syncStepButtons(); syncBrush();
 
 /* ---------- rollover help: a short tip on hover, or on keyboard focus ---------- */
@@ -3692,7 +3778,9 @@ const TIPS = [
   ['#cropTrim', 'Cut away the empty margin around the art: clear pixels, or a plain background such as a JPG’s white.'],
   ['#cropDraw', 'Drag a crop on the preview. Enter applies it, Esc cancels.'], ['#cropReset', 'Use the whole file again.'],
   ['[data-ink="art"]', 'Print each dot in the art’s own colour.'], ['[data-ink="one"]', 'Print every dot in one ink colour.'],
-  ['#sizeChips [data-w="max"]', 'The largest size that fits within 400 × 500 mm.']
+  ['#sizeChips [data-w="max"]', 'The largest size that fits within 400 × 500 mm.'],
+  ['#tuneToggle', 'Every other tool: crop, dots, background, sharpen, levels, knock out, colour ranges, ink, edge and touch up. Open it only when a design needs it.'],
+  ['#sizeTrimBtn', 'Cut away the empty margin around the art, so the print width measures the art itself.']
 ];
 for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el.dataset.tip = t;
 {
