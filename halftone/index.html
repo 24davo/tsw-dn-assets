@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>DTF Halftone</title>
+<title>Graphic Engine</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 529.96 529.96%22%3E%3Cpath fill=%22%23ea0a8c%22 d=%22M495.87,67.07h-32.98V1.1h-164.92v65.97h-65.97v164.92H67.07v65.97H1.1v164.92h65.97v65.97h461.79V67.07h-32.98ZM441.53,418.26h0l-23.43,23.43h0l-23.74,23.74-.16-.15-23.43-23.43-.16-.16-23.27-23.27-.16-.16-23.27-23.27-.16-.16-23.11-23.11-22.87,22.87h0l-23.43,23.43h0l-23.74,23.74-.16-.15-23.43-23.43-.16-.16-23.27-23.27-.16-.16-23.43-23.43,23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43.16-.16,23.27-23.27h0l23.43-23.43h0l23.74-23.74.16.15,23.43,23.43.16.16,23.43,23.43,23.42,23.43-.16.16-23.27,23.27-.16.16-23.27,23.27h0l-23.43,23.43h0l-.12.12,23.27,23.27h0s23.43,23.43,23.43,23.43l.16.16,23.27,23.27.16.16,23.43,23.43-23.55,23.55Z%22/%3E%3C/svg%3E">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,7 +36,9 @@ button,input{font:inherit;color:inherit}
 
 .app{display:flex;flex-direction:column;height:100%;min-height:600px}
 .bar{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--panel);border-bottom:1px solid var(--line)}
-.brand{display:flex;flex-direction:column;gap:2px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-t{display:flex;flex-direction:column;gap:2px}
+.logo-mark{flex:none;width:38px;height:38px;display:block}
 .kicker{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.05}
 .file{flex:1 1 220px;min-width:0;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
@@ -321,8 +324,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 <div class="app">
   <header class="bar">
     <div class="brand">
-      <span class="kicker">Tshirt Workshop · Staff tool</span>
-      <h1>DTF Halftone</h1>
+      <svg class="logo-mark" viewBox="0 0 529.96 529.96" aria-hidden="true"><path fill="#ea0a8c" d="M495.87,67.07h-32.98V1.1h-164.92v65.97h-65.97v164.92H67.07v65.97H1.1v164.92h65.97v65.97h461.79V67.07h-32.98ZM441.53,418.26h0l-23.43,23.43h0l-23.74,23.74-.16-.15-23.43-23.43-.16-.16-23.27-23.27-.16-.16-23.27-23.27-.16-.16-23.11-23.11-22.87,22.87h0l-23.43,23.43h0l-23.74,23.74-.16-.15-23.43-23.43-.16-.16-23.27-23.27-.16-.16-23.43-23.43,23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43.16-.16,23.27-23.27h0l23.43-23.43h0l23.74-23.74.16.15,23.43,23.43.16.16,23.43,23.43,23.42,23.43-.16.16-23.27,23.27-.16.16-23.27,23.27h0l-23.43,23.43h0l-.12.12,23.27,23.27h0s23.43,23.43,23.43,23.43l.16.16,23.27,23.27.16.16,23.43,23.43-23.55,23.55Z"/></svg>
+      <div class="brand-t">
+        <span class="kicker">Tshirt Workshop · Staff tool</span>
+        <h1>Graphic Engine</h1>
+      </div>
     </div>
     <div class="file" id="fileInfo"><span class="tag">Sample</span><b>Sample art</b></div>
     <div class="actions">
@@ -3662,7 +3668,7 @@ async function savePng(){ // answers true once the PNG is saved
     $('busyTxt').textContent = 'Preparing the PNG…'; $('busy').hidden = false;
     await new Promise(r => setTimeout(r, 30));
     const raw = await new Promise((res, rej) => outCanvas.toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
-    const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop DTF Halftone'], ['Comment', settingsText()]]);
+    const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
     $('busy').hidden = true;
     ok = await saveFile(png, fileName());
   } catch(err){
@@ -4050,7 +4056,7 @@ $('presetShare').addEventListener('click', () => { const c = chosen(); if (c && 
 function exportPresets(){
   const all = [...shared, ...presets];
   if (!all.length){ toast('There are no presets to export yet.'); return; }
-  saveFile(new Blob([JSON.stringify({app: 'Tshirt Workshop DTF Halftone', v: 1, presets: all}, null, 2)], {type: 'application/json'}), 'dtf-halftone-presets.json');
+  saveFile(new Blob([JSON.stringify({app: 'Tshirt Workshop Graphic Engine', v: 1, presets: all}, null, 2)], {type: 'application/json'}), 'graphic-engine-presets.json');
 }
 for (const id of ['syncNote', 'presetHelp']) $(id).addEventListener('click', e => {
   const act = e.target.closest('[data-act]')?.dataset.act;
