@@ -246,6 +246,13 @@ input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .preset-sel{width:100%;height:40px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
 .preset-sel:hover{border-color:var(--ink)}
 .preset-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.speed-head{display:flex;align-items:center;gap:6px}
+.speed-head .kicker{margin-right:auto}
+.speed-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.speed-btn{min-height:46px;padding:6px 10px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:700;line-height:1.25;text-align:left;overflow-wrap:anywhere;cursor:pointer}
+.speed-btn:hover{border-color:var(--ink)}
+.speed-btn.empty{border-style:dashed;border-color:var(--line-strong);color:var(--muted);font-weight:600}
+.speed-btn.del{border-style:dashed;border-color:var(--ink)}
 .chip[disabled]{opacity:.45;cursor:default;pointer-events:none}
 .preset-form{display:grid;gap:10px;padding:12px;border:1.5px solid var(--ink);border-radius:var(--r)}
 .preset-form input[type="text"],.preset-form input[type="password"]{height:38px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:600}
@@ -387,6 +394,18 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="revertBtn">Revert</button><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
+
+      <section class="group" id="speedGroup" aria-label="Speed buttons">
+        <div class="speed-head"><span class="kicker">Speed buttons</span><button class="chip" type="button" data-speedtab="ours" aria-pressed="false">Ours</button><button class="chip" type="button" data-speedtab="built" aria-pressed="false">Built in</button></div>
+        <div class="speed-grid" id="speedGrid"></div>
+        <form class="preset-form" id="speedForm" hidden>
+          <select class="preset-sel" id="speedFrom" aria-label="What the button does"></select>
+          <input type="text" id="speedName" maxlength="32" placeholder="Button name, e.g. Logo on black" aria-label="Button name" autocomplete="off">
+          <label class="check-row"><input type="checkbox" id="speedTrim"> Also trim to the art</label>
+          <div class="preset-actions"><button class="btn small primary" type="submit">Save button</button><button class="btn small" type="button" id="speedCancel">Cancel</button></div>
+        </form>
+        <p class="f-note" id="speedNote"></p>
+      </section>
 
       <section class="group" id="historyGroup">
         <h2>History</h2>
@@ -3785,6 +3804,7 @@ function capturePreset(name, withSize){
   return p;
 }
 function applyPreset(p){
+  if (p.trim && art){ const t = findTrim(); if (t && !(t.x === 0 && t.y === 0 && t.w >= art.fullW && t.h >= art.fullH)) trimToArt(art.sizeFrom === 'user'); }
   for (const k of PRESET_KEYS) if (k in p.s) st[k] = p.s[k]; else if (k in EDGE_KEYS) st[k] = EDGE_KEYS[k]; else if (k in SHARP_KEYS) st[k] = SHARP_KEYS[k]; else if (k in BG_KEYS) st[k] = BG_KEYS[k]; // older presets: these steps off
   if ('edge' in p.s && !('emode' in p.s)){ st.emode = p.s.edge ? 'near' : 'any'; if (!p.s.edge && p.s.contract){ st.edge = p.s.contract; } } // the first Edge step had two sliders
   st.knock = p.s.knock || null; knockFrom = st.knock ? (p.s.knockFrom || 'hand') : 'shirt';
@@ -3885,6 +3905,74 @@ $('presetNew').addEventListener('click', () => {
   $('presetConfirm').hidden = true; $('codeForm').hidden = true; $('presetForm').hidden = false; $('presetName').focus(); $('presetName').select();
 });
 $('presetCancel').addEventListener('click', () => { $('presetForm').hidden = true; });
+/* ---------- speed buttons ---------- */
+function quickCut(){ // the everyday basic job: solid print with a hard edge, background off, trimmed. Only the print size is left to check
+  const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
+  Object.assign(s, {finish: 'cut', look: 'edges', cut: 50}, LOOKS.edges, EDGE_KEYS, SHARP_KEYS, BG_KEYS, {bgOn: true});
+  s.knock = null; s.knockFrom = 'shirt';
+  return {name: 'Quick clean cut', desc: 'solid print with a hard edge, background removed, trimmed to the art. Check the print size', v: 1, s, levels: {}, rules: [], trim: true};
+}
+const SPEED_BUILT = [
+  {label: 'Quick clean cut', tip: 'Clean cut with a hard edge: the background is removed and the file is trimmed to the art. Then check the print size.', make: quickCut},
+  {label: 'Black tee', starter: 'Black tee · everyday'},
+  {label: 'White tee', starter: 'White tee · everyday'},
+  {label: 'Coloured tee', starter: 'Coloured tee · everyday'},
+  {label: 'Dark photo on black', starter: 'Black tee · dark photo, brightened'},
+  {label: 'Glows & soft shadows', starter: 'Glows & soft shadows · any tee'}
+];
+const SPEED_N = 6;
+let slots = (() => { const a = [].concat(readJSON('tsw-dtf-slots', [])); return Array.from({length: SPEED_N}, (_, i) => a[i] && isPreset(a[i]) ? a[i] : null); })();
+let speedTab = readJSON('tsw-dtf-speedtab', null); if (speedTab !== 'ours' && speedTab !== 'built') speedTab = slots.some(Boolean) ? 'ours' : 'built';
+let speedEdit = false, speedAdd = -1;
+function keepSlots(){ try { localStorage.setItem('tsw-dtf-slots', JSON.stringify(slots)); localStorage.setItem('tsw-dtf-speedtab', JSON.stringify(speedTab)); } catch(e){} }
+function syncSpeed(){
+  for (const b of document.querySelectorAll('[data-speedtab]')) b.setAttribute('aria-pressed', String(b.dataset.speedtab === speedTab));
+  const any = slots.some(Boolean); if (!any) speedEdit = false;
+  let html = '';
+  if (speedTab === 'built') html = SPEED_BUILT.map((B, i) => { const S = B.starter && STARTERS.find(x => x.name === B.starter); return `<button class="speed-btn" type="button" data-built="${i}" data-tip="${esc(B.tip || (S && S.desc) || '')}">${esc(B.label)}</button>`; }).join('');
+  else html = slots.map((p, i) => !p ? `<button class="speed-btn empty" type="button" data-slot="${i}" data-tip="Add a button of your own here.">+ Add</button>`
+    : speedEdit ? `<button class="speed-btn del" type="button" data-slot="${i}" data-tip="Take this button away. Saved presets stay.">Remove: ${esc(p.name)}</button>`
+    : `<button class="speed-btn" type="button" data-slot="${i}" data-tip="${esc(p.linked ? 'Applies the saved preset' : 'Applies the set-up saved in this button')}${p.trim ? ', then trims to the art' : ''}.">${esc(p.name)}</button>`).join('');
+  $('speedGrid').innerHTML = html;
+  $('speedForm').hidden = speedTab !== 'ours' || speedAdd < 0;
+  $('speedNote').innerHTML = speedTab === 'built' ? 'One click sets the whole job up. Check the print size after.'
+    : (any ? 'Your own buttons, on this computer. ' : 'Six spaces for your own buttons. Set a job up the way you like, then click + Add. ') + (any ? `<button class="link" type="button" id="speedEditBtn">${speedEdit ? 'Done' : 'Remove a button'}</button>` : '');
+}
+function openSpeedForm(i){
+  speedAdd = i;
+  const opts = (list, w) => list.map((p, k) => `<option value="${w}${k}">Saved preset: ${esc(p.name)}</option>`).join('');
+  $('speedFrom').innerHTML = '<option value="">The settings on screen now</option>' + opts(shared, 's') + opts(presets, 'l');
+  $('speedName').value = ''; $('speedName').hidden = false; $('speedTrim').checked = false;
+  syncSpeed(); $('speedName').focus();
+}
+$('speedFrom').addEventListener('change', () => { $('speedName').hidden = !!$('speedFrom').value; });
+$('speedCancel').addEventListener('click', () => { speedAdd = -1; syncSpeed(); });
+$('speedForm').addEventListener('submit', e => {
+  e.preventDefault(); if (speedAdd < 0) return;
+  const v = $('speedFrom').value; let p;
+  if (v){ const src = (v[0] === 's' ? shared : presets)[+v.slice(1)]; if (!src) return; p = JSON.parse(JSON.stringify(src)); p.linked = true; }
+  else { const name = $('speedName').value.trim().slice(0, 32); if (!name){ toast('Give the button a name.'); $('speedName').focus(); return; } p = capturePreset(name, false); }
+  if ($('speedTrim').checked) p.trim = true; else delete p.trim;
+  slots[speedAdd] = p; speedAdd = -1; keepSlots(); syncSpeed(); toast(`Added the “${p.name}” button.`);
+});
+$('speedGroup').addEventListener('click', e => {
+  const tab = e.target.closest('[data-speedtab]');
+  if (tab){ speedTab = tab.dataset.speedtab; speedAdd = -1; speedEdit = false; keepSlots(); syncSpeed(); return; }
+  if (e.target.closest('#speedEditBtn')){ speedEdit = !speedEdit; speedAdd = -1; syncSpeed(); return; }
+  const b = e.target.closest('.speed-btn'); if (!b) return;
+  if (b.dataset.built != null){
+    const B = SPEED_BUILT[+b.dataset.built], S = B.starter && STARTERS.find(x => x.name === B.starter);
+    if (!B.make && !S) return;
+    syncPresets(null); applyPreset(B.make ? B.make() : starterPreset(S)); return;
+  }
+  const i = +b.dataset.slot, p = slots[i];
+  if (!p){ openSpeedForm(i); return; }
+  if (speedEdit){ slots[i] = null; keepSlots(); syncSpeed(); toast(`Removed the “${p.name}” button.`); return; }
+  const fresh = p.linked && shared.concat(presets).find(x => sameName(x.name, p.name)); // a saved preset that's been updated since: use it as it is now
+  syncPresets(null); applyPreset(fresh ? {...fresh, trim: p.trim} : p);
+});
+syncSpeed();
+
 $('presetForm').addEventListener('submit', async e => {
   e.preventDefault();
   const name = $('presetName').value.trim().slice(0, 48);
