@@ -259,6 +259,9 @@ input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .preset-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .speed-head{display:flex;align-items:center;gap:6px}
 .speed-head .kicker{margin-right:auto}
+#speedGroup.shut{gap:0}
+#speedGroup.shut > :not(.speed-head),#speedGroup.shut .speed-head .chip{display:none}
+#speedGroup.shut .sec-toggle::before{transform:rotate(-45deg);margin-bottom:0}
 .speed-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .speed-btn{min-height:46px;padding:6px 10px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:700;line-height:1.25;text-align:left;overflow-wrap:anywhere;cursor:pointer}
 .speed-btn:hover{border-color:var(--ink)}
@@ -410,7 +413,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="revertBtn">Revert</button><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
 
       <section class="group" id="speedGroup" aria-label="Speed buttons">
-        <div class="speed-head"><span class="kicker">Speed buttons</span><button class="chip" type="button" data-speedtab="ours" aria-pressed="false">Ours</button><button class="chip" type="button" data-speedtab="built" aria-pressed="false">Built in</button></div>
+        <div class="speed-head"><span class="kicker"><button class="sec-toggle" type="button" id="speedFold" aria-expanded="true" data-tip="One-click set-ups for everyday jobs. Click to fold them away or bring them back.">Speed buttons</button></span><button class="chip" type="button" data-speedtab="ours" aria-pressed="false">Ours</button><button class="chip" type="button" data-speedtab="built" aria-pressed="false">Built in</button></div>
         <div class="speed-grid" id="speedGrid"></div>
         <form class="preset-form" id="speedForm" hidden>
           <select class="preset-sel" id="speedFrom" aria-label="What the button does"></select>
@@ -4462,6 +4465,12 @@ for (const g of document.querySelectorAll('.panel > .group')){
     foot.firstChild.addEventListener('click', () => stepDone(g));
   }
 }
+function setSpeedFold(open, keep){
+  $('speedGroup').classList.toggle('shut', !open); $('speedFold').setAttribute('aria-expanded', String(open));
+  if (keep) try { localStorage.setItem('tsw-dtf-speed', open ? 'open' : 'shut'); } catch(e){}
+}
+$('speedFold').addEventListener('click', () => setSpeedFold($('speedGroup').classList.contains('shut'), true));
+try { if (localStorage.getItem('tsw-dtf-speed') === 'shut') setSpeedFold(false); } catch(e){}
 function setTune(open){
   tuneOpen = !!open;
   document.querySelector('.panel').classList.toggle('tune-closed', !tuneOpen);
@@ -4570,7 +4579,7 @@ document.querySelector('.panel').addEventListener('click', e => { // More / Less
   x.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? 'Less' : 'More';
 });
 function clearDoneMarks(){ for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
-$('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); if (!open) setTune(false); syncFoldAll(); if (open) drawHisto(); });
+$('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); if (open) setSpeedFold(true, true); if (!open) setTune(false); syncFoldAll(); if (open) drawHisto(); });
 syncFoldAll(); syncStepButtons(); syncBrush();
 
 /* ---------- rollover help: a short tip on hover, or on keyboard focus ---------- */
