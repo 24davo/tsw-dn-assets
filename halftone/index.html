@@ -524,6 +524,9 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <p class="f-note" id="flatNote">Every area becomes one flat colour, so Image Trace finds clean shapes.</p>
           <label class="check-row"><input type="checkbox" id="flatSnap"> Pure white and pure black</label>
           <p class="f-note">Nearly-white becomes true white, and nearly-black true black.</p>
+          <div class="f-head"><label for="flatSmooth">Smooth jagged edges</label><output id="flatSmoothOut" for="flatSmooth">4</output></div>
+          <input type="range" id="flatSmooth" min="0" max="10" step="1" value="4">
+          <p class="f-note"><span>Evens out the stair-steps a small or low-res logo leaves along its edges.</span><span class="more-x" hidden> Higher is smoother, but sharp corners round off a little and very thin lines get thinner. Lower it if fine detail is lost; set it to Off for art that is already sharp.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
           <div class="f-head"><label for="flatTidy">Tidy bits smaller than</label><output id="flatTidyOut" for="flatTidy">0.5 mm</output></div>
           <input type="range" id="flatTidy" min="0" max="1.5" step="0.1" value="0.5">
           <p class="f-note"><span>Specks, and the thin in-between lines where two colours meet, join the colour beside them.</span><span class="more-x" hidden> Measured on the print. Raise it for a rough scan or a JPG; set it to Off to keep every fine detail. A bigger print size gives the tracer smoother curves.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
@@ -1624,6 +1627,52 @@ function engine(){
             tidied++;
           }
         }
+        // smooth: each colour's shape is softened and the strongest one wins each pixel, so an edge that followed the art's
+        // own pixels in steps runs straight. The empty area outside the art counts as a colour too, so the outline is smoothed.
+        const SM = F.smooth || 0, sig = SM*up;
+        if (sig >= 1.5){ // under that the steps are a pixel high: nothing to even out
+          // worked out on a smaller copy (the softening is wide, so nothing is lost), then read back at full size
+          const r0 = Math.max(1, Math.round((Math.sqrt(4*sig*sig + 1) - 1)/2)), D = Math.max(2, Math.round(r0/3)), r = Math.max(1, Math.round(r0/D)), box = 2*r + 1;
+          const m = L.length, lw = Math.ceil(w/D), lh = Math.ceil(h/D), ln = lw*lh, M = [], B = new Float32Array(ln), col = new Float32Array(lw);
+          for (let v = 0; v <= m; v++) M.push(null);
+          const need = v => M[v] || (M[v] = new Float32Array(ln));
+          for (let y = 0, k = 0; y < h; y++){ const o = ((y/D) | 0)*lw; for (let x = 0; x < w; x++, k++){ const v = idx[k]; need(v === 255 ? m : v)[o + ((x/D) | 0)]++; } }
+          for (let v = 0; v <= m; v++){
+            const A = M[v]; if (!A) continue;
+            for (let j = 0, i = 0; j < lh; j++){ const ch = Math.min(D, h - j*D); for (let x = 0; x < lw; x++, i++) A[i] /= ch*Math.min(D, w - x*D); }
+            for (let t = 0; t < 3; t++){ // (edges repeat outwards, so art that runs off the side isn't pulled in)
+              for (let y = 0; y < lh; y++){
+                const o = y*lw, e0 = A[o], e1 = A[o + lw - 1]; let sum = e0*r; for (let x = 0; x <= r; x++) sum += x < lw ? A[o + x] : e1;
+                for (let x = 0; x < lw; x++){ B[o + x] = sum/box; sum += (x + r + 1 < lw ? A[o + x + r + 1] : e1) - (x - r >= 0 ? A[o + x - r] : e0); }
+              }
+              const last = (lh - 1)*lw;
+              for (let x = 0; x < lw; x++){ let sum = B[x]*r; for (let y = 0; y <= r; y++) sum += B[(y < lh ? y*lw : last) + x]; col[x] = sum; }
+              for (let y = 0; y < lh; y++){
+                const o = y*lw, a = y + r + 1 < lh ? (y + r + 1)*lw : last, d = y - r >= 0 ? (y - r)*lw : 0;
+                for (let x = 0; x < lw; x++){ A[o + x] = col[x]/box; col[x] += B[a + x] - B[d + x]; }
+              }
+            }
+          }
+          const labs = []; for (let v = 0; v <= m; v++) if (M[v]) labs.push(v);
+          const nodeL = new Uint8Array(ln), sure = new Uint8Array(ln); // which colour wins each point of the small copy, and whether outright
+          for (let i = 0; i < ln; i++){ let bv = -1, bl = 0; for (const v of labs){ const a = M[v][i]; if (a > bv){ bv = a; bl = v; } } nodeL[i] = bl; sure[i] = bv > 0.5 ? 1 : 0; }
+          const X0 = new Int32Array(w), X1 = new Int32Array(w), TX = new Float32Array(w);
+          for (let x = 0; x < w; x++){ const fx = (x + 0.5)/D - 0.5, i0 = Math.floor(fx); X0[x] = Math.max(0, Math.min(lw - 1, i0)); X1[x] = Math.max(0, Math.min(lw - 1, i0 + 1)); TX[x] = fx - i0; }
+          for (let y = 0, k = 0; y < h; y++){
+            const fy = (y + 0.5)/D - 0.5, j0 = Math.floor(fy), ty = fy - j0, o0 = Math.max(0, Math.min(lh - 1, j0))*lw, o1 = Math.max(0, Math.min(lh - 1, j0 + 1))*lw;
+            for (let x = 0; x < w; x++, k++){
+              const a = o0 + X0[x], b = o0 + X1[x], c = o1 + X0[x], d = o1 + X1[x]; let nl = nodeL[a];
+              if (!(sure[a] && sure[b] && sure[c] && sure[d] && nodeL[b] === nl && nodeL[c] === nl && nodeL[d] === nl)){
+                const tx = TX[x], w00 = (1 - tx)*(1 - ty), w10 = tx*(1 - ty), w01 = (1 - tx)*ty, w11 = tx*ty; let bv = -1;
+                for (const v of labs){ const A = M[v], val = A[a]*w00 + A[b]*w10 + A[c]*w01 + A[d]*w11; if (val > bv + 1e-6){ bv = val; nl = v; } }
+              }
+              const lab = nl === m ? 255 : nl, ol = idx[k]; if (lab === ol) continue;
+              if (lab === 255){ const j = k*4; cls[k] = 1; out[j] = out[j+1] = out[j+2] = out[j+3] = 0; on--; }
+              else if (ol === 255){ cls[k] = 3; on++; }
+              idx[k] = lab;
+            }
+          }
+        }
         for (const c of L) c.n = 0;
         for (let k = 0; k < n; k++){ const v = idx[k]; if (v === 255) continue; const c = L[v], j = k*4; out[j] = c.r; out[j+1] = c.g; out[j+2] = c.b; out[j+3] = 255; c.n++; }
         flat = {pal: C.filter(c => c.off || c.n > 0).map(c => [c.r, c.g, c.b, c.off ? 0 : c.n/total, c.off ? 1 : 0]), tidied};
@@ -1779,14 +1828,14 @@ const LOOK_TEXT = {
         knock: ['Knock out the shirt colour', 'Colours near the shirt colour drop out.', 'Colours close to the shirt drop out. Everything else prints solid.'],
         edges: ['Clean up only', 'Soft edges print solid or are removed.', 'Nothing is knocked out. Glows, fades and soft edges print solid or are removed at the threshold.']}
 };
-const FLAT_KEYS = {flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatDrop: ''}; // Trace prep: flat colours, how many (0 = found from the art), pure white and black, smallest detail (mm), colours left out
+const FLAT_KEYS = {flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: ''}; // Trace prep: flat colours, how many (0 = found from the art), pure white and black, smallest detail (mm), colours left out
 const isFlat = () => st.finish === 'cut' && !!st.flat;
 const routeOf = f => f === 'cut' ? 'cut' : 'dots';
 function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[routeOf(finish || st.finish)][look] || LOOK_TEXT.dots[look] || LOOK_TEXT.cut[look]; return t ? t[0] : look; }
 const $ = id => document.getElementById(id);
 const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatDrop: ''}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: ''}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','areaV'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
@@ -1901,7 +1950,7 @@ function params(){
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(partParams), selOut: rules.length ? activeRule : -1,
           hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
           rich: st.rich && st.finish !== 'cut', crisp: st.crisp && st.finish !== 'cut' ? 3 : 0, speck: !!st.speck,
-          flat: isFlat() ? {n: st.flatN, snap: !!st.flatSnap, tidy: Math.round(st.flatTidy/25.4*DPI), up: art ? toMm(st.widthCm)/25.4*DPI/art.w : 1, drop: st.flatDrop ? st.flatDrop.split(',').map(hexRgb) : []} : null,
+          flat: isFlat() ? {n: st.flatN, snap: !!st.flatSnap, tidy: Math.round(st.flatTidy/25.4*DPI), smooth: (st.flatSmooth == null ? 4 : +st.flatSmooth)*0.16, up: art ? toMm(st.widthCm)/25.4*DPI/art.w : 1, drop: st.flatDrop ? st.flatDrop.split(',').map(hexRgb) : []} : null,
           clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn && !isFlat() ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100,
           fade: st.fade && st.finish !== 'cut' ? {px: Math.max(1, Math.round(st.fade/25.4*DPI)), out: st.fadeDir !== 'in', spread: st.fadeDir === 'spread', max: [Math.round(MAX_SHORT/2.54*DPI), Math.round(MAX_LONG/2.54*DPI)]} : null};
 }
@@ -2899,8 +2948,8 @@ $('bgPick').addEventListener('click', () => picking ? endPick() : startPick('bg'
 $('bgAuto').addEventListener('click', () => { st.bgHex = null; syncBg(); noteChange('Background colour found on the edge'); schedule(); });
 let hardWas = 50; // the hard edge threshold to go back to when it's ticked again
 const SLIDERS = [['fade', v => v ? `${v} mm` : 'Off'], ['back', pxMm], ['bgTol', v => `${v}%`], ['sharp', v => v ? `${v}%` : 'Off'], ['sradius', v => `${(+v).toFixed(1)} px`], ['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
-                 ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`], ['flatTidy', v => +v ? `${(+v).toFixed(1)} mm` : 'Off']];
-function syncSliders(){ for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi);
+                 ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`], ['flatTidy', v => +v ? `${(+v).toFixed(1)} mm` : 'Off'], ['flatSmooth', v => +v ? `${+v}` : 'Off']];
+function syncSliders(){ if (st.flatSmooth == null) st.flatSmooth = FLAT_KEYS.flatSmooth; for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi);
   syncBg();
   for (const b of $('sharpChips').querySelectorAll('[data-sharp]')) b.setAttribute('aria-pressed', String(+b.dataset.sharp === st.sharp && (!st.sharp || Math.abs(+b.dataset.sr - st.sradius) < 1e-6)));
   $('sradiusField').hidden = !st.sharp;
@@ -3810,7 +3859,7 @@ function syncFileName(){ if (art) $('nameNote').innerHTML = `Saves as <b>${esc(f
 $('nameSuffix').addEventListener('input', () => { syncFileName(); persistSoon(); });
 function settingsText(){
   const look = lookName();
-  const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` + (st.flat ? `; flat colours (${st.flatN || 'auto'}${lastFlat ? ': ' + lastFlat.pal.filter(c => !c[4]).map(c => rgbHex(c[0], c[1], c[2]).toUpperCase()).join(' ') : ''}); tidy under ${st.flatTidy} mm` : '') : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
+  const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` + (st.flat ? `; flat colours (${st.flatN || 'auto'}${lastFlat ? ': ' + lastFlat.pal.filter(c => !c[4]).map(c => rgbHex(c[0], c[1], c[2]).toUpperCase()).join(' ') : ''}); tidy under ${st.flatTidy} mm; smooth edges ${st.flatSmooth == null ? 4 : st.flatSmooth}` : '') : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
   const ruleText = (R, i) => `range ${i + 1}: ${R.type === 'sample' ? 'colours ' + R.samples.join(' ').toUpperCase() : R.type + ' ' + R.range + '%'}` +
     ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}${R.action === 'ramp' ? ` ${R.k0 == null ? 10 : R.k0}-${R.k1 == null ? 30 : R.k1}%` : ''}${R.action === 'nodots' ? ' at ' + (R.cut == null ? 50 : R.cut) + '%' : ''}${R.action === 'recolour' ? ' ' + (R.to || '#ffffff').toUpperCase() : ''}`;
   const levels = (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') + ((lv.bri || lv.bc) && lv.lum !== false ? ' (colour strength kept)' : '') +
@@ -3906,7 +3955,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatDrop'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -4263,7 +4312,7 @@ $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentEleme
 const HIST_MAX = 40;
 const sign = v => (v > 0 ? '+' : '') + v;
 const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', flat: v => v ? 'Print style: Trace prep' : 'Trace prep off',
-  flatN: v => v ? `Flat colours: ${v}` : 'Flat colours: Auto', flatSnap: v => v ? 'Pure white and black on' : 'Pure white and black off', flatTidy: v => v ? `Tidy bits under ${(+v).toFixed(1)} mm` : 'Tidy off', flatDrop: () => 'Flat colour left out or brought back', look: v => `Quick start: ${lookName(v)}`, cut: v => `Threshold ${v}%`, // the style first: switching it can move the Quick start too
+  flatN: v => v ? `Flat colours: ${v}` : 'Flat colours: Auto', flatSnap: v => v ? 'Pure white and black on' : 'Pure white and black off', flatTidy: v => v ? `Tidy bits under ${(+v).toFixed(1)} mm` : 'Tidy off', flatSmooth: v => +v ? `Smooth edges ${+v}` : 'Smooth edges off', flatDrop: () => 'Flat colour left out or brought back', look: v => `Quick start: ${lookName(v)}`, cut: v => `Threshold ${v}%`, // the style first: switching it can move the Quick start too
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, clean: v => v ? 'Clean colour dots on' : 'Clean colour dots off', rich: v => v ? 'Rich fade dots on' : 'Rich fade dots off', crisp: v => v ? 'Crisp outlines on' : 'Crisp outlines off', speck: v => v ? 'Speck clean-up on' : 'Speck clean-up off', ktol: v => `Knock-out tolerance ${v}%`,
   hb: () => 'Halftone levels', hg: () => 'Halftone levels', hw: () => 'Halftone levels', hob: () => 'Halftone output levels', how: () => 'Halftone output levels',
   mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
@@ -4545,7 +4594,7 @@ const openedWidth = () => Math.max(0.5, Math.min(art.isSample ? 25*art.w/art.ful
 const sameRules = () => st.look === 'shadows' ? rules.length === 1 && JSON.stringify(rules[0]) === JSON.stringify(newRule('shadows', 'remove')) : !rules.length;
 const STEP_RESETS = {
   finishGroup: {get name(){ return isFlat() ? 'Flat colours' : st.finish === 'cut' ? 'Threshold' : 'Halftone dots'; }, // the print style itself stays
-                vals: () => isFlat() ? {cut: DEFAULTS.cut, flatN: 0, flatSnap: true, flatTidy: 0.5, flatDrop: ''} : st.finish === 'cut' ? {cut: DEFAULTS.cut} : {lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape}},
+                vals: () => isFlat() ? {cut: DEFAULTS.cut, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: ''} : st.finish === 'cut' ? {cut: DEFAULTS.cut} : {lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape}},
   sizeGroup: {name: 'Print size', same: () => !art || (Math.abs(st.widthCm - openedWidth()) < 0.005 && !art.smooth),
               reset: () => { art.smooth = false; art.sizeFrom = sizeAsOpened(art); setWidth(openedWidth(), true); buildSrcSoon(); }},
   knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null, clean: DEFAULTS.clean, rich: DEFAULTS.rich})},
