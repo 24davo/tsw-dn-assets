@@ -236,6 +236,7 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .name-field{margin-top:14px}
 .trace-body{display:grid;gap:12px}
 .eswatch.bgsw{width:22px;height:22px;vertical-align:middle}
+.warn-t{color:var(--warn);font-weight:600}
 .eswatch{display:inline-block;width:12px;height:12px;border:1px solid var(--line-strong);border-radius:var(--r);vertical-align:-1px}
 .name-field .opt{font-weight:500;color:var(--muted)}
 .name-field input{height:38px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:600}
@@ -530,6 +531,12 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <div class="f-head"><label for="flatTidy">Tidy bits smaller than</label><output id="flatTidyOut" for="flatTidy">0.5 mm</output></div>
           <input type="range" id="flatTidy" min="0" max="1.5" step="0.1" value="0.5">
           <p class="f-note"><span>Specks, and the thin in-between lines where two colours meet, join the colour beside them.</span><span class="more-x" hidden> Measured on the print. Raise it for a rough scan or a JPG; set it to Off to keep every fine detail. A bigger print size gives the tracer smoother curves.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+          <div class="lv-sub">Background for tracing</div>
+          <div class="chips" id="flatBgChips" role="group" aria-label="Background for tracing">
+            <button class="chip" type="button" data-flatbg="auto">Auto</button><button class="chip" type="button" data-flatbg="black">Black</button><button class="chip" type="button" data-flatbg="white">White</button><button class="chip" type="button" data-flatbg="own">Own</button><button class="chip" type="button" data-flatbg="off">Off</button>
+          </div>
+          <div class="knock" id="flatBgRow"><span class="eswatch bgsw" id="flatBgSw" aria-hidden="true"></span><span class="colorbox" id="flatBgBox" hidden><input type="color" id="flatBgPick" value="#000000" aria-label="Background colour for tracing"></span><span id="flatBgTxt"></span></div>
+          <p class="f-note"><span>The saved PNG gets a solid colour behind the logo, so Image Trace sees one flat picture.</span><span class="more-x" hidden> With nothing see-through, the tracer has no faint edge to turn into stray outlines. Auto picks a colour far from every colour in the logo, so no part of it joins the background. After tracing, delete the background shape. The picture on screen stays as it is: only the saved file gets the background, with a small margin all round.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
         <div class="field dotf">
           <div class="f-head"><label for="lpi">Lines per inch</label><output id="lpiOut" for="lpi">30 lpi</output></div>
@@ -568,6 +575,20 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
             <div class="f-head"><label for="bgTol">Tolerance</label><output id="bgTolOut" for="bgTol">12%</output></div>
             <input type="range" id="bgTol" min="1" max="40" step="1" value="12">
             <p class="f-note"><span>How close a colour must be to the background to go.</span><span class="more-x" hidden> Raise it for noisy JPGs; lower it if parts of the design start to go too.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+          </div>
+        </div>
+        <label class="check-row"><input type="checkbox" id="thruOn"> Make see-through areas solid</label>
+        <p class="f-note"><span id="thruNote">For art whose colours are partly see-through, like many AI images.</span><span class="more-x" hidden> A see-through fill prints dark on a dark tee and faint on a light one. This gives the design a backing colour and makes it fully solid, so it prints the way it looks on that colour. The outer edge stays where it is.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button> <button class="link" type="button" id="thruShow">Show the see-through areas</button></p>
+        <div class="trace-body" id="thruBody" hidden>
+          <div class="lv-sub">Make it look the way it does on</div>
+          <div class="chips" id="thruChips" role="group" aria-label="Backing colour">
+            <button class="chip" type="button" data-thru="#ffffff">White</button><button class="chip" type="button" data-thru="#000000">Black</button><button class="chip" type="button" data-thru="shirt">The shirt colour</button>
+          </div>
+          <div class="knock"><span class="colorbox"><input type="color" id="thruPick" value="#ffffff" aria-label="Backing colour"></span><span id="thruTxt">Backing colour: #FFFFFF</span></div>
+          <div class="field">
+            <div class="f-head"><label for="thruFloor">Leave out anything fainter than</label><output id="thruFloorOut" for="thruFloor">4%</output></div>
+            <input type="range" id="thruFloor" min="1" max="40" step="1" value="4">
+            <p class="f-note"><span>Faint haze around the design stays clear instead of turning solid.</span><span class="more-x" hidden> Raise it if a soft glow or smudge around the design has turned into a solid patch. Lower it if a pale part of the design has gone missing.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
           </div>
         </div>
       </section>
@@ -929,6 +950,45 @@ function engine(){
   const tiles = {};
   let S = null;             // source pixels at output size {w,h,d}
   let bgCache = null;       // the background mask for S, kept while its colour and tolerance stay the same
+  let thruCache = null;     // S with its see-through areas made solid, kept while the backing colour and floor stay the same
+  // The smallest (mx false) or largest (mx true) value within r pixels, across then down: a square window, in one pass
+  // each way whatever its size (van Herk). Beyond the image counts as nothing to find.
+  function slide(src, w, h, r, mx){
+    const k = 2*r + 1, pad = mx ? 0 : 255, dst = new Uint8Array(w*h), tmp = new Uint8Array(w*h);
+    const L = Math.max(w, h) + 2*r, buf = new Uint8Array(L), g = new Uint8Array(L), hh = new Uint8Array(L);
+    const line = (from, to, len, o, step) => {
+      const n = len + 2*r;
+      buf.fill(pad, 0, r); for (let i = 0, j = o; i < len; i++, j += step) buf[r + i] = from[j]; buf.fill(pad, r + len, n);
+      for (let i = 0; i < n; i++) g[i] = i % k === 0 ? buf[i] : (mx ? (buf[i] > g[i-1] ? buf[i] : g[i-1]) : (buf[i] < g[i-1] ? buf[i] : g[i-1]));
+      for (let i = n - 1; i >= 0; i--) hh[i] = (i === n - 1 || i % k === k - 1) ? buf[i] : (mx ? (buf[i] > hh[i+1] ? buf[i] : hh[i+1]) : (buf[i] < hh[i+1] ? buf[i] : hh[i+1]));
+      for (let i = 0, j = o; i < len; i++, j += step){ const a = hh[i], b = g[i + 2*r]; to[j] = mx ? (a > b ? a : b) : (a < b ? a : b); }
+    };
+    for (let y = 0; y < h; y++) line(src, tmp, w, y*w, 1);
+    for (let x = 0; x < w; x++) line(tmp, dst, h, x, w);
+    return dst;
+  }
+  // Make see-through areas solid: art whose fills are partly transparent (common in AI images) prints dark on a dark
+  // tee and faint on a light one. Each pixel is blended onto the backing colour by its own transparency and made
+  // fully solid, so it looks the way it did on that colour. Anything fainter than the floor stays clear. Within a few
+  // pixels of the outside the transparency is kept in proportion to the area just inside, so a solid shape's smooth
+  // edge is untouched and a see-through shape gets the same smooth edge, with no pale rim.
+  function thruFill(d, w, h, f){
+    const n = w*h, a = new Uint8Array(n), fl = f.floor, r = f.r, br = f.rgb[0], bg = f.rgb[1], bb = f.rgb[2];
+    for (let i = 0, j = 3; i < n; i++, j += 4){ const v = d[j]; a[i] = v >= fl ? v : 0; }
+    const inner = slide(a, w, h, r, false);          // above 0: nothing clear within r pixels
+    const low = slide(inner, w, h, 2*r + 1, true);   // how solid the area just inside is (its faintest part, so texture can't dim the rim)
+    const top = slide(a, w, h, 2*r + 1, true);       // for lines too thin to have an inside
+    const o = new Uint8ClampedArray(n*4);
+    for (let i = 0, j = 0; i < n; i++, j += 4){
+      const v = a[i];
+      if (!v) continue;
+      let A = v, al = 255;
+      if (!inner[i]){ A = low[i] || top[i]; if (A < v) A = v; al = Math.round(255*v/A); }
+      const t = A/255, u = 1 - t;
+      o[j] = d[j]*t + br*u; o[j+1] = d[j+1]*t + bg*u; o[j+2] = d[j+2]*t + bb*u; o[j+3] = al;
+    }
+    return o;
+  }
   const masks = new Map();  // painted areas of parts, by id: {w, h, d}, one byte a pixel, stretched over the image
   // Remove background: the background colour (found on the edge, or picked) is cleared only where it joins the outside
   // edge, so the same colour inside the design stays. Answers a mask (255 cleared; 1–254 part of an edge pixel kept, to
@@ -1034,11 +1094,12 @@ function engine(){
     S = {w, h, d};
     let vis = 0, soft = 0;
     const hist = new Array(256).fill(0); // brightness of the visible art, for the Levels histogram
+    let mid = 0; // clearly see-through, not just a soft edge: 10% to 90% solid
     for (let i = 0; i < d.length; i += 4){
       const a = d[i+3];
-      if (a){ vis++; if (a < 255) soft++; hist[(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]) | 0]++; }
+      if (a){ vis++; if (a < 255){ soft++; if (a >= 26 && a < 230) mid++; } hist[(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]) | 0]++; }
     }
-    return {vis, soft, total: w*h, hist};
+    return {vis, soft, mid, total: w*h, hist};
   }
   // How much a colour belongs to a colour range (like Photoshop's Select > Color Range): 1 selected, 0 not, in between at the fuzzy edge.
   function selectWeight(R, r, g, b, L){
@@ -1065,6 +1126,11 @@ function engine(){
   }
   function run(p){
     let {w, h, d} = S, out = new Uint8ClampedArray(w*h*4); // let: an outward fade may add room round the design
+    if (p.thru){
+      const key = p.thru.rgb.join() + '|' + p.thru.floor + '|' + p.thru.r;
+      if (!thruCache || thruCache.S !== S || thruCache.key !== key) thruCache = {S, key, d: thruFill(d, w, h, p.thru)};
+      d = thruCache.d;
+    }
     const t = tile(p.shape);
     let cls = new Uint8Array(w*h); // what happened to each pixel: 0 clear, 1 removed, 2 gap between dots, 3 dot, 4 solid, 5 shirt-colour edge
     const lut = new Float32Array(1025);
@@ -1123,7 +1189,7 @@ function engine(){
     };
     let bgm = null;
     if (p.bg){
-      const key = (p.bg.rgb ? p.bg.rgb.join() : 'edge') + '|' + p.bg.tol;
+      const key = (p.bg.rgb ? p.bg.rgb.join() : 'edge') + '|' + p.bg.tol + (p.thru ? '|' + thruCache.key : '');
       if (!bgCache || bgCache.S !== S || bgCache.key !== key) bgCache = {S, key, m: bgMask(d, w, h, p.bg)};
       bgm = bgCache.m;
     }
@@ -1828,14 +1894,14 @@ const LOOK_TEXT = {
         knock: ['Knock out the shirt colour', 'Colours near the shirt colour drop out.', 'Colours close to the shirt drop out. Everything else prints solid.'],
         edges: ['Clean up only', 'Soft edges print solid or are removed.', 'Nothing is knocked out. Glows, fades and soft edges print solid or are removed at the threshold.']}
 };
-const FLAT_KEYS = {flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: ''}; // Trace prep: flat colours, how many (0 = found from the art), pure white and black, smallest detail (mm), colours left out
+const FLAT_KEYS = {flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // Trace prep: flat colours, how many (0 = found from the art), pure white and black, smallest detail (mm), colours left out
 const isFlat = () => st.finish === 'cut' && !!st.flat;
 const routeOf = f => f === 'cut' ? 'cut' : 'dots';
 function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[routeOf(finish || st.finish)][look] || LOOK_TEXT.dots[look] || LOOK_TEXT.cut[look]; return t ? t[0] : look; }
 const $ = id => document.getElementById(id);
 const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: ''}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','areaV'];
 try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
@@ -1926,7 +1992,8 @@ function restartEngine(msg){ // a fresh engine, the art sent again, then the cur
 $('redrawBtn').addEventListener('click', () => { autoRestarts = 0; restartEngine('Redrawn with your settings.'); });
 function onMsg(m){
   if (m.type === 'mask') return; // a part's area arrived at the engine
-  if (m.type === 'src'){ if (m.v === srcV){ srcStats = m.stats; hist = m.stats.hist; drawHisto(); } return; }
+  if (m.type === 'src'){ if (m.v === srcV){ srcStats = m.stats; hist = m.stats.hist; drawHisto(); syncThru();
+    const pc = thruPct(); if (art && !art.thruTold && pc != null){ art.thruTold = true; if (pc >= 15 && !st.thruOn) setTimeout(() => toast(`${pc}% of this design is partly see-through. If it should print solid, see Background.`), 600); } } return; }
   try { runSettled(); } catch(e){} if (m.type !== 'err') autoRestarts = 0;
   if (m.type === 'err'){ running = false; pending = false; $('busy').hidden = true; toast('That didn’t work: ' + m.msg); flushIdle(); return; }
   running = false;
@@ -1951,7 +2018,7 @@ function params(){
           hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
           rich: st.rich && st.finish !== 'cut', crisp: st.crisp && st.finish !== 'cut' ? 3 : 0, speck: !!st.speck,
           flat: isFlat() ? {n: st.flatN, snap: !!st.flatSnap, tidy: Math.round(st.flatTidy/25.4*DPI), smooth: (st.flatSmooth == null ? 4 : +st.flatSmooth)*0.16, up: art ? toMm(st.widthCm)/25.4*DPI/art.w : 1, drop: st.flatDrop ? st.flatDrop.split(',').map(hexRgb) : []} : null,
-          clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn && !isFlat() ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100,
+          clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: st.blkOn && !isFlat() ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, thru: st.thruOn ? {rgb: hexRgb(thruHex()), floor: Math.max(1, Math.round((st.thruFloor || 4)*2.55)), r: Math.max(2, Math.min(6, Math.round(1.5*outW()/Math.max(1, art.w))))} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100,
           fade: st.fade && st.finish !== 'cut' ? {px: Math.max(1, Math.round(st.fade/25.4*DPI)), out: st.fadeDir !== 'in', spread: st.fadeDir === 'spread', max: [Math.round(MAX_SHORT/2.54*DPI), Math.round(MAX_LONG/2.54*DPI)]} : null};
 }
 /* A part's area: brush strokes and boxes in the file's own pixels, drawn onto a small mask (up to 1400 px wide, over the
@@ -2933,7 +3000,22 @@ $('backOn').addEventListener('change', e => { st.back = e.target.checked ? backW
 $('backPick').addEventListener('input', e => { st.backHex = e.target.value.toLowerCase(); syncBack(); schedule(); });
 $('backFollow').addEventListener('click', () => { st.backHex = null; syncBack(); noteChange('Edge colour follows the shirt'); schedule(); });
 const SHARP_KEYS = {sharp: 0, sradius: 1};
-const BG_KEYS = {bgOn: false, bgTol: 12, bgHex: null};
+const BG_KEYS = {bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4};
+function thruHex(){ return st.thruHex === 'shirt' ? st.shirt : (st.thruHex || '#ffffff'); } // hoisted: the engine's settings ask early
+const thruPct = () => { const s = srcStats; return s && s.vis ? Math.round((s.mid || 0)/s.vis*100) : null; }; // how much of the design is clearly see-through
+function syncThru(){
+  $('thruOn').checked = !!st.thruOn; $('thruBody').hidden = !st.thruOn;
+  const pc = thruPct();
+  $('thruNote').textContent = pc != null && pc >= 1 ? `${pc}% of this design is partly see-through.` + (pc >= 15 && !st.thruOn ? ' If those parts are meant to be solid colour, tick this.' : '') : 'For art whose colours are partly see-through, like many AI images.';
+  if (!st.thruOn) return;
+  syncChips('thruChips', 'thru', st.thruHex);
+  const hex = thruHex(); $('thruPick').value = hex;
+  $('thruTxt').textContent = st.thruHex === 'shirt' ? `Follows the shirt colour: ${hex.toUpperCase()}` : `Backing colour: ${hex.toUpperCase()}`;
+}
+$('thruOn').addEventListener('change', e => { st.thruOn = e.target.checked; syncThru(); noteChange(st.thruOn ? 'See-through areas made solid' : 'See-through areas left as they are'); schedule(); });
+$('thruChips').addEventListener('click', e => { const b = e.target.closest('[data-thru]'); if (!b) return; st.thruHex = b.dataset.thru; syncThru(); remember(); schedule(); });
+$('thruPick').addEventListener('input', e => { st.thruHex = e.target.value.toLowerCase(); syncThru(); remember(); schedule(); });
+$('thruShow').addEventListener('click', () => { st.paneA = 'origbase'; st.paneB = 'shirt'; syncPaneOptions(); setView('split'); toast('Left: white is solid, grey is see-through.'); });
 let bgFound = null; // [r, g, b] found on the edge, 'none' when the edge is clear already, null before a run
 function syncBg(){
   $('bgOn').checked = !!st.bgOn; $('bgBody').hidden = !st.bgOn;
@@ -2947,10 +3029,11 @@ $('bgOn').addEventListener('change', e => { st.bgOn = e.target.checked; syncBg()
 $('bgPick').addEventListener('click', () => picking ? endPick() : startPick('bg'));
 $('bgAuto').addEventListener('click', () => { st.bgHex = null; syncBg(); noteChange('Background colour found on the edge'); schedule(); });
 let hardWas = 50; // the hard edge threshold to go back to when it's ticked again
-const SLIDERS = [['fade', v => v ? `${v} mm` : 'Off'], ['back', pxMm], ['bgTol', v => `${v}%`], ['sharp', v => v ? `${v}%` : 'Off'], ['sradius', v => `${(+v).toFixed(1)} px`], ['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
+const SLIDERS = [['fade', v => v ? `${v} mm` : 'Off'], ['back', pxMm], ['bgTol', v => `${v}%`], ['thruFloor', v => `${v}%`], ['sharp', v => v ? `${v}%` : 'Off'], ['sradius', v => `${(+v).toFixed(1)} px`], ['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
                  ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`], ['flatTidy', v => +v ? `${(+v).toFixed(1)} mm` : 'Off'], ['flatSmooth', v => +v ? `${+v}` : 'Off']];
-function syncSliders(){ if (st.flatSmooth == null) st.flatSmooth = FLAT_KEYS.flatSmooth; for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi);
-  syncBg();
+function syncSliders(){ for (const K of [BG_KEYS, FLAT_KEYS]) for (const k in K) if (st[k] === undefined) st[k] = K[k]; // designs kept from before a setting existed
+  for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi);
+  syncBg(); syncThru();
   for (const b of $('sharpChips').querySelectorAll('[data-sharp]')) b.setAttribute('aria-pressed', String(+b.dataset.sharp === st.sharp && (!st.sharp || Math.abs(+b.dataset.sr - st.sradius) < 1e-6)));
   $('sradiusField').hidden = !st.sharp;
   const near = st.emode === 'near'; syncChips('emodeChips', 'emode', st.emode); $('emodeAny').hidden = near; $('emodeNear').hidden = !near; $('etolField').hidden = !st.edge || !near;
@@ -3024,8 +3107,48 @@ const isPrep = () => st.finish === 'cut' && st.look === 'edges' && !st.flat;
 function syncFinChips(){ syncChips('finishChips', 'finish', isFlat() ? 'flat' : isPrep() ? 'prep' : st.finish); }
 /* ---------- Trace prep: flat colours ---------- */
 var lastFlat = null; // the colours the engine found: [r, g, b, share of the ink, left out]
+const TRACE_BGS = ['#00ff00', '#ff00ff', '#00ffff', '#ffff00', '#ff0000', '#0000ff', '#ff8000', '#808080', '#000000', '#ffffff'];
+function colourGap(a, b){ const rm = (a[0] + b[0])/2, dr = a[0] - b[0], dg = a[1] - b[1], db = a[2] - b[2]; return Math.sqrt((2 + rm/256)*dr*dr + 4*dg*dg + (2 + (255 - rm)/256)*db*db)/765; } // 0 the same, 1 black to white
+function flatUsed(){ return lastFlat ? lastFlat.pal.filter(c => !c[4]) : []; }
+function nearestGap(hex){ const c = hexRgb(hex); let best = 1, at = null; for (const q of flatUsed()){ const g = colourGap(c, q); if (g < best){ best = g; at = q; } } return [best, at]; }
+// the colour behind the saved Trace prep PNG, or null for none. Auto: the bright colour furthest from every colour in the logo.
+function traceBgHex(){
+  if (!isFlat() || st.flatBg === 'off') return null;
+  if (st.flatBg === 'black') return '#000000';
+  if (st.flatBg === 'white') return '#ffffff';
+  if (st.flatBg === 'own') return st.flatBgHex || '#000000';
+  let best = TRACE_BGS[0], gap = -1;
+  for (const h of TRACE_BGS){ const g = nearestGap(h)[0]; if (g > gap + 1e-9){ gap = g; best = h; } }
+  return best;
+}
+function traceCanvas(){ // the print on its tracing background, with a small margin all round
+  const hex = traceBgHex(); if (!hex) return null;
+  const W = outCanvas.width, H = outCanvas.height, m = Math.max(12, Math.round(Math.max(W, H)*0.03));
+  const c = document.createElement('canvas'); c.width = W + 2*m; c.height = H + 2*m;
+  const x = c.getContext('2d'); x.fillStyle = hex; x.fillRect(0, 0, c.width, c.height); x.drawImage(outCanvas, m, m);
+  return c;
+}
+function syncFlatBg(){
+  if (st.flatBg == null) st.flatBg = FLAT_KEYS.flatBg;
+  syncChips('flatBgChips', 'flatbg', st.flatBg);
+  const hex = traceBgHex(), own = st.flatBg === 'own', n = flatUsed().length;
+  $('flatBgSw').hidden = own || !hex; $('flatBgBox').hidden = !own;
+  if (hex) $('flatBgSw').style.background = hex;
+  if (own) $('flatBgPick').value = st.flatBgHex || '#000000';
+  let t = 'Off: the saved PNG keeps a transparent background.';
+  if (hex){
+    const [gap, at] = nearestGap(hex);
+    t = `${st.flatBg === 'auto' ? 'Auto: ' : ''}${hex.toUpperCase()}` + (n ? `. In Image Trace, ask for ${n + 1} colours (${n} + the background).` : '.');
+    if (at && gap < 0.12) t = `${hex.toUpperCase()} is too close to ${rgbHex(at[0], at[1], at[2]).toUpperCase()} in the logo: those parts would join the background. Auto picks a safe colour.`;
+    $('flatBgTxt').classList.toggle('warn-t', !!(at && gap < 0.12));
+  } else $('flatBgTxt').classList.remove('warn-t');
+  $('flatBgTxt').textContent = t;
+}
+$('flatBgChips').addEventListener('click', e => { const b = e.target.closest('[data-flatbg]'); if (!b) return; st.flatBg = b.dataset.flatbg; syncFlatBg(); syncFileName(); updateChecks(); remember(); });
+$('flatBgPick').addEventListener('input', e => { st.flatBgHex = e.target.value.toLowerCase(); syncFlatBg(); updateChecks(); remember(); });
 function syncFlat(){
   const on = isFlat(); $('flatField').hidden = !on; if (!on) return;
+  syncFlatBg();
   syncChips('flatChips', 'flatn', st.flatN); $('flatSnap').checked = !!st.flatSnap;
   const pal = lastFlat ? lastFlat.pal : [], used = pal.filter(c => !c[4]).length;
   $('flatSw').innerHTML = pal.map(c => { const hex = rgbHex(c[0], c[1], c[2]), pc = c[3]*100;
@@ -3387,12 +3510,16 @@ function updateChecks(){
   if (art.sizeFrom === 'guess') rows.push(['warn', '!', 'Print size not chosen', `No size is saved in this file, so it opened at ${toMm(st.widthCm)} mm wide. Choose the print width in step 1.`]);
   const s = srcStats;
   const softPct = s && s.vis ? Math.round(s.soft/s.vis*100) : null;
+  const thruPc = thruPct();
+  if (st.thruOn) rows.push(['info', '◧', `See-through areas made solid (on ${thruHex().toUpperCase()})`, (thruPc ? `${thruPc}% of the design was partly see-through. ` : '') + `It now prints the way it looked on ${thruHex().toUpperCase()}, on any tee. Anything fainter than ${st.thruFloor}% stays clear.`]);
+  else if (thruPc != null && thruPc >= 15) rows.push(['warn', '!', `${thruPc}% of the design is partly see-through`, 'Fine for glows, shadows and fades. If those parts are meant to be solid colour (common with AI art), tick “Make see-through areas solid” in Background, or they print dark on a dark tee and faint on a light one.']);
   rows.push(['good', '✓', 'No see-through pixels',
     (softPct != null && softPct >= 1 ? `The art had ${softPct}% see-through pixels (glows, shadows, fades, soft edges). ` : '') + 'Every pixel is now solid ink or clear film, so the film has no haze.']);
   const md = minDotMm();
   if (st.finish === 'cut') rows.push(['good', '✓', 'Clean cut, no dots', `Pixels at least ${st.cut}% solid print fully solid. The rest is removed.`]);
   if (isFlat() && lastFlat){ const n = lastFlat.pal.filter(c => !c[4]).length;
     rows.push(['good', '✓', `${n} flat colour${n === 1 ? '' : 's'}`, 'Every area is one flat colour with a hard edge, ready for Image Trace in Illustrator.' + (lastFlat.tidied ? ` ${lastFlat.tidied} speck${lastFlat.tidied === 1 ? '' : 's'} and in-between lines tidied away.` : '')]);
+    if (traceBgHex()) rows.push(['info', '▣', `Tracing background ${traceBgHex().toUpperCase()}`, `The saved PNG has this colour behind the logo, with a small margin. In Image Trace, ask for ${n + 1} colours, then delete the background shape.`]);
     if (art && st.widthCm*Math.max(1, art.h/art.w) < 20) rows.push(['info', 'i', 'A bigger size traces smoother', 'For tracing, set the print size to 250 mm or more on the long side. The curves come out rounder.']); }
   else rows.push(md >= 0.3 ? ['good', '✓', `Smallest dot about ${md.toFixed(2)} mm`, 'A good size for DTF film.']
                        : ['warn', '!', `Smallest dot about ${md.toFixed(2)} mm`, 'Very small dots can lose grip in the wash. Raise “Drop dots under” or lower the lines per inch.']);
@@ -3853,13 +3980,13 @@ function fileName(){
   const clean = t => t.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
   const base = art.isSample ? 'sample-art' : clean((art.name || 'art').replace(/\.[a-z0-9]+$/i, '').replace(/_twedit(_.*)?$/i, '')) || 'art';
   const extra = clean($('nameSuffix').value);
-  return `${base}_twedit_${hasRoom() ? pxToMm(printPxW()) : toMm(st.widthCm)}w` + (st.finish === 'cut' ? (st.flat ? '_flat' : '') : `_${st.lpi}lpi`) + (extra ? `_${extra}` : '') + '.png';
+  return `${base}_twedit_${hasRoom() ? pxToMm(printPxW()) : toMm(st.widthCm)}w` + (st.finish === 'cut' ? (st.flat ? (traceBgHex() ? '_trace' : '_flat') : '') : `_${st.lpi}lpi`) + (extra ? `_${extra}` : '') + '.png';
 }
 function syncFileName(){ if (art) $('nameNote').innerHTML = `Saves as <b>${esc(fileName())}</b>`; }
 $('nameSuffix').addEventListener('input', () => { syncFileName(); persistSoon(); });
 function settingsText(){
   const look = lookName();
-  const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` + (st.flat ? `; flat colours (${st.flatN || 'auto'}${lastFlat ? ': ' + lastFlat.pal.filter(c => !c[4]).map(c => rgbHex(c[0], c[1], c[2]).toUpperCase()).join(' ') : ''}); tidy under ${st.flatTidy} mm; smooth edges ${st.flatSmooth == null ? 4 : st.flatSmooth}` : '') : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
+  const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` + (st.flat ? `; flat colours (${st.flatN || 'auto'}${lastFlat ? ': ' + lastFlat.pal.filter(c => !c[4]).map(c => rgbHex(c[0], c[1], c[2]).toUpperCase()).join(' ') : ''}); tidy under ${st.flatTidy} mm; smooth edges ${st.flatSmooth == null ? 4 : st.flatSmooth}` + (traceBgHex() ? `; tracing background ${traceBgHex().toUpperCase()}` : '') : '') : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
   const ruleText = (R, i) => `range ${i + 1}: ${R.type === 'sample' ? 'colours ' + R.samples.join(' ').toUpperCase() : R.type + ' ' + R.range + '%'}` +
     ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}${R.action === 'ramp' ? ` ${R.k0 == null ? 10 : R.k0}-${R.k1 == null ? 30 : R.k1}%` : ''}${R.action === 'nodots' ? ' at ' + (R.cut == null ? 50 : R.cut) + '%' : ''}${R.action === 'recolour' ? ' ' + (R.to || '#ffffff').toUpperCase() : ''}`;
   const levels = (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') + ((lv.bri || lv.bc) && lv.lum !== false ? ' (colour strength kept)' : '') +
@@ -3867,7 +3994,7 @@ function settingsText(){
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (knockLook(st.look) ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
          (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.finish !== 'cut' && !hlvIdentity() ? `; halftone levels ${st.hb} ${st.hg.toFixed(2)} ${st.hw}, output ${st.hob}-${st.how}` : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
-         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.fade && st.finish !== 'cut' ? `; edge faded ${st.fade} mm ${st.fadeDir === 'spread' ? 'outward, dots spread' : st.fadeDir === 'out' ? 'outward' : 'inward'}` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
+         (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.fade && st.finish !== 'cut' ? `; edge faded ${st.fade} mm ${st.fadeDir === 'spread' ? 'outward, dots spread' : st.fadeDir === 'out' ? 'outward' : 'inward'}` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.thruOn ? `; see-through areas made solid on ${thruHex().toUpperCase()}, floor ${st.thruFloor}%` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (hasRoom() ? `, ${pxToMm(printPxW())} x ${pxToMm(printPxH())} mm with the fade` : '') + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
 let saving = false;
@@ -3879,7 +4006,7 @@ async function savePng(){ // answers true once the PNG is saved
     await idle();
     $('busyTxt').textContent = 'Preparing the PNG…'; $('busy').hidden = false;
     await new Promise(r => setTimeout(r, 30));
-    const raw = await new Promise((res, rej) => outCanvas.toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
+    const raw = await new Promise((res, rej) => (traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
     const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
     $('busy').hidden = true;
     ok = await saveFile(png, fileName());
@@ -3955,7 +4082,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
@@ -4318,6 +4445,8 @@ const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print
   mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
   ink: v => v === 'one' ? 'Mono' : 'Full colour', inkHex: v => `Ink colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
   knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt',
+  thruOn: v => v ? 'See-through areas made solid' : 'See-through areas left as they are', thruHex: v => v === 'shirt' ? 'Backing follows the shirt colour' : `Backing colour ${String(v).toUpperCase()}`, thruFloor: v => `Leave out fainter than ${v}%`,
+  flatBg: v => ({auto: 'Tracing background: Auto', black: 'Tracing background: Black', white: 'Tracing background: White', own: 'Tracing background: own colour', off: 'Tracing background off'}[v] || 'Tracing background'), flatBgHex: v => `Tracing background ${String(v).toUpperCase()}`,
   bgOn: v => v ? 'Background removed' : 'Background kept', bgTol: v => `Background tolerance ${v}%`, bgHex: v => v ? `Background colour ${v.toUpperCase()}` : 'Background colour found on the edge',
   sharp: v => v ? `Sharpen ${v}%` : 'Sharpen off', sradius: v => `Sharpen radius ${(+v).toFixed(1)} px`,
   back: v => v ? `Shirt-colour edge ${pxMm(v)}` : 'Shirt-colour edge off', backHex: v => v ? `Edge colour ${v.toUpperCase()}` : 'Edge colour follows the shirt',
@@ -4452,7 +4581,7 @@ const SUMS = { // short, so a title stays on one line
   cropGroup: () => !art || (art.w === art.fullW && art.h === art.fullH) ? 'Whole file' : `${art.w} × ${art.h} px`,
   sizeGroup: () => art ? `${toMm(st.widthCm)} × ${toMm(st.widthCm*art.h/art.w)} mm` : '',
   finishGroup: () => isFlat() ? (lastFlat ? (n => `${n} colour${n === 1 ? '' : 's'}`)(lastFlat.pal.filter(c => !c[4]).length) : 'Flat colours') : st.finish === 'cut' ? `Solid from ${st.cut}%` : `${st.lpi} lpi · ${st.angle}° · ${st.shape}`,
-  bgGroup: () => { if (!st.bgOn) return 'Off'; const h = st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : ''); return h ? `Removing ${h.toUpperCase()}` : 'On'; },
+  bgGroup: () => { if (!st.bgOn) return st.thruOn ? 'See-through made solid' : 'Off'; const h = st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : ''); return (h ? `Removing ${h.toUpperCase()}` : 'On') + (st.thruOn ? ' · solid' : ''); },
   sharpGroup: () => st.sharp ? ({50: 'Light', 100: 'Medium', 160: 'Strong'}[st.sharp] || `${st.sharp}%`) : 'Off',
   levelsGroup: () => lvIdentity() ? 'Unchanged' : 'Adjusted',
   knockGroup: () => `${st.knock ? st.knock.toUpperCase() : 'Shirt colour'} · ${st.finish === 'cut' ? `${st.ktol}%` : `${st.k0}–${st.k1}%` + (st.clean ? ' · clean' : '')}`,
@@ -4475,7 +4604,7 @@ const SECTION_TIPS = {
   routeGroup: 'Halftone or clean cut, then a quick start. The Fine-tune tools change to suit it.',
   cropGroup: 'Trim empty margins or draw a crop, so the print size measures the real art.',
   sizeGroup: 'How wide the print is. The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
-  bgGroup: 'Clear a plain background (a JPG’s white, a screenshot’s colour) only where it joins the outside edge, so the same colour inside the design stays.',
+  bgGroup: 'Clear a plain background (a JPG’s white, a screenshot’s colour) only where it joins the outside edge, so the same colour inside the design stays. Or give see-through art a backing colour, so it prints solid.',
   sharpGroup: 'Unsharp mask on the art at print size: crisper edges and detail before the dots. Light or Medium suits most soft files.',
   levelsGroup: 'Brightness/Contrast and Levels, like Photoshop’s, on the art’s colours before anything else. Move the black point right so more of the art counts as shadow.',
   knockGroup: 'Colours close to the shirt (or the colour you set) drop out so the shirt shows through.',
@@ -4567,7 +4696,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -4594,7 +4723,7 @@ const openedWidth = () => Math.max(0.5, Math.min(art.isSample ? 25*art.w/art.ful
 const sameRules = () => st.look === 'shadows' ? rules.length === 1 && JSON.stringify(rules[0]) === JSON.stringify(newRule('shadows', 'remove')) : !rules.length;
 const STEP_RESETS = {
   finishGroup: {get name(){ return isFlat() ? 'Flat colours' : st.finish === 'cut' ? 'Threshold' : 'Halftone dots'; }, // the print style itself stays
-                vals: () => isFlat() ? {cut: DEFAULTS.cut, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: ''} : st.finish === 'cut' ? {cut: DEFAULTS.cut} : {lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape}},
+                vals: () => isFlat() ? {cut: DEFAULTS.cut, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto'} : st.finish === 'cut' ? {cut: DEFAULTS.cut} : {lpi: DEFAULTS.lpi, angle: DEFAULTS.angle, shape: DEFAULTS.shape}},
   sizeGroup: {name: 'Print size', same: () => !art || (Math.abs(st.widthCm - openedWidth()) < 0.005 && !art.smooth),
               reset: () => { art.smooth = false; art.sizeFrom = sizeAsOpened(art); setWidth(openedWidth(), true); buildSrcSoon(); }},
   knockGroup: {name: 'Knock out', vals: () => ({k0: lookVal('k0'), k1: lookVal('k1'), ktol: DEFAULTS.ktol, knock: null, clean: DEFAULTS.clean, rich: DEFAULTS.rich})},
@@ -4655,6 +4784,9 @@ const TIPS = [
   ['#allSaveBtn', 'Save a PNG of every open tab, one after another. The browser may ask once to allow several downloads.'],
   ['#bgOn', 'Clear the plain background around the design, only where it joins the outside edge.'], ['#bgPick', 'Click the background colour in the art, if the one found on the edge isn’t right.'],
   ['#bgTol', 'Raise it for noisy JPGs; lower it if parts of the design go too.'],
+  ['#thruOn', 'Give partly see-through art a backing colour and make it fully solid, so it prints the same on any tee.'], ['#thruShow', 'Side by side: the art’s transparency (white is solid, grey is see-through) and the print.'],
+  ['[data-thru="#ffffff"]', 'The colours as they look on white: paler.'], ['[data-thru="#000000"]', 'The colours as they look on black: darker.'], ['[data-thru="shirt"]', 'The colours as they look on the shirt colour chosen in the view.'],
+  ['[data-flatbg="auto"]', 'A bright colour far from every colour in the logo.'], ['[data-flatbg="off"]', 'No background: the saved PNG stays transparent, as before.'],
   ['[data-sharp="0"]', 'No sharpening.'], ['[data-sharp="50"]', 'Light: 50% at 0.8 px. A gentle lift for slightly soft art.'],
   ['[data-sharp="100"]', 'Medium: 100% at 1 px. Good for resized or soft files.'], ['[data-sharp="160"]', 'Strong: 160% at 1.2 px. For quite soft files. Check for halos at 1:1.'],
   ['#backOn', 'Add a thin edge in the shirt colour around the design, to hold fine detail together. It blends into the tee.'],
