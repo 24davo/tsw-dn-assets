@@ -3750,7 +3750,10 @@ try { teamCode = localStorage.getItem('tsw-dtf-team'); } catch(e){}
 function savePresets(){ if (!writeJSON('tsw-dtf-presets', presets)) toast('This browser could not keep presets. Export them to a file instead.'); }
 function putLocal(p){ const i = presets.findIndex(x => sameName(x.name, p.name)); if (i >= 0) presets[i] = p; else presets.push(p); savePresets(); return i >= 0; }
 function dropLocal(name){ const i = presets.findIndex(x => sameName(x.name, name)); if (i >= 0){ presets.splice(i, 1); savePresets(); } }
-function useShared(list){ shared = [].concat(list || []).filter(isPreset); sharedAt = Date.now(); writeJSON('tsw-dtf-shared', shared); writeJSON('tsw-dtf-shared-at', sharedAt); }
+const SLOTS_ROW = '~ Speed buttons (keep this row)';
+function useShared(list){ shared = [].concat(list || []).filter(isPreset);
+  const row = shared.find(x => x.name === SLOTS_ROW); shared = shared.filter(x => x.name !== SLOTS_ROW);
+  try { takeSlots(row); } catch(e){} sharedAt = Date.now(); writeJSON('tsw-dtf-shared', shared); writeJSON('tsw-dtf-shared-at', sharedAt); }
 /* Starters: ten built-in set-ups at 30 lpi (go to 35 by hand), on every computer, read-only. Each is a whole halftone
    style (Quick start, fade range, rich dots, Fade the edge, and sometimes a part of its own), so flipping through them
    never leaves bits of the last one behind. The file's own fixes (Levels, its own parts, background, sharpen, touch-ups,
@@ -3868,7 +3871,7 @@ async function refreshShared(quiet){
   const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null);
 }
 function askCode(){
-  return new Promise(res => { codeAsk = res; $('teamCode').value = ''; $('presetForm').hidden = true; $('presetConfirm').hidden = true; $('codeForm').hidden = false; $('teamCode').focus(); });
+  return new Promise(res => { codeAsk = res; $('teamCode').value = ''; $('presetForm').hidden = true; $('presetConfirm').hidden = true; $('codeForm').hidden = false; const f = folds.find(f => f.g.id === 'presetGroup'); if (f && f.g.classList.contains('folded')){ f.set(true); syncFoldAll(); } $('teamCode').focus(); });
 }
 function answerCode(v){ $('codeForm').hidden = true; if (codeAsk){ const r = codeAsk; codeAsk = null; r(v); } }
 $('codeForm').addEventListener('submit', e => { e.preventDefault(); answerCode($('teamCode').value.trim() || null); });
@@ -3925,6 +3928,24 @@ let slots = (() => { const a = [].concat(readJSON('tsw-dtf-slots', [])); return 
 let speedTab = readJSON('tsw-dtf-speedtab', null); if (speedTab !== 'ours' && speedTab !== 'built') speedTab = slots.some(Boolean) ? 'ours' : 'built';
 let speedEdit = false, speedAdd = -1;
 function keepSlots(){ try { localStorage.setItem('tsw-dtf-slots', JSON.stringify(slots)); localStorage.setItem('tsw-dtf-speedtab', JSON.stringify(speedTab)); } catch(e){} }
+// shared: 'yes' (the same as the Sheet), 'no' (a change here hasn't reached the Sheet yet: it's kept, and Share now sends it)
+let slotsDirty = readJSON('tsw-dtf-slots-dirty', false) === true, slotsShared = false;
+const normSlots = a => Array.from({length: SPEED_N}, (_, i) => a && a[i] && isPreset(a[i]) ? a[i] : null);
+function takeSlots(row){ // the shared list just arrived
+  if (!SYNC_URL) return;
+  if (row && Array.isArray(row.slots) && !slotsDirty){ slots = normSlots(row.slots); slotsShared = true; speedAdd = -1; keepSlots(); if (!readJSON('tsw-dtf-speedtab-set', false) && slots.some(Boolean)) speedTab = 'ours'; }
+  else slotsShared = false;
+  syncSpeed();
+}
+async function shareSlots(){ // after a change to the Ours buttons
+  if (!SYNC_URL) return;
+  slotsDirty = true; writeJSON('tsw-dtf-slots-dirty', true);
+  const mine = JSON.stringify(slots);
+  const d = await remote({action: 'save', preset: {name: SLOTS_ROW, v: 1, s: {}, slots: JSON.parse(mine)}});
+  if (d.ok){ slotsDirty = false; writeJSON('tsw-dtf-slots-dirty', false); slots = normSlots(JSON.parse(mine)); slotsShared = true; keepSlots(); toast('Your buttons are now the same on every computer.'); }
+  else toast(d.error === 'cancelled' ? 'Kept on this computer only. Click Share now when you have the team code.' : `${remoteProblem(d).replace('That preset is', 'These buttons are')} The buttons are kept on this computer for now.`);
+  const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); syncSpeed();
+}
 function syncSpeed(){
   for (const b of document.querySelectorAll('[data-speedtab]')) b.setAttribute('aria-pressed', String(b.dataset.speedtab === speedTab));
   const any = slots.some(Boolean); if (!any) speedEdit = false;
@@ -3936,7 +3957,9 @@ function syncSpeed(){
   $('speedGrid').innerHTML = html;
   $('speedForm').hidden = speedTab !== 'ours' || speedAdd < 0;
   $('speedNote').innerHTML = speedTab === 'built' ? 'One click sets the whole job up. Check the print size after.'
-    : (any ? 'Your own buttons, on this computer. ' : 'Six spaces for your own buttons. Set a job up the way you like, then click + Add. ') + (any ? `<button class="link" type="button" id="speedEditBtn">${speedEdit ? 'Done' : 'Remove a button'}</button>` : '');
+    : (!any ? 'Six spaces for your own buttons. Set a job up the way you like, then click + Add. ' : !SYNC_URL ? 'Your own buttons, on this computer. ' : slotsShared && !slotsDirty ? 'Your own buttons, the same on every computer. ' : 'Your own buttons, on this computer only so far. <button class="link" type="button" id="speedShareBtn">Share now</button> ')
+      + (any ? `<button class="link" type="button" id="speedEditBtn">${speedEdit ? 'Done' : 'Remove a button'}</button>` : '')
+      + (!any && SYNC_URL && slotsDirty ? '<button class="link" type="button" id="speedShareBtn">Share now</button>' : '');
 }
 function openSpeedForm(i){
   speedAdd = i;
@@ -3953,11 +3976,12 @@ $('speedForm').addEventListener('submit', e => {
   if (v){ const src = (v[0] === 's' ? shared : presets)[+v.slice(1)]; if (!src) return; p = JSON.parse(JSON.stringify(src)); p.linked = true; }
   else { const name = $('speedName').value.trim().slice(0, 32); if (!name){ toast('Give the button a name.'); $('speedName').focus(); return; } p = capturePreset(name, false); }
   if ($('speedTrim').checked) p.trim = true; else delete p.trim;
-  slots[speedAdd] = p; speedAdd = -1; keepSlots(); syncSpeed(); toast(`Added the “${p.name}” button.`);
+  slots[speedAdd] = p; speedAdd = -1; keepSlots(); syncSpeed(); toast(`Added the “${p.name}” button.`); shareSlots();
 });
 $('speedGroup').addEventListener('click', e => {
   const tab = e.target.closest('[data-speedtab]');
-  if (tab){ speedTab = tab.dataset.speedtab; speedAdd = -1; speedEdit = false; keepSlots(); syncSpeed(); return; }
+  if (tab){ speedTab = tab.dataset.speedtab; speedAdd = -1; speedEdit = false; writeJSON('tsw-dtf-speedtab-set', true); keepSlots(); syncSpeed(); return; }
+  if (e.target.closest('#speedShareBtn')){ shareSlots(); return; }
   if (e.target.closest('#speedEditBtn')){ speedEdit = !speedEdit; speedAdd = -1; syncSpeed(); return; }
   const b = e.target.closest('.speed-btn'); if (!b) return;
   if (b.dataset.built != null){
@@ -3967,7 +3991,7 @@ $('speedGroup').addEventListener('click', e => {
   }
   const i = +b.dataset.slot, p = slots[i];
   if (!p){ openSpeedForm(i); return; }
-  if (speedEdit){ slots[i] = null; keepSlots(); syncSpeed(); toast(`Removed the “${p.name}” button.`); return; }
+  if (speedEdit){ slots[i] = null; keepSlots(); syncSpeed(); toast(`Removed the “${p.name}” button.`); shareSlots(); return; }
   const fresh = p.linked && shared.concat(presets).find(x => sameName(x.name, p.name)); // a saved preset that's been updated since: use it as it is now
   syncPresets(null); applyPreset(fresh ? {...fresh, trim: p.trim} : p);
 });
