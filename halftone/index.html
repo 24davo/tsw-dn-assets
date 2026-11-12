@@ -344,8 +344,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .bg-grow{flex:1}
 .bg-set{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding:12px;background:var(--soft);border:1px solid var(--line);border-radius:var(--r);font-size:13px}
 .bg-set b{font-weight:700}
-.bg-set .bg-w{display:inline-flex;align-items:center;gap:6px;font-weight:600}
-.bg-set .bg-w input{width:76px;height:34px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.bg-w{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.bg-w input{width:76px;height:34px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
 .bg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
 .bitem{position:relative;display:grid;gap:4px;padding:8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:12px;min-width:0}
 .bitem.on{border-color:var(--ink)}
@@ -374,7 +374,16 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .bo-head h3{margin:0;font-size:18px;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--ink)}
 .bg-tick{width:22px;height:22px;margin:0;cursor:pointer;accent-color:var(--accent)}
 .bgroup.off{opacity:.62}
-.bg-set select{height:34px;max-width:260px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600}
+.bg-set select,.bg-quick select{height:34px;max-width:260px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600}
+.bg-head .link:disabled{opacity:.45;cursor:default;text-decoration:none}
+.bg-lock{padding:2px 8px;border-radius:4px;background:var(--ink);color:var(--panel);font-size:12px;font-weight:700}
+.bgroup.locked{gap:8px;background:var(--soft)}
+.bgroup.locked .bg-set{background:var(--panel)}
+.bg-quick{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;font-size:13px;font-weight:600}
+.bg-quick .chip{height:32px}
+.bg-quick .chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.bg-trim{display:inline-flex;align-items:center;gap:6px;font-weight:600;cursor:pointer}
+.bg-trim input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -987,7 +996,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 <div class="batch" id="batch" role="dialog" aria-modal="true" aria-labelledby="batchTitle" hidden>
   <div class="batch-bar">
     <h2 id="batchTitle">Batch</h2>
-    <span class="batch-sub">Many files, one set-up for each group. Pick a preset on each group (or set it up on a file), tick the groups, then process them all into one zip. Every file in a group prints at the same scale.</span>
+    <span class="batch-sub">Many files, one set-up for each group. Pick a preset on each group (or set it up on a file), tick the groups, then process them all into one zip. Lock a group when it is right.</span>
     <label class="batch-label">Production label <select id="batchLabelMode"><option value="off">Off</option><option value="simple">Simple</option><option value="full">Full info</option></select></label>
     <button class="btn primary" type="button" id="batchRun" disabled data-tip="Works out every ticked group that is set up, and saves one zip with a folder for each group.">Process ticked groups</button>
     <button class="btn" type="button" id="batchNew">New group</button>
@@ -5039,17 +5048,49 @@ cur = {id: ++docSeq, key: newKey()}; docs = [cur]; renderTabs(); // the first ta
    The set-up is made in the editor on any file of the group. Saving puts each ticked file through the editor in turn. */
 let batchGroups = [], batchSeq = 0, batchBusy = false, batchStopped = false, batchAddTo = null, batchKeepTimer = 0, batchKeepFailed = false;
 const batchOk = f => /^image\//.test(f.type || '') || /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name || '');
-const batchWidest = g => g.items.reduce((m, it) => Math.max(m, it.w), 0);
-const batchTooBig = (g, it) => !!g.scale && it.w*g.scale > maxWidthFor(it) + 0.001;
+/* Size: g.fit 's' one scale for the group (cm per pixel), 'w' every file the same width, 'h' every file the same height
+   (g.fitMm). With g.trim each file is cut to its own art first (it.tb, found when the file is added), so the sizes
+   are the art's, not the empty space around it. */
+const batchBox = (g, it) => g.trim && it.tb ? it.tb : {x: 0, y: 0, w: it.w, h: it.h};
+const batchSized = g => g.fit === 's' ? g.scale > 0 : g.fitMm > 0;
+const batchCm = (g, it) => { const b = batchBox(g, it); return g.fit === 'w' ? g.fitMm/10 : g.fit === 'h' ? g.fitMm/10*b.w/b.h : b.w*g.scale; }; // the print width of one file
+const batchWidestIt = g => g.items.reduce((m, it) => !m || batchBox(g, it).w > batchBox(g, m).w ? it : m, null);
+const batchWidest = g => { const it = batchWidestIt(g); return it ? batchBox(g, it).w : 0; };
+const batchTooBig = (g, it) => batchSized(g) && batchCm(g, it) > maxWidthFor(batchBox(g, it)) + 0.001;
+const round1 = v => Math.round(v*10)/10;
+function batchFit(g, fit){ // changing how the group is sized keeps the widest file as it prints now
+  if (!['s', 'w', 'h'].includes(fit) || fit === g.fit) return;
+  const W = batchWidestIt(g), cm = W && batchSized(g) ? batchCm(g, W) : 0, b = W && batchBox(g, W);
+  g.fit = fit;
+  if (cm){ if (fit === 's') g.scale = cm/b.w; else g.fitMm = round1(fit === 'w' ? cm*10 : cm*10*b.h/b.w); }
+  g.scaleFrom = 'user';
+}
+function batchCropArt(g, it, a){ // the file's art box, in the opened art's own pixels
+  const b = batchBox(g, it), k = a.fullW/it.w;
+  a.crop = {x: Math.round(b.x*k), y: Math.round(b.y*k), w: Math.max(1, Math.round(b.w*k)), h: Math.max(1, Math.round(b.h*k))};
+  a.crop.w = Math.min(a.crop.w, a.fullW - a.crop.x); a.crop.h = Math.min(a.crop.h, a.fullH - a.crop.y);
+  a.w = a.crop.w; a.h = a.crop.h;
+}
+const batchTrimOf = (el, w, h) => { try { const t = findTrim({el, fullW: w, fullH: h}); return t ? {x: t.x, y: t.y, w: t.w, h: t.h} : null; } catch(e){ return null; } };
+async function batchTrims(){ // files kept from before trims were found
+  let any = false;
+  for (const g of [...batchGroups]) for (const it of [...g.items]){
+    if (it.tb !== undefined) continue;
+    const im = new Image(); im.decoding = 'async'; const url = URL.createObjectURL(it.file); im.src = url;
+    try { await im.decode(); it.tb = batchTrimOf(im, it.w, it.h); } catch(e){ it.tb = null; }
+    URL.revokeObjectURL(url); any = true;
+  }
+  if (any){ batchKeepSoon(); renderBatch(); }
+}
 function batchGroup(name, note, order, orderNote){
-  const g = {id: ++batchSeq, name: String(name || `Group ${batchGroups.length + 1}`).slice(0, 60), note: String(note || '').slice(0, 80), order: String(order || '').slice(0, 40), orderNote: String(orderNote || '').slice(0, 80), on: true, preset: null, items: [], snap: null, scale: 0, scaleFrom: '', desc: '', widthMm: 0};
+  const g = {id: ++batchSeq, name: String(name || `Group ${batchGroups.length + 1}`).slice(0, 60), note: String(note || '').slice(0, 80), order: String(order || '').slice(0, 40), orderNote: String(orderNote || '').slice(0, 80), on: true, preset: null, items: [], snap: null, scale: 0, scaleFrom: '', desc: '', widthMm: 0, locked: false, open: false, fit: 's', fitMm: 0, trim: false, quick: ''};
   batchGroups.push(g); return g;
 }
 async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; answers what happened
   const out = {count: 0, skipped: [], bad: 0};
   for (const x of list){
     const name = String(x.name || x.file.name || 'artwork.png').slice(0, 120);
-    if (x.key && g.items.some(it => it.key === String(x.key))){ out.skipped.push(x.key); continue; }
+    if (x.key && batchGroups.some(G => G.items.some(it => it.key === String(x.key)))){ out.skipped.push(x.key); continue; }
     const file = new File([x.file], name, {type: x.file.type || ''});
     if (!batchOk(file)){ out.bad++; continue; }
     const im = new Image(); im.decoding = 'async'; const url = URL.createObjectURL(file); im.src = url;
@@ -5057,10 +5098,11 @@ async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; ans
     const w = im.naturalWidth, h = im.naturalHeight;
     if (!w || !h){ URL.revokeObjectURL(url); out.bad++; continue; }
     const k = Math.min(1, 220/Math.max(w, h)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w*k)); c.height = Math.max(1, Math.round(h*k));
-    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+    const tb = batchTrimOf(im, w, h); URL.revokeObjectURL(url);
     let thumb = ''; try { thumb = c.toDataURL('image/png'); } catch(e){}
     const mm = Math.round(+x.widthMm) || 0;
-    g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), lab: String(x.label || '').slice(0, 160), labShort: String(x.labelShort || '').slice(0, 60), w, h, thumb, file, on: true, mm, kept: false});
+    g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), lab: String(x.label || '').slice(0, 160), labShort: String(x.labelShort || '').slice(0, 60), w, h, tb, thumb, file, on: true, mm, kept: false});
     out.count++;
   }
   if (g.scaleFrom !== 'user' && g.items.length){ // the Workboard's width: the widest file prints that wide; or the first file that came with a width
@@ -5146,7 +5188,8 @@ async function batchDrop(list, target){
   for (const z of zips) await batchZip(z);
   if (!list.length) return;
   const card = target && target.closest ? target.closest('.bgroup') : null;
-  const g = (card && batchGroups.find(g => g.id === +card.dataset.g)) || batchGroups[batchGroups.length - 1] || batchGroup();
+  const free = batchGroups.filter(g => !g.locked); // a locked group takes no new files
+  const g = (card && free.find(g => g.id === +card.dataset.g)) || free[free.length - 1] || batchGroup();
   const r = await batchAdd(g, list.map(file => ({file})));
   toast(r.count ? `${r.count} file${r.count === 1 ? '' : 's'} added to “${g.name}”.` + (r.bad ? ` ${r.bad} couldn’t be opened.` : '') : 'Those files couldn’t be opened. Use PNG, JPG, WebP or SVG.');
 }
@@ -5178,12 +5221,37 @@ function batchPresetOpts(g){
 }
 function batchUsePreset(g, key){
   const where = key[0], p = (batchLists()[where] || [])[+key.slice(1)]; if (!p) return;
-  g.snap = presetSnap(p, where); g.preset = {where, name: p.name};
+  g.snap = presetSnap(p, where); g.preset = {where, name: p.name}; g.quick = '';
   g.desc = `${p.name} · ${lookName(g.snap.s.look, g.snap.s.finish)}` + (g.snap.s.finish === 'cut' ? ' · clean cut' : ` · ${g.snap.s.lpi} lpi`);
   for (const it of g.items) it.saved = false;
 }
 const batchOrderList = () => [...new Set(batchGroups.map(g => g.order))];
-const batchReady = g => !!(g.snap && g.scale && g.items.some(it => it.on && !batchTooBig(g, it)));
+const batchReady = g => !!(g.snap && batchSized(g) && g.items.some(it => it.on && !batchTooBig(g, it)));
+/* The Speed buttons on a group: the built-in ones and Ours, as in the editor. One with "trim" turns the group's trim on. */
+function batchQuicks(){
+  return SPEED_BUILT.map((B, i) => ({q: 'b' + i, label: B.label, tip: B.tip || ((B.starter && STARTERS.find(x => x.name === B.starter)) || {}).desc || ''}))
+    .concat(slots.map((p, i) => p ? {q: 'o' + i, label: p.name, tip: 'One of your own buttons' + (p.trim ? ', with trim to the art' : '') + '.'} : null).filter(Boolean));
+}
+function batchUseQuick(g, q){
+  const i = +q.slice(1); let p = null, where = 'l', label = '';
+  if (q[0] === 'b'){ const B = SPEED_BUILT[i]; if (!B) return; label = B.label; if (B.make) p = B.make(); else { p = STARTERS.find(x => x.name === B.starter); where = 'b'; } }
+  else { p = slots[i]; if (p){ label = p.name; const fresh = p.linked && shared.concat(presets).find(x => sameName(x.name, p.name)); if (fresh) p = {...fresh, trim: p.trim}; } }
+  if (!p || !p.s) return;
+  g.snap = presetSnap(p, where); g.preset = where === 'b' ? {where, name: p.name} : null; g.quick = q[0] + ':' + label;
+  if (p.trim) g.trim = true;
+  g.desc = `${label} · ${lookName(g.snap.s.look, g.snap.s.finish)}` + (g.snap.s.finish === 'cut' ? ' · clean cut' : ` · ${g.snap.s.lpi} lpi`);
+  for (const it of g.items) it.saved = false;
+}
+function batchSplit(g){ // the ticked files leave for a group of their own, right under this one, at the same size
+  const picked = g.items.filter(x => x.on); if (!picked.length || picked.length === g.items.length) return null;
+  const ng = batchGroup(`${g.name.slice(0, 50)} · picked`, '', g.order, g.orderNote);
+  batchGroups.pop(); batchGroups.splice(batchGroups.indexOf(g) + 1, 0, ng);
+  Object.assign(ng, {scale: g.scale, scaleFrom: g.scale ? 'user' : '', fit: g.fit, fitMm: g.fitMm, trim: g.trim});
+  if (g.scale) g.scaleFrom = 'user'; // both keep the size they have now, whatever is sent later
+  ng.items = picked; g.items = g.items.filter(x => !x.on);
+  for (const x of g.items) x.on = true;
+  return ng;
+}
 function batchShow(){ $('batch').hidden = false; renderBatch(); }
 function renderBatch(){
   const run = batchGroups.filter(g => g.on && batchReady(g)).length;
@@ -5193,29 +5261,48 @@ function renderBatch(){
     $('batchBody').innerHTML = '<div class="batch-empty"><b>No groups yet</b><p>A group is a set of files that share one set-up, like the back names of an order. An order sent from the Workboard arrives here already in its groups. For anything else, start a group and add its files, or drop files or a zip here.</p><button class="btn primary" type="button" data-act="first">Start a group and add files</button></div>';
     return;
   }
+  const quicks = batchQuicks();
   const card = g => {
-    const on = g.items.filter(it => it.on), ready = on.filter(it => !batchTooBig(g, it)), widest = batchWidest(g);
-    const set = g.snap ? `<b>${esc(g.desc || 'Set up')}</b>` : '<b>Not set up yet.</b> Pick a preset, or set it up on a file.';
+    const L = g.locked, sized = batchSized(g), on = g.items.filter(it => it.on), ready = on.filter(it => !batchTooBig(g, it)), W = batchWidestIt(g), some = on.length > 0 && on.length < g.items.length;
+    const set = g.snap ? `<b>${esc(g.desc || 'Set up')}</b>` : '<b>Not set up yet.</b>' + (L ? '' : ' Pick a preset or a Speed button, or set it up on a file.');
+    const sizeTxt = !sized ? 'no print size yet' : g.fit === 'w' ? `every file ${round1(g.fitMm)} mm wide` : g.fit === 'h' ? `every file ${round1(g.fitMm)} mm tall` : `one scale, widest file ${toMm(batchCm(g, W))} mm wide`;
+    const save = `<button class="btn" type="button" data-act="save"${g.snap && sized && ready.length ? '' : ' disabled'}>Save ${ready.length || ''} PNG${ready.length === 1 ? '' : 's'} as a zip</button>`;
+    const grid = L && !g.open ? '' : `<div class="bg-grid">${g.items.map(it => {
+        const big = batchTooBig(g, it), cm = sized ? batchCm(g, it) : 0, b = batchBox(g, it);
+        return `<div class="bitem${it.on ? ' on' : ''}${big ? ' big' : ''}" data-k="${esc(it.key)}">
+          <div class="bi-pic"${L ? '' : ' data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up."'}>${it.thumb ? `<img src="${it.thumb}" alt="">` : ''}</div>
+          <input class="bi-tick" type="checkbox" ${it.on ? 'checked' : ''}${L ? ' disabled' : ''} aria-label="Include ${esc(it.name)}">
+          ${L ? '' : `<button class="bi-x" type="button" data-act="drop" aria-label="Remove ${esc(it.name)}">×</button>`}
+          <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}
+          <div class="bi-row">${big ? '<span class="bi-warn">Over 400 × 500 mm</span>' : `<span>${sized ? `${toMm(cm)} × ${toMm(cm*b.h/b.w)} mm` : `${b.w} × ${b.h} px`}</span>`}${it.saved ? '<span>Saved</span>' : ''}</div></div>`;
+      }).join('')}</div>`;
+    const tick = `<input class="bg-tick" type="checkbox" ${g.on ? 'checked' : ''} aria-label="Include the group ${esc(g.name)} in Process ticked groups" data-tip="Ticked groups are worked out together by Process ticked groups.">`;
+    const count = `<span class="bg-count">${g.items.length} file${g.items.length === 1 ? '' : 's'} · ${on.length} ticked${g.note ? ' · ' + esc(g.note) : ''}</span>`;
+    if (L) return `<section class="bgroup locked${g.on ? '' : ' off'}" data-g="${g.id}">
+      <div class="bg-head">${tick}<input class="bg-name" type="text" value="${esc(g.name)}" disabled aria-label="Group name">
+        ${count}<span class="bg-lock">Locked</span><span class="bg-grow"></span>
+        <button class="link" type="button" data-act="files">${g.open ? 'Hide files' : 'Show files'}</button><button class="link" type="button" data-act="lock" data-tip="Unlock to change the set-up, the size or the files.">Unlock</button></div>
+      <div class="bg-set"><span>${set} · ${sizeTxt}${g.trim ? ' · trimmed to the art' : ''}</span><span class="bg-grow"></span>${save}</div>
+      ${grid}</section>`;
     return `<section class="bgroup${g.on ? '' : ' off'}" data-g="${g.id}">
-      <div class="bg-head"><input class="bg-tick" type="checkbox" ${g.on ? 'checked' : ''} aria-label="Include the group ${esc(g.name)} in Process ticked groups" data-tip="Ticked groups are worked out together by Process ticked groups."><input class="bg-name" type="text" value="${esc(g.name)}" maxlength="60" aria-label="Group name">
-        <span class="bg-count">${g.items.length} file${g.items.length === 1 ? '' : 's'} · ${on.length} ticked${g.note ? ' · ' + esc(g.note) : ''}</span><span class="bg-grow"></span>
+      <div class="bg-head">${tick}<input class="bg-name" type="text" value="${esc(g.name)}" maxlength="60" aria-label="Group name">
+        ${count}<span class="bg-grow"></span>
         <button class="link" type="button" data-act="all">Tick all</button><button class="link" type="button" data-act="none">Untick all</button>
-        <button class="link" type="button" data-act="add">Add files</button><button class="link" type="button" data-act="del">Remove group</button></div>
+        <button class="link" type="button" data-act="split"${some ? '' : ' disabled'} data-tip="Pick files out into a group of their own, like the custom names in a set. Untick all, tick the ones that belong together, then click this.">Move ticked to a new group</button>
+        <button class="link" type="button" data-act="add">Add files</button>
+        <button class="link" type="button" data-act="lock" data-tip="Keeps this group as it is: its set-up, size and files can’t change until you unlock it. It still saves with Process ticked groups.">Lock</button>
+        <button class="link" type="button" data-act="del">Remove group</button></div>
       <div class="bg-set"><span>${set}</span>
         <select data-preset aria-label="Preset for the group ${esc(g.name)}" data-tip="The group’s set-up from a preset, without opening the editor. The print size stays as it is here.">${batchPresetOpts(g)}</select>
-        <label class="bg-w" data-tip="One scale for the whole group: the widest file prints this wide, and every other file follows at the same scale.">Widest file prints <input type="number" inputmode="numeric" min="5" max="500" step="1" data-w value="${g.scale && widest ? toMm(widest*g.scale) : ''}" placeholder="mm"${g.items.length ? '' : ' disabled'}> mm wide</label>
         <span class="bg-grow"></span>
         <button class="btn" type="button" data-act="setup"${on.length || g.items.length ? '' : ' disabled'}>${g.snap ? 'Check or change on a file' : 'Set up on a file'}</button>
-        <button class="btn" type="button" data-act="save"${g.snap && g.scale && ready.length ? '' : ' disabled'}>Save ${ready.length || ''} PNG${ready.length === 1 ? '' : 's'} as a zip</button></div>
-      <div class="bg-grid">${g.items.map(it => {
-        const big = batchTooBig(g, it);
-        return `<div class="bitem${it.on ? ' on' : ''}${big ? ' big' : ''}" data-k="${esc(it.key)}">
-          <div class="bi-pic" data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up.">${it.thumb ? `<img src="${it.thumb}" alt="">` : ''}</div>
-          <input class="bi-tick" type="checkbox" ${it.on ? 'checked' : ''} aria-label="Include ${esc(it.name)}">
-          <button class="bi-x" type="button" data-act="drop" aria-label="Remove ${esc(it.name)}">×</button>
-          <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}
-          <div class="bi-row">${big ? '<span class="bi-warn">Over 400 × 500 mm</span>' : `<span>${g.scale ? `${toMm(it.w*g.scale)} × ${toMm(it.h*g.scale)} mm` : `${it.w} × ${it.h} px`}</span>`}${it.saved ? '<span>Saved</span>' : ''}</div></div>`;
-      }).join('')}</div></section>`;
+        ${save}</div>
+      <div class="bg-quick"><span>Speed buttons</span>${quicks.map(Q => `<button class="chip" type="button" data-act="quick" data-q="${Q.q}" aria-pressed="${g.quick === Q.q[0] + ':' + Q.label}" data-tip="${esc(Q.tip)}">${esc(Q.label)}</button>`).join('')}</div>
+      <div class="bg-quick"><span>Print size</span>
+        <select data-fit aria-label="How the group ${esc(g.name)} is sized" data-tip="One scale: the widest file prints at the size here and the others follow, so letters are the same height on every file. Same width or same height: every file is made that wide or that tall."><option value="s"${g.fit === 's' ? ' selected' : ''}>One scale, set by the widest file</option><option value="w"${g.fit === 'w' ? ' selected' : ''}>Every file the same width</option><option value="h"${g.fit === 'h' ? ' selected' : ''}>Every file the same height</option></select>
+        <label class="bg-w"><input type="number" inputmode="decimal" min="5" max="500" step="1" data-w value="${!sized ? '' : g.fit === 's' ? toMm(batchCm(g, W)) : round1(g.fitMm)}" placeholder="mm"${g.items.length ? '' : ' disabled'}> mm ${g.fit === 'h' ? 'tall' : 'wide'}</label>
+        <label class="bg-trim" data-tip="Cuts the empty space off around each file’s art first, so the size is the art’s own. Best for names and logos."><input type="checkbox" data-trim ${g.trim ? 'checked' : ''}> Trim each file to its art</label></div>
+      ${grid}</section>`;
   };
   const orders = batchOrderList();
   $('batchBody').innerHTML = orders.map((o, i) => {
@@ -5235,11 +5322,26 @@ $('batchBody').addEventListener('click', e => {
   if (head){
     const o = batchOrderList()[+head.dataset.o], gs = batchGroups.filter(g => g.order === o);
     if (act === 'oall' || act === 'onone') for (const g of gs) g.on = act === 'oall';
-    else if (act === 'odel'){ batchForget(gs.flatMap(g => g.items)); batchGroups = batchGroups.filter(g => g.order !== o); }
+    else if (act === 'odel'){
+      const gone = gs.filter(g => !g.locked);
+      batchForget(gone.flatMap(g => g.items)); batchGroups = batchGroups.filter(g => !gone.includes(g));
+      if (gone.length < gs.length) toast('Locked groups were kept. Unlock a group to remove it.');
+    }
     batchKeepSoon(); renderBatch(); return;
   }
   const {g, it} = batchFind(b); if (!g) return;
-  if (act === 'all' || act === 'none'){ for (const x of g.items) x.on = act === 'all'; }
+  if (g.locked && !['lock', 'files', 'save'].includes(act)) return;
+  if (act === 'lock'){ g.locked = !g.locked; g.open = false; }
+  else if (act === 'files') g.open = !g.open;
+  else if (act === 'quick'){ batchUseQuick(g, b.dataset.q); }
+  else if (act === 'split'){
+    const ng = batchSplit(g); if (!ng) return;
+    batchKeepSoon(); renderBatch();
+    const el = $('batchBody').querySelector(`.bgroup[data-g="${ng.id}"] .bg-name`); if (el){ el.scrollIntoView({block: 'center'}); el.focus(); el.select(); }
+    toast(`${ng.items.length} file${ng.items.length === 1 ? '' : 's'} moved to a new group. Name it, then pick a preset or a Speed button.`);
+    return;
+  }
+  else if (act === 'all' || act === 'none'){ for (const x of g.items) x.on = act === 'all'; }
   else if (act === 'add'){ batchAddTo = g; $('batchIn').click(); return; }
   else if (act === 'del'){ batchForget(g.items); batchGroups.splice(batchGroups.indexOf(g), 1); }
   else if (act === 'drop' && it){ batchForget([it]); g.items.splice(g.items.indexOf(it), 1); }
@@ -5250,13 +5352,16 @@ $('batchBody').addEventListener('click', e => {
 });
 $('batchBody').addEventListener('change', e => {
   const {g, it} = batchFind(e.target); if (!g) return;
-  if (e.target.classList.contains('bi-tick') && it) it.on = e.target.checked;
-  else if (e.target.classList.contains('bg-tick')) g.on = e.target.checked;
+  if (e.target.classList.contains('bg-tick')) g.on = e.target.checked;
+  else if (g.locked){ renderBatch(); return; }
+  else if (e.target.classList.contains('bi-tick') && it) it.on = e.target.checked;
+  else if (e.target.hasAttribute('data-fit')){ batchFit(g, e.target.value); for (const x of g.items) x.saved = false; }
+  else if (e.target.hasAttribute('data-trim')){ g.trim = e.target.checked; for (const x of g.items) x.saved = false; }
   else if (e.target.hasAttribute('data-preset')){ if (e.target.value) batchUsePreset(g, e.target.value); }
   else if (e.target.classList.contains('bg-name')) g.name = e.target.value.trim().slice(0, 60) || g.name;
   else if (e.target.hasAttribute('data-w')){
     const v = parseFloat(e.target.value), widest = batchWidest(g);
-    if (v > 0 && widest){ g.scale = Math.min(v, 500)/10/widest; g.scaleFrom = 'user'; }
+    if (v > 0 && widest){ if (g.fit === 's') g.scale = Math.min(v, 500)/10/widest; else g.fitMm = round1(Math.min(v, 500)); g.scaleFrom = 'user'; for (const x of g.items) x.saved = false; }
   }
   batchKeepSoon(); renderBatch();
 });
@@ -5277,9 +5382,9 @@ $('batchClose').addEventListener('click', () => { if (!batchBusy) $('batch').hid
 $('batchStop').addEventListener('click', () => { batchStopped = true; $('batchBusyTxt').textContent = 'Stopping…'; });
 
 // the group's settings for one file: the same settings, and the width that keeps the group's scale
-function batchSnapFor(g, a){
+function batchSnapFor(g, it, a){ // a: the opened art, already cut to the file's art box (batchCropArt)
   return {s: {...g.snap.s}, lv: {...g.snap.lv}, rules: g.snap.rules.map(R => ({...R, samples: [...R.samples]})),
-          w: Math.max(0.5, Math.min(a.w*g.scale, maxWidthFor(a))), crop: {x: 0, y: 0, w: a.fullW, h: a.fullH}, n: 0};
+          w: Math.max(0.5, Math.min(batchCm(g, it), maxWidthFor(a))), crop: {...a.crop}, n: 0};
 }
 /* Set-up: the file opens in a tab of the editor with the group's set-up so far. Everything works as usual there; a bar
    above offers "Use for the group", which takes the settings and the scale (print width over the file's pixel width). */
@@ -5290,12 +5395,13 @@ async function batchSetup(g, it){
   let ok = false; try { ok = !!(await openFile(it.file)); } catch(e){}
   if (!ok || !cur){ batchShow(); return; }
   cur.batch = {g: g.id, key: it.key};
-  if (g.snap && g.scale){
-    art.sizeFrom = 'user'; stashDoc();
-    const snap = batchSnapFor(g, art);
+  if (g.snap && batchSized(g)){
+    art.sizeFrom = 'user'; batchCropArt(g, it, art); stashDoc();
+    const snap = batchSnapFor(g, it, art);
     cur.snap = snap; cur.steps = [{snap, label: `Group “${g.name}”`, at: Date.now()}]; cur.stepPos = 0; cur.unsaved = false;
     loadDoc(cur);
-  } else if (g.scale){ art.sizeFrom = 'user'; setWidth(art.w*g.scale, true); buildSrcSoon(); resetSteps(`Opened ${art.name}`); }
+  } else if (batchSized(g)){ art.sizeFrom = 'user'; batchCropArt(g, it, art); syncCrop(); setWidth(batchCm(g, it), true); buildSrcSoon(); resetSteps(`Opened ${art.name}`); }
+  else if (g.trim && it.tb){ const w = st.widthCm/art.w; batchCropArt(g, it, art); syncCrop(); setWidth(w*art.w, true); buildSrcSoon(); resetSteps(`Opened ${art.name}`); }
   $('labelFull').value = it.lab || ''; $('labelShort').value = it.labShort || '';
   if (it.note) $('nameSuffix').value = it.note.slice(0, 40);
   syncFileName();
@@ -5304,7 +5410,7 @@ async function batchSetup(g, it){
 function syncBatchNote(){
   const b = cur && cur.batch, g = b && batchGroups.find(g => g.id === b.g);
   $('batchNote').hidden = !g;
-  if (g) $('batchNoteTxt').textContent = `Setting up the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Choose the preset or settings and the print size on this file. Every ticked file gets the same settings at the same scale.`;
+  if (g) $('batchNoteTxt').textContent = `Setting up the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Choose the preset or settings and the print size on this file. Every ticked file gets the same settings, sized the way the group is set.`;
 }
 function batchLeaveTab(){ // closes the set-up tab without questions and goes back to the Batch screen
   const d = cur; if (!d || !d.batch) return;
@@ -5321,7 +5427,10 @@ $('batchNoteUse').addEventListener('click', () => {
   commitStep();
   const src = snapshot(), opt = $('presetSel').selectedOptions[0];
   g.snap = {s: src.s, lv: src.lv, rules: src.rules.filter(R => !R.area)};
-  g.scale = st.widthCm/art.w; g.scaleFrom = 'user'; g.preset = null;
+  const it = g.items.find(x => x.key === b.key), f = it ? it.w/art.fullW : 1, full = art.crop.x === 0 && art.crop.y === 0 && art.crop.w >= art.fullW && art.crop.h >= art.fullH;
+  if (!full) g.trim = true; else if (it && it.tb && (it.tb.w < it.w || it.tb.h < it.h)) g.trim = false; // cropped in here: the group trims; the whole file: it doesn't
+  if (g.fit === 'w') g.fitMm = round1(st.widthCm*10); else if (g.fit === 'h') g.fitMm = round1(st.widthCm*10*art.h/art.w); else g.scale = st.widthCm/(art.w*f);
+  g.scaleFrom = 'user'; g.preset = null; g.quick = '';
   g.desc = (opt && $('presetSel').value ? opt.textContent.trim() + ' · ' : '') + lookName() + (st.finish === 'cut' ? ' · clean cut' : ` · ${st.lpi} lpi`);
   for (const it of g.items) it.saved = false;
   batchKeepSoon(); batchLeaveTab();
@@ -5351,8 +5460,8 @@ async function makeZip(files){
    ticked group in one zip, a folder for each group, named after the order when they share one. */
 async function batchSave(groups, whole){
   if (batchBusy || saving) return;
-  const notSet = groups.filter(g => g.items.some(it => it.on) && !(g.snap && g.scale)).length;
-  groups = groups.filter(g => g.snap && g.scale);
+  const notSet = groups.filter(g => g.items.some(it => it.on) && !(g.snap && batchSized(g))).length;
+  groups = groups.filter(g => g.snap && batchSized(g));
   const jobs = []; let left = 0;
   for (const g of groups) for (const it of g.items) if (it.on){ if (batchTooBig(g, it)) left++; else jobs.push({g, it}); }
   if (!jobs.length) return;
@@ -5370,7 +5479,8 @@ async function batchSave(groups, whole){
         await im.decode();
         const a = makeArt(im, im.naturalWidth, im.naturalHeight, it.name, false, null, {vector: /svg/i.test(it.file.type) || /\.svg$/i.test(it.name)});
         Object.assign(a, {quiet: true, sizeFrom: 'user'});
-        const snap = batchSnapFor(g, a);
+        batchCropArt(g, it, a);
+        const snap = batchSnapFor(g, it, a);
         cur = null;
         loadDoc({id: ++docSeq, key: '', art: a, snap, activeRule: 0, steps: [{snap, label: 'Batch', at: Date.now()}], stepPos: 0, unsaved: false, zoom: 'fit', cx: 0, cy: 0, suffix: (it.note || '').slice(0, 40), lab: it.lab || '', labShort: it.labShort || '', done: []});
         await new Promise(r => setTimeout(r, 30));
@@ -5430,8 +5540,8 @@ async function batchKeepNow(){
     try { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').put(it.file, 'b:' + it.key); await idbDone(tx); it.kept = true; }
     catch(e){ it.keepFailed = true; if (!batchKeepFailed){ batchKeepFailed = true; toast('This batch is too big to keep for a refresh on this computer. Save it before closing.'); } }
   }
-  const list = batchGroups.map(g => ({name: g.name, note: g.note, order: g.order, orderNote: g.orderNote, on: g.on, preset: g.preset, snap: g.snap, scale: g.scale, scaleFrom: g.scaleFrom, desc: g.desc, widthMm: g.widthMm,
-    items: g.items.filter(it => it.kept).map(it => ({key: it.key, name: it.name, note: it.note, lab: it.lab, labShort: it.labShort, w: it.w, h: it.h, thumb: it.thumb, on: it.on, mm: it.mm, saved: !!it.saved}))}));
+  const list = batchGroups.map(g => ({name: g.name, note: g.note, order: g.order, orderNote: g.orderNote, on: g.on, preset: g.preset, snap: g.snap, scale: g.scale, scaleFrom: g.scaleFrom, desc: g.desc, widthMm: g.widthMm, locked: g.locked, open: g.open, fit: g.fit, fitMm: g.fitMm, trim: g.trim, quick: g.quick,
+    items: g.items.filter(it => it.kept).map(it => ({key: it.key, name: it.name, note: it.note, lab: it.lab, labShort: it.labShort, w: it.w, h: it.h, tb: it.tb === undefined ? undefined : it.tb, thumb: it.thumb, on: it.on, mm: it.mm, saved: !!it.saved}))}));
   try { const tx = db.transaction('meta', 'readwrite'); tx.objectStore('meta').put({groups: list}, 'batch'); await idbDone(tx); } catch(e){}
 }
 async function batchForget(items){
@@ -5444,14 +5554,14 @@ async function batchRestore(){
   for (const r of meta.groups){
     if (!r || !Array.isArray(r.items)) continue;
     const g = batchGroup(r.name, r.note, r.order, r.orderNote);
-    Object.assign(g, {on: r.on !== false, preset: r.preset && typeof r.preset.name === 'string' && ['b', 'c', 's', 'l'].includes(r.preset.where) ? {where: r.preset.where, name: r.preset.name} : null, snap: r.snap && r.snap.s && r.snap.lv && Array.isArray(r.snap.rules) ? r.snap : null, scale: +r.scale || 0, scaleFrom: r.scaleFrom || '', desc: String(r.desc || ''), widthMm: +r.widthMm || 0});
+    Object.assign(g, {on: r.on !== false, preset: r.preset && typeof r.preset.name === 'string' && ['b', 'c', 's', 'l'].includes(r.preset.where) ? {where: r.preset.where, name: r.preset.name} : null, snap: r.snap && r.snap.s && r.snap.lv && Array.isArray(r.snap.rules) ? r.snap : null, scale: +r.scale || 0, scaleFrom: r.scaleFrom || '', desc: String(r.desc || ''), widthMm: +r.widthMm || 0, locked: r.locked === true, open: r.open === true, fit: ['w', 'h'].includes(r.fit) ? r.fit : 's', fitMm: +r.fitMm || 0, trim: r.trim === true, quick: String(r.quick || '').slice(0, 60)});
     for (const x of r.items){
       const file = await idbGet(db, 'files', 'b:' + x.key);
       if (!(file instanceof Blob) || !(x.w > 0) || !(x.h > 0)) continue;
-      g.items.push({key: String(x.key), name: String(x.name || 'artwork.png'), note: String(x.note || ''), lab: String(x.lab || '').slice(0, 160), labShort: String(x.labShort || '').slice(0, 60), w: x.w, h: x.h, thumb: /^data:image\/png;base64,/.test(x.thumb || '') ? x.thumb : '', file, on: x.on !== false, mm: +x.mm || 0, kept: true, saved: !!x.saved});
+      g.items.push({key: String(x.key), name: String(x.name || 'artwork.png'), note: String(x.note || ''), lab: String(x.lab || '').slice(0, 160), labShort: String(x.labShort || '').slice(0, 60), w: x.w, h: x.h, tb: x.tb && x.tb.w > 0 && x.tb.h > 0 ? {x: +x.tb.x || 0, y: +x.tb.y || 0, w: +x.tb.w, h: +x.tb.h} : x.tb === null ? null : undefined, thumb: /^data:image\/png;base64,/.test(x.thumb || '') ? x.thumb : '', file, on: x.on !== false, mm: +x.mm || 0, kept: true, saved: !!x.saved});
     }
   }
-  renderBatch();
+  renderBatch(); batchTrims();
 }
 window.addEventListener('pagehide', () => { if (batchKeepTimer) batchKeepNow(); });
 batchRestore().catch(() => 0);
