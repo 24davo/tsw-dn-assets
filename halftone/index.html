@@ -370,6 +370,11 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .label-chip{display:inline-block;padding:2px 8px;border-radius:4px;background:#1a1a1a;font-weight:700;word-break:break-word}
 .label-chip.red{color:#ff3b30}.label-chip.yellow{color:#ffe600}
 .batch-label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.bo-head{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;padding:8px 0 0}
+.bo-head h3{margin:0;font-size:18px;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--ink)}
+.bg-tick{width:22px;height:22px;margin:0;cursor:pointer;accent-color:var(--accent)}
+.bgroup.off{opacity:.62}
+.bg-set select{height:34px;max-width:260px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600}
 </style>
 </head>
 <body>
@@ -982,13 +987,14 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 <div class="batch" id="batch" role="dialog" aria-modal="true" aria-labelledby="batchTitle" hidden>
   <div class="batch-bar">
     <h2 id="batchTitle">Batch</h2>
-    <span class="batch-sub">Many files, one set-up. Tick the files, set the group up once on any file, then save them all as full-size PNGs. Every file in a group prints at the same scale.</span>
+    <span class="batch-sub">Many files, one set-up for each group. Pick a preset on each group (or set it up on a file), tick the groups, then process them all into one zip. Every file in a group prints at the same scale.</span>
     <label class="batch-label">Production label <select id="batchLabelMode"><option value="off">Off</option><option value="simple">Simple</option><option value="full">Full info</option></select></label>
+    <button class="btn primary" type="button" id="batchRun" disabled data-tip="Works out every ticked group that is set up, and saves one zip with a folder for each group.">Process ticked groups</button>
     <button class="btn" type="button" id="batchNew">New group</button>
     <button class="btn" type="button" id="batchClose">Back to the editor</button>
   </div>
   <div class="batch-body" id="batchBody"></div>
-  <input type="file" id="batchIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
+  <input type="file" id="batchIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,application/zip,.png,.jpg,.jpeg,.webp,.gif,.svg,.zip" hidden>
   <div class="batch-busy" id="batchBusy" hidden><div><span id="batchBusyTxt">Working…</span><button class="btn" type="button" id="batchStop">Stop</button></div></div>
 </div>
 <div class="cal" id="allDlg" role="dialog" aria-modal="true" aria-labelledby="allTitle" hidden>
@@ -1974,6 +1980,7 @@ const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, k
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
             edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
+const ST0 = JSON.parse(JSON.stringify(st)); // the settings a new visit starts with
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','areaV'];
 const cleanStr = v => v.replace(/[<>"'&`();\\]/g, '');
 function cleanDeep(o, d = 0){ // in place; anything nested too deep to be a real setting is dropped
@@ -4022,10 +4029,17 @@ async function openFile(f){
 if (/^https?:$/.test(location.protocol) && location.pathname.startsWith('/engine/')) for (const a of document.querySelectorAll('a[href^="https://24davo.github.io/tsw-dn-assets/halftone/"]')) a.setAttribute('href', a.getAttribute('href').replace('https://24davo.github.io/tsw-dn-assets/halftone/', '/engine/'));
 const HANDOVER_FROM = ['https://board.tshirtworkshop.com.au', location.origin].filter(o => /^https?:/.test(o));
 let handoverUp = false;
-function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 3, batch: true, labels: true}, o); } catch(e){} } }
+function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 4, batch: true, labels: true, orders: true}, o); } catch(e){} } }
 window.addEventListener('message', async e => {
   const m = e.data; if (!m || typeof m !== 'object' || !HANDOVER_FROM.includes(e.origin)) return;
   if (m.tsw === 'ge-ping'){ handoverReady(e.source); return; }
+  if (m.tsw === 'ge-order'){
+    let ans = {ok: false, count: 0, skipped: [], sets: [], why: 'unsupported'};
+    try { ans = await batchTakeOrder(m); } catch(err){ ans = {ok: false, count: 0, skipped: [], sets: [], why: 'unreadable'}; }
+    try { e.source.postMessage({tsw: 'ge-ordered', id: m.id, ...ans}, e.origin); } catch(err){}
+    try { window.focus(); } catch(err){}
+    return;
+  }
   if (m.tsw === 'ge-batch'){
     let ans = {ok: false, count: 0, skipped: [], why: 'unsupported'};
     try { ans = await batchTake(m); } catch(err){ ans = {ok: false, count: 0, skipped: [], why: 'unreadable'}; }
@@ -4056,7 +4070,7 @@ let dragDepth = 0;
 window.addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')){ dragDepth++; $('drop').hidden = false; } });
 window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('drop').hidden = true; });
 window.addEventListener('dragover', e => { e.preventDefault(); });
-window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const list = [...(e.dataTransfer?.files || [])]; if (!list.length) return; if (!$('batch').hidden){ batchDrop(list, e.target); return; } openFiles(list); });
+window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const list = [...(e.dataTransfer?.files || [])]; if (!list.length) return; if (!$('batch').hidden){ batchDrop(list, e.target); return; } if (list.some(isZip)){ batchShow(); batchDrop(list, null); return; } openFiles(list); });
 window.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) openFile(it.getAsFile()); });
 
 /* ---------- saving: transparent PNG at 300 dpi, settings written into the file ---------- */
@@ -5027,8 +5041,8 @@ let batchGroups = [], batchSeq = 0, batchBusy = false, batchStopped = false, bat
 const batchOk = f => /^image\//.test(f.type || '') || /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name || '');
 const batchWidest = g => g.items.reduce((m, it) => Math.max(m, it.w), 0);
 const batchTooBig = (g, it) => !!g.scale && it.w*g.scale > maxWidthFor(it) + 0.001;
-function batchGroup(name, note){
-  const g = {id: ++batchSeq, name: String(name || `Group ${batchGroups.length + 1}`).slice(0, 60), note: String(note || '').slice(0, 80), items: [], snap: null, scale: 0, scaleFrom: '', desc: '', widthMm: 0};
+function batchGroup(name, note, order, orderNote){
+  const g = {id: ++batchSeq, name: String(name || `Group ${batchGroups.length + 1}`).slice(0, 60), note: String(note || '').slice(0, 80), order: String(order || '').slice(0, 40), orderNote: String(orderNote || '').slice(0, 80), on: true, preset: null, items: [], snap: null, scale: 0, scaleFrom: '', desc: '', widthMm: 0};
   batchGroups.push(g); return g;
 }
 async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; answers what happened
@@ -5057,44 +5071,142 @@ async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; ans
   batchKeepSoon(); renderBatch();
   return out;
 }
-async function batchTake(m){ // a set from the Workboard
+async function batchTake(m, quiet){ // a set from the Workboard; with an order, it sits under that order's heading
   const files = (Array.isArray(m.files) ? m.files : []).filter(x => x && x.file instanceof Blob).slice(0, 400);
   if (!files.length) return {ok: false, count: 0, skipped: [], why: 'unsupported'};
-  const name = String(m.set || 'From the Workboard').slice(0, 60);
-  const g = batchGroups.find(g => g.name === name) || batchGroup(name, m.note);
+  const name = String(m.set || 'From the Workboard').slice(0, 60), order = String(m.order || '').slice(0, 40);
+  const g = batchGroups.find(g => g.name === name && g.order === order) || batchGroup(name, m.note, order, m.orderNote);
   const mm = Math.round(+m.widthMm); if (mm > 0 && g.scaleFrom !== 'user') g.widthMm = mm;
   const r = await batchAdd(g, files);
-  batchShow();
+  if (!g.items.length) batchGroups.splice(batchGroups.indexOf(g), 1);
+  if (!quiet) batchShow();
   if (!r.count && !r.skipped.length) return {ok: false, count: 0, skipped: [], why: 'unreadable'};
-  toast(`From the Workboard: ${r.count} file${r.count === 1 ? '' : 's'} in “${g.name}”.`);
+  if (!quiet) toast(`From the Workboard: ${r.count} file${r.count === 1 ? '' : 's'} in “${g.name}”.`);
   return {ok: true, count: r.count, skipped: r.skipped};
 }
+async function batchTakeOrder(m){ // a whole order: every set as a group, in the Workboard's order
+  const sets = (Array.isArray(m.sets) ? m.sets : []).filter(x => x && typeof x === 'object').slice(0, 60);
+  const order = String(m.order || 'From the Workboard').slice(0, 40), out = {ok: false, count: 0, skipped: [], sets: []};
+  for (const x of sets){
+    let r = {ok: false, count: 0, skipped: [], why: 'unreadable'};
+    try { r = await batchTake({...x, order, orderNote: m.note}, true); } catch(err){}
+    out.sets.push({set: String(x.set || ''), ...r}); out.count += r.count; out.skipped.push(...r.skipped); if (r.ok) out.ok = true;
+  }
+  batchShow();
+  if (!out.ok){ out.why = sets.length ? 'unreadable' : 'unsupported'; return out; }
+  const n = out.sets.filter(x => x.ok).length;
+  toast(`From the Workboard: order ${order}, ${out.count} file${out.count === 1 ? '' : 's'} in ${n} group${n === 1 ? '' : 's'}.`);
+  return out;
+}
+/* A zip opens as groups: the pictures in each folder make one group, named after the folder (or after the zip when
+   they sit loose). Several folders sit together under a heading named after the zip. Read here in the browser. */
+const isZip = f => /\.zip$/i.test(f.name || '') || /zip/i.test(f.type || '');
+const ZIP_TYPES = {png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml'};
+async function unzip(file){
+  const buf = new Uint8Array(await file.arrayBuffer()), v = new DataView(buf.buffer);
+  let e = -1; for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) if (v.getUint32(i, true) === 0x06054b50){ e = i; break; }
+  if (e < 0) throw new Error('not a zip');
+  const n = v.getUint16(e + 10, true); let at = v.getUint32(e + 16, true);
+  if (n === 0xFFFF || at === 0xFFFFFFFF) throw new Error('zip64');
+  const dec = new TextDecoder(), out = [];
+  for (let k = 0; k < n && out.length < 400; k++){
+    if (at + 46 > buf.length || v.getUint32(at, true) !== 0x02014b50) break;
+    const flags = v.getUint16(at + 8, true), method = v.getUint16(at + 10, true), size = v.getUint32(at + 20, true), nl = v.getUint16(at + 28, true), xl = v.getUint16(at + 30, true), cl = v.getUint16(at + 32, true), off = v.getUint32(at + 42, true);
+    const path = dec.decode(buf.subarray(at + 46, at + 46 + nl)).replace(/\\/g, '/'); at += 46 + nl + xl + cl;
+    const base = path.split('/').pop(), type = ZIP_TYPES[((base.match(/\.([a-z0-9]+)$/i) || [])[1] || '').toLowerCase()];
+    if (!base || base[0] === '.' || !type || path.includes('__MACOSX/') || (flags & 1) || (method !== 0 && method !== 8) || off + 30 > buf.length) continue;
+    const start = off + 30 + v.getUint16(off + 26, true) + v.getUint16(off + 28, true), data = buf.subarray(start, start + size);
+    try {
+      const blob = method === 0 ? new Blob([data]) : await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+      out.push({path, file: new File([blob], base, {type})});
+    } catch(err){}
+  }
+  return out;
+}
+async function batchZip(file){
+  let list;
+  try { list = await unzip(file); }
+  catch(err){ toast(err.message === 'zip64' ? 'That zip is too big to open here. Unzip it first, then drop the files.' : 'That zip couldn’t be opened. Unzip it first, then drop the files.'); return 0; }
+  if (!list.length){ toast('No pictures found in that zip. Use PNG, JPG, WebP or SVG.'); return 0; }
+  const zipName = file.name.replace(/\.zip$/i, ''), by = new Map();
+  for (const x of list){ const parts = x.path.split('/'); parts.pop(); const dir = parts.pop() || ''; if (!by.has(dir)) by.set(dir, []); by.get(dir).push(x.file); }
+  let n = 0;
+  for (const [dir, files] of by){
+    files.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+    const g = batchGroup(dir || zipName, `from ${file.name}`, by.size > 1 ? zipName : '');
+    const r = await batchAdd(g, files.map(file => ({file}))); n += r.count;
+    if (!g.items.length) batchGroups.splice(batchGroups.indexOf(g), 1);
+  }
+  renderBatch();
+  toast(n ? `${n} file${n === 1 ? '' : 's'} from ${file.name} in ${by.size} group${by.size === 1 ? '' : 's'}.` : 'The pictures in that zip couldn’t be opened.');
+  return n;
+}
 async function batchDrop(list, target){
+  const zips = list.filter(isZip); list = list.filter(f => !isZip(f));
+  for (const z of zips) await batchZip(z);
+  if (!list.length) return;
   const card = target && target.closest ? target.closest('.bgroup') : null;
   const g = (card && batchGroups.find(g => g.id === +card.dataset.g)) || batchGroups[batchGroups.length - 1] || batchGroup();
   const r = await batchAdd(g, list.map(file => ({file})));
   toast(r.count ? `${r.count} file${r.count === 1 ? '' : 's'} added to “${g.name}”.` + (r.bad ? ` ${r.bad} couldn’t be opened.` : '') : 'Those files couldn’t be opened. Use PNG, JPG, WebP or SVG.');
 }
+/* A preset as a group's set-up, worked out without touching the editor: a starter sits on the settings a new visit
+   starts with; a saved preset brings its own. The print size comes from the group, not the preset. */
+function presetSnap(p, where){
+  const s = {}; for (const k of PRESET_KEYS) s[k] = ST0[k];
+  const L = {...LV0}; let R = [];
+  if (where === 'b' || where === 'c'){
+    Object.assign(s, {finish: 'dots', lpi: 30, angle: 22.5, shape: 'round', ink: 'art', cut: 50, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88, hard: 50, rich: false, clean: false, crisp: true, speck: true, fade: 0, fadeDir: 'in'}, p.s);
+    if (p.lv) Object.assign(L, p.lv);
+    R = (p.rules || []).map(r => ({...newRule(r.type, r.action), ...r, starter: true}));
+    s.knock = null; s.knockFrom = 'shirt';
+  } else {
+    for (const k of PRESET_KEYS) if (k in p.s) s[k] = p.s[k];
+    if ('edge' in p.s && !('emode' in p.s)){ s.emode = p.s.edge ? 'near' : 'any'; if (!p.s.edge && p.s.contract) s.edge = p.s.contract; }
+    Object.assign(L, p.levels || {});
+    R = [].concat(p.rules || []).filter(r => r && !r.area).map(r => ({...newRule(r.type || 'shadows', r.action || 'remove'), ...r}));
+    s.knock = p.s.knock || null; s.knockFrom = s.knock ? (p.s.knockFrom || 'hand') : 'shirt';
+  }
+  return {s, lv: L, rules: R.slice(0, MAX_RULES).map(r => ({...r, samples: [...(r.samples || [])]}))};
+}
+const batchLists = () => ({b: STARTERS, c: RECIPES, s: shared, l: presets});
+function batchPresetOpts(g){
+  const sel = g.preset, L = batchLists();
+  const grp = (label, w) => L[w].length ? `<optgroup label="${label}">${L[w].map((p, i) => `<option value="${w}${i}"${sel && sel.where === w && sameName(sel.name, p.name) ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</optgroup>` : '';
+  return `<option value="">${g.snap && !sel ? 'Set up by hand' : 'Choose a preset…'}</option>` + grp('Starters · 30 lpi', 'b') + grp('Claude recipes', 'c')
+    + (SYNC_URL ? grp('Shared with all computers', 's') + grp('This computer only', 'l') : grp('Saved on this computer', 'l'));
+}
+function batchUsePreset(g, key){
+  const where = key[0], p = (batchLists()[where] || [])[+key.slice(1)]; if (!p) return;
+  g.snap = presetSnap(p, where); g.preset = {where, name: p.name};
+  g.desc = `${p.name} · ${lookName(g.snap.s.look, g.snap.s.finish)}` + (g.snap.s.finish === 'cut' ? ' · clean cut' : ` · ${g.snap.s.lpi} lpi`);
+  for (const it of g.items) it.saved = false;
+}
+const batchOrderList = () => [...new Set(batchGroups.map(g => g.order))];
+const batchReady = g => !!(g.snap && g.scale && g.items.some(it => it.on && !batchTooBig(g, it)));
 function batchShow(){ $('batch').hidden = false; renderBatch(); }
 function renderBatch(){
+  const run = batchGroups.filter(g => g.on && batchReady(g)).length;
+  $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
   if ($('batch').hidden) return;
   if (!batchGroups.length){
-    $('batchBody').innerHTML = '<div class="batch-empty"><b>No groups yet</b><p>A group is a set of files that share one set-up, like the back names of an order. Start a group, then add its files, or drop files here.</p><button class="btn primary" type="button" data-act="first">Start a group and add files</button></div>';
+    $('batchBody').innerHTML = '<div class="batch-empty"><b>No groups yet</b><p>A group is a set of files that share one set-up, like the back names of an order. An order sent from the Workboard arrives here already in its groups. For anything else, start a group and add its files, or drop files or a zip here.</p><button class="btn primary" type="button" data-act="first">Start a group and add files</button></div>';
     return;
   }
-  $('batchBody').innerHTML = batchGroups.map(g => {
+  const card = g => {
     const on = g.items.filter(it => it.on), ready = on.filter(it => !batchTooBig(g, it)), widest = batchWidest(g);
-    const set = g.snap ? `<b>${esc(g.desc || 'Set up')}</b>` : '<b>Not set up yet.</b> Choose the print style and size once, on any file.';
-    return `<section class="bgroup" data-g="${g.id}">
-      <div class="bg-head"><input class="bg-name" type="text" value="${esc(g.name)}" maxlength="60" aria-label="Group name">
+    const set = g.snap ? `<b>${esc(g.desc || 'Set up')}</b>` : '<b>Not set up yet.</b> Pick a preset, or set it up on a file.';
+    return `<section class="bgroup${g.on ? '' : ' off'}" data-g="${g.id}">
+      <div class="bg-head"><input class="bg-tick" type="checkbox" ${g.on ? 'checked' : ''} aria-label="Include the group ${esc(g.name)} in Process ticked groups" data-tip="Ticked groups are worked out together by Process ticked groups."><input class="bg-name" type="text" value="${esc(g.name)}" maxlength="60" aria-label="Group name">
         <span class="bg-count">${g.items.length} file${g.items.length === 1 ? '' : 's'} · ${on.length} ticked${g.note ? ' · ' + esc(g.note) : ''}</span><span class="bg-grow"></span>
         <button class="link" type="button" data-act="all">Tick all</button><button class="link" type="button" data-act="none">Untick all</button>
         <button class="link" type="button" data-act="add">Add files</button><button class="link" type="button" data-act="del">Remove group</button></div>
       <div class="bg-set"><span>${set}</span>
+        <select data-preset aria-label="Preset for the group ${esc(g.name)}" data-tip="The group’s set-up from a preset, without opening the editor. The print size stays as it is here.">${batchPresetOpts(g)}</select>
         <label class="bg-w" data-tip="One scale for the whole group: the widest file prints this wide, and every other file follows at the same scale.">Widest file prints <input type="number" inputmode="numeric" min="5" max="500" step="1" data-w value="${g.scale && widest ? toMm(widest*g.scale) : ''}" placeholder="mm"${g.items.length ? '' : ' disabled'}> mm wide</label>
         <span class="bg-grow"></span>
-        <button class="btn" type="button" data-act="setup"${on.length || g.items.length ? '' : ' disabled'}>${g.snap ? 'Change the set-up' : 'Set up the group'}</button>
-        <button class="btn primary" type="button" data-act="save"${g.snap && g.scale && ready.length ? '' : ' disabled'}>Save ${ready.length || ''} PNG${ready.length === 1 ? '' : 's'} as a zip</button></div>
+        <button class="btn" type="button" data-act="setup"${on.length || g.items.length ? '' : ' disabled'}>${g.snap ? 'Check or change on a file' : 'Set up on a file'}</button>
+        <button class="btn" type="button" data-act="save"${g.snap && g.scale && ready.length ? '' : ' disabled'}>Save ${ready.length || ''} PNG${ready.length === 1 ? '' : 's'} as a zip</button></div>
       <div class="bg-grid">${g.items.map(it => {
         const big = batchTooBig(g, it);
         return `<div class="bitem${it.on ? ' on' : ''}${big ? ' big' : ''}" data-k="${esc(it.key)}">
@@ -5104,6 +5216,14 @@ function renderBatch(){
           <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}
           <div class="bi-row">${big ? '<span class="bi-warn">Over 400 × 500 mm</span>' : `<span>${g.scale ? `${toMm(it.w*g.scale)} × ${toMm(it.h*g.scale)} mm` : `${it.w} × ${it.h} px`}</span>`}${it.saved ? '<span>Saved</span>' : ''}</div></div>`;
       }).join('')}</div></section>`;
+  };
+  const orders = batchOrderList();
+  $('batchBody').innerHTML = orders.map((o, i) => {
+    const gs = batchGroups.filter(g => g.order === o), files = gs.reduce((n, g) => n + g.items.length, 0), note = (gs.find(g => g.orderNote) || {}).orderNote;
+    const head = o || orders.length > 1 ? `<div class="bo-head" data-o="${i}"><h3>${o ? esc(o) : 'Other groups'}</h3>
+      <span class="bg-count">${gs.length} group${gs.length === 1 ? '' : 's'} · ${files} file${files === 1 ? '' : 's'}${note ? ' · ' + esc(note) : ''}</span><span class="bg-grow"></span>
+      <button class="link" type="button" data-act="oall">Tick all groups</button><button class="link" type="button" data-act="onone">Untick all groups</button><button class="link" type="button" data-act="odel">Remove ${o ? 'this order' : 'these groups'}</button></div>` : '';
+    return head + gs.map(card).join('');
   }).join('');
 }
 const batchFind = el => { const card = el.closest('.bgroup'), g = card && batchGroups.find(g => g.id === +card.dataset.g), cell = el.closest('.bitem'); return {g, it: g && cell ? g.items.find(it => it.key === cell.dataset.k) : null}; };
@@ -5111,6 +5231,13 @@ $('batchBody').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || batchBusy) return;
   const act = b.dataset.act;
   if (act === 'first'){ batchAddTo = batchGroup(); renderBatch(); $('batchIn').click(); return; }
+  const head = b.closest('.bo-head');
+  if (head){
+    const o = batchOrderList()[+head.dataset.o], gs = batchGroups.filter(g => g.order === o);
+    if (act === 'oall' || act === 'onone') for (const g of gs) g.on = act === 'oall';
+    else if (act === 'odel'){ batchForget(gs.flatMap(g => g.items)); batchGroups = batchGroups.filter(g => g.order !== o); }
+    batchKeepSoon(); renderBatch(); return;
+  }
   const {g, it} = batchFind(b); if (!g) return;
   if (act === 'all' || act === 'none'){ for (const x of g.items) x.on = act === 'all'; }
   else if (act === 'add'){ batchAddTo = g; $('batchIn').click(); return; }
@@ -5118,12 +5245,14 @@ $('batchBody').addEventListener('click', e => {
   else if (act === 'drop' && it){ batchForget([it]); g.items.splice(g.items.indexOf(it), 1); }
   else if (act === 'open' && it){ batchSetup(g, it); return; }
   else if (act === 'setup'){ const first = g.items.find(x => x.on) || g.items[0]; if (first) batchSetup(g, first); return; }
-  else if (act === 'save'){ batchSave(g); return; }
+  else if (act === 'save'){ batchSave([g], false); return; }
   batchKeepSoon(); renderBatch();
 });
 $('batchBody').addEventListener('change', e => {
   const {g, it} = batchFind(e.target); if (!g) return;
   if (e.target.classList.contains('bi-tick') && it) it.on = e.target.checked;
+  else if (e.target.classList.contains('bg-tick')) g.on = e.target.checked;
+  else if (e.target.hasAttribute('data-preset')){ if (e.target.value) batchUsePreset(g, e.target.value); }
   else if (e.target.classList.contains('bg-name')) g.name = e.target.value.trim().slice(0, 60) || g.name;
   else if (e.target.hasAttribute('data-w')){
     const v = parseFloat(e.target.value), widest = batchWidest(g);
@@ -5135,10 +5264,14 @@ $('batchIn').addEventListener('change', async e => {
   const list = [...e.target.files]; e.target.value = '';
   const g = batchAddTo && batchGroups.includes(batchAddTo) ? batchAddTo : batchGroups[batchGroups.length - 1]; batchAddTo = null;
   if (!g || !list.length) return;
-  const r = await batchAdd(g, list.map(file => ({file})));
+  const zips = list.filter(isZip), rest = list.filter(f => !isZip(f));
+  for (const z of zips) await batchZip(z);
+  if (!rest.length){ if (!g.items.length && !g.snap && batchGroups.includes(g)){ batchGroups.splice(batchGroups.indexOf(g), 1); batchKeepSoon(); renderBatch(); } return; } // the zip made its own groups
+  const r = await batchAdd(g, rest.map(file => ({file})));
   if (r.bad) toast(`${r.bad} file${r.bad === 1 ? '' : 's'} couldn’t be opened. Use PNG, JPG, WebP or SVG.`);
 });
 $('batchBtn').addEventListener('click', batchShow);
+$('batchRun').addEventListener('click', () => batchSave(batchGroups.filter(g => g.on), true));
 $('batchNew').addEventListener('click', () => { if (batchBusy) return; batchGroup(); batchKeepSoon(); renderBatch(); $('batchBody').scrollTop = $('batchBody').scrollHeight; });
 $('batchClose').addEventListener('click', () => { if (!batchBusy) $('batch').hidden = true; });
 $('batchStop').addEventListener('click', () => { batchStopped = true; $('batchBusyTxt').textContent = 'Stopping…'; });
@@ -5188,7 +5321,7 @@ $('batchNoteUse').addEventListener('click', () => {
   commitStep();
   const src = snapshot(), opt = $('presetSel').selectedOptions[0];
   g.snap = {s: src.s, lv: src.lv, rules: src.rules.filter(R => !R.area)};
-  g.scale = st.widthCm/art.w; g.scaleFrom = 'user';
+  g.scale = st.widthCm/art.w; g.scaleFrom = 'user'; g.preset = null;
   g.desc = (opt && $('presetSel').value ? opt.textContent.trim() + ' · ' : '') + lookName() + (st.finish === 'cut' ? ' · clean cut' : ` · ${st.lpi} lpi`);
   for (const it of g.items) it.saved = false;
   batchKeepSoon(); batchLeaveTab();
@@ -5213,21 +5346,25 @@ async function makeZip(files){
   ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true); ev.setUint32(12, size, true); ev.setUint32(16, at, true);
   return new Blob([...parts, ...dir, end], {type: 'application/zip'});
 }
-/* Save: each ticked file is put through the editor in turn (off the tabs, so nothing there changes), worked out at the
-   group's settings and scale, and its full-size PNG goes into one zip named after the group. */
-async function batchSave(g){
-  if (batchBusy || saving || !g.snap || !g.scale) return;
-  const list = g.items.filter(it => it.on && !batchTooBig(g, it)), left = g.items.filter(it => it.on && batchTooBig(g, it)).length;
-  if (!list.length) return;
+/* Save: each ticked file is put through the editor in turn (off the tabs, so nothing there changes), worked out at its
+   group's settings and scale. One group saves a zip named after the group. Process ticked groups (whole) saves every
+   ticked group in one zip, a folder for each group, named after the order when they share one. */
+async function batchSave(groups, whole){
+  if (batchBusy || saving) return;
+  const notSet = groups.filter(g => g.items.some(it => it.on) && !(g.snap && g.scale)).length;
+  groups = groups.filter(g => g.snap && g.scale);
+  const jobs = []; let left = 0;
+  for (const g of groups) for (const it of g.items) if (it.on){ if (batchTooBig(g, it)) left++; else jobs.push({g, it}); }
+  if (!jobs.length) return;
   batchBusy = true; batchStopped = false; saving = true; $('saveBtn').disabled = true;
-  $('batchBusyTxt').textContent = `Working out 1 of ${list.length}…`; $('batchBusy').hidden = false;
+  $('batchBusyTxt').textContent = `Working out 1 of ${jobs.length}…`; $('batchBusy').hidden = false;
   stashDoc(); clearTimeout(stepTimer);
-  const start = cur, wasKeeping = restoringDocs, files = [], names = new Set(); let failed = 0;
+  const start = cur, wasKeeping = restoringDocs, files = [], names = new Map(); let failed = 0;
   restoringDocs = true; // nothing here is kept as a tab
   try {
-    for (let i = 0; i < list.length && !batchStopped; i++){
-      const it = list[i];
-      $('batchBusyTxt').textContent = `Working out ${i + 1} of ${list.length}…`;
+    for (let i = 0; i < jobs.length && !batchStopped; i++){
+      const {g, it} = jobs[i];
+      $('batchBusyTxt').textContent = `Working out ${i + 1} of ${jobs.length}…` + (whole ? ` ${g.name}` : '');
       const im = new Image(); im.decoding = 'async'; const url = URL.createObjectURL(it.file); im.src = url;
       try {
         await im.decode();
@@ -5241,8 +5378,10 @@ async function batchSave(g){
         if (!outReady) throw new Error('not ready');
         const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('no png')), 'image/png'));
         const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
-        let name = fileName(); for (let n = 2; names.has(name.toLowerCase()); n++) name = fileName().replace(/\.png$/, `-${n}.png`);
-        names.add(name.toLowerCase()); files.push({name, blob: png, it});
+        if (!names.has(g.id)) names.set(g.id, new Set());
+        const used = names.get(g.id);
+        let name = fileName(); for (let n = 2; used.has(name.toLowerCase()); n++) name = fileName().replace(/\.png$/, `-${n}.png`);
+        used.add(name.toLowerCase()); files.push({name, blob: png, it, g});
       } catch(err){ failed++; }
       URL.revokeObjectURL(url);
     }
@@ -5252,19 +5391,31 @@ async function batchSave(g){
     else { renderTabs(); sampleArt().then(c => { if (!art){ setArt(c, c.width, c.height, 'Sample art', true, DPI); art.quiet = true; art.thruTold = true; } }); }
     restoringDocs = wasKeeping;
   }
-  let ok = false;
+  let ok = false; const done = new Set(files.map(f => f.g.id)).size;
   if (!batchStopped && files.length){
     $('batchBusyTxt').textContent = 'Packing the zip…';
     try {
-      const zip = await makeZip(files), clean = t => t.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
-      ok = await saveFile(zip, `${clean(g.name) || 'batch'}_twedit_${files.length}-files.zip`);
+      const clean = t => String(t).replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
+      let base = clean(files[0].g.name) || 'batch', list = files;
+      if (whole){
+        const orders = [...new Set(files.map(f => f.g.order))], many = orders.length > 1, dirs = new Map(), taken = new Set();
+        for (const f of files){
+          if (dirs.has(f.g.id)) continue;
+          const top = many ? (clean(f.g.order) || 'Other-groups') + '/' : '', name = clean(f.g.name) || 'Group';
+          let dir = top + name; for (let n = 2; taken.has(dir.toLowerCase()); n++) dir = `${top}${name}-${n}`;
+          taken.add(dir.toLowerCase()); dirs.set(f.g.id, dir);
+        }
+        list = files.map(f => ({name: `${dirs.get(f.g.id)}/${f.name}`, blob: f.blob}));
+        base = (!many && clean(orders[0])) || 'Batch';
+      }
+      ok = await saveFile(await makeZip(list), `${base}_twedit_${files.length}-files.zip`);
     } catch(err){ toast('The zip couldn’t be made. Try fewer files at a time.'); }
   }
   if (ok) for (const f of files) f.it.saved = true;
   batchBusy = false; saving = false; $('saveBtn').disabled = !outReady; $('batchBusyTxt').textContent = 'Working…'; $('batchBusy').hidden = true;
-  renderBatch();
+  batchKeepSoon(); renderBatch();
   if (batchStopped) toast('Stopped. Nothing was saved.');
-  else if (ok && (failed || left)) toast(`Saved ${files.length} PNGs in one zip.` + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: over 400 × 500 mm at this scale.` : ''));
+  else if (ok && (failed || left || notSet || whole)) toast(`Saved ${files.length} PNG${files.length === 1 ? '' : 's'}` + (whole ? ` from ${done} group${done === 1 ? '' : 's'}` : '') + ' in one zip.' + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: over 400 × 500 mm at this scale.` : '') + (notSet ? ` ${notSet} ticked group${notSet === 1 ? ' isn’t' : 's aren’t'} set up yet.` : ''));
   else if (!files.length) toast('Those files couldn’t be worked out.');
 }
 
@@ -5279,7 +5430,7 @@ async function batchKeepNow(){
     try { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').put(it.file, 'b:' + it.key); await idbDone(tx); it.kept = true; }
     catch(e){ it.keepFailed = true; if (!batchKeepFailed){ batchKeepFailed = true; toast('This batch is too big to keep for a refresh on this computer. Save it before closing.'); } }
   }
-  const list = batchGroups.map(g => ({name: g.name, note: g.note, snap: g.snap, scale: g.scale, scaleFrom: g.scaleFrom, desc: g.desc, widthMm: g.widthMm,
+  const list = batchGroups.map(g => ({name: g.name, note: g.note, order: g.order, orderNote: g.orderNote, on: g.on, preset: g.preset, snap: g.snap, scale: g.scale, scaleFrom: g.scaleFrom, desc: g.desc, widthMm: g.widthMm,
     items: g.items.filter(it => it.kept).map(it => ({key: it.key, name: it.name, note: it.note, lab: it.lab, labShort: it.labShort, w: it.w, h: it.h, thumb: it.thumb, on: it.on, mm: it.mm, saved: !!it.saved}))}));
   try { const tx = db.transaction('meta', 'readwrite'); tx.objectStore('meta').put({groups: list}, 'batch'); await idbDone(tx); } catch(e){}
 }
@@ -5292,8 +5443,8 @@ async function batchRestore(){
   const meta = await idbGet(db, 'meta', 'batch'); if (!meta || !Array.isArray(meta.groups)) return;
   for (const r of meta.groups){
     if (!r || !Array.isArray(r.items)) continue;
-    const g = batchGroup(r.name, r.note);
-    Object.assign(g, {snap: r.snap && r.snap.s && r.snap.lv && Array.isArray(r.snap.rules) ? r.snap : null, scale: +r.scale || 0, scaleFrom: r.scaleFrom || '', desc: String(r.desc || ''), widthMm: +r.widthMm || 0});
+    const g = batchGroup(r.name, r.note, r.order, r.orderNote);
+    Object.assign(g, {on: r.on !== false, preset: r.preset && typeof r.preset.name === 'string' && ['b', 'c', 's', 'l'].includes(r.preset.where) ? {where: r.preset.where, name: r.preset.name} : null, snap: r.snap && r.snap.s && r.snap.lv && Array.isArray(r.snap.rules) ? r.snap : null, scale: +r.scale || 0, scaleFrom: r.scaleFrom || '', desc: String(r.desc || ''), widthMm: +r.widthMm || 0});
     for (const x of r.items){
       const file = await idbGet(db, 'files', 'b:' + x.key);
       if (!(file instanceof Blob) || !(x.w > 0) || !(x.h > 0)) continue;
