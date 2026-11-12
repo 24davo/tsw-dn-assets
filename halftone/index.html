@@ -329,6 +329,40 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .look-t{font-size:14px}
 .look-d{display:none;font-size:12px}
 .look:has(input:checked) .look-d{display:block}
+.batch{position:fixed;inset:0;z-index:15;display:flex;flex-direction:column;background:var(--bg);color:var(--ink)}
+.batch-bar{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.batch-bar h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em;text-transform:none;color:var(--ink)}
+.batch-sub{font-size:13px;color:var(--muted);flex:1;min-width:200px}
+.batch-body{flex:1;min-height:0;overflow:auto;padding:16px;display:grid;gap:16px;align-content:start}
+.batch-empty{display:grid;gap:12px;justify-items:start;max-width:70ch;padding:24px;border:1.5px dashed var(--line-strong);border-radius:var(--r);font-size:14px}
+.batch-empty p{margin:0;color:var(--muted)}
+.bgroup{display:grid;gap:12px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.bgroup.over{border-color:var(--ink)}
+.bg-head{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap}
+.bg-name{height:38px;width:min(320px,100%);padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:16px;font-weight:800}
+.bg-count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bg-grow{flex:1}
+.bg-set{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding:12px;background:var(--soft);border:1px solid var(--line);border-radius:var(--r);font-size:13px}
+.bg-set b{font-weight:700}
+.bg-set .bg-w{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.bg-set .bg-w input{width:76px;height:34px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.bg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.bitem{position:relative;display:grid;gap:4px;padding:8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:12px;min-width:0}
+.bitem.on{border-color:var(--ink)}
+.bitem.big{border-color:#c98a00}
+.bi-pic{display:grid;place-items:center;height:104px;background:#808080;border-radius:2px;cursor:pointer;overflow:hidden}
+.bi-pic img{max-width:100%;max-height:104px;display:block}
+.bi-tick{position:absolute;top:12px;left:12px;width:20px;height:20px;margin:0;cursor:pointer;accent-color:var(--accent)}
+.bi-x{position:absolute;top:10px;right:10px;width:24px;height:24px;border:0;border-radius:2px;background:rgba(0,0,0,.55);color:#fff;font-size:16px;line-height:1;cursor:pointer}
+.bi-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bi-note{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bi-row{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bi-warn{color:#c98a00;font-weight:700}
+.batch-busy{position:absolute;inset:0;z-index:2;display:grid;place-items:center;background:rgba(0,0,0,.55)}
+.batch-busy > div{display:grid;gap:12px;justify-items:start;padding:20px 24px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);font-size:15px;font-weight:700}
+.batch-note{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding:10px 16px;background:var(--on);color:var(--on-ink);font-size:13px;font-weight:600}
+.batch-note span{flex:1;min-width:220px}
+.batch-note .btn{height:36px}
 </style>
 </head>
 <body>
@@ -348,11 +382,13 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
       <button class="btn" id="redoBtn" type="button" disabled>Redo</button>
       <a class="btn" id="helpBtn" href="https://24davo.github.io/tsw-dn-assets/halftone/guide/" target="_blank" rel="noopener" style="text-decoration:none">Guide</a>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
+      <button class="btn" type="button" id="batchBtn" data-tip="Many files at once: one set-up for a group, every file at the same scale, saved together as full-size PNGs.">Batch</button>
       <button class="btn" type="button" id="openBtn">Open art</button>
       <input type="file" id="fileIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
       <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
     </div>
   </header>
+  <div class="batch-note" id="batchNote" hidden><span id="batchNoteTxt"></span><button class="btn" type="button" id="batchNoteBack">Back to Batch, no change</button><button class="btn primary" type="button" id="batchNoteUse">Use for the group</button></div>
 
   <main class="work">
     <div class="stage-col">
@@ -923,6 +959,17 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     <p class="cal-text">Set it up again on each screen you use, and after changing the display's scaling setting.</p>
     <div class="cal-actions"><button class="btn" type="button" id="calCancel">Cancel</button><button class="btn primary" type="button" id="calSave">Save and show life size</button></div>
   </div>
+</div>
+<div class="batch" id="batch" role="dialog" aria-modal="true" aria-labelledby="batchTitle" hidden>
+  <div class="batch-bar">
+    <h2 id="batchTitle">Batch</h2>
+    <span class="batch-sub">Many files, one set-up. Tick the files, set the group up once on any file, then save them all as full-size PNGs. Every file in a group prints at the same scale.</span>
+    <button class="btn" type="button" id="batchNew">New group</button>
+    <button class="btn" type="button" id="batchClose">Back to the editor</button>
+  </div>
+  <div class="batch-body" id="batchBody"></div>
+  <input type="file" id="batchIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
+  <div class="batch-busy" id="batchBusy" hidden><div><span id="batchBusyTxt">Working…</span><button class="btn" type="button" id="batchStop">Stop</button></div></div>
 </div>
 <div class="cal" id="allDlg" role="dialog" aria-modal="true" aria-labelledby="allTitle" hidden>
   <div class="cal-box ask-box">
@@ -3784,7 +3831,7 @@ function closeDoc(d){
   if (d === cur) guardThen(go, false, true); else go();
 }
 function renderTabs(){
-  persistSoon();
+  persistSoon(); syncBatchNote();
   $('tabsActions').hidden = docs.filter(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample).length < 2;
   $('tabsList').innerHTML = docs.map(d => {
     const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
@@ -3952,10 +3999,17 @@ async function openFile(f){
 if (/^https?:$/.test(location.protocol) && location.pathname.startsWith('/engine/')) for (const a of document.querySelectorAll('a[href^="https://24davo.github.io/tsw-dn-assets/halftone/"]')) a.setAttribute('href', a.getAttribute('href').replace('https://24davo.github.io/tsw-dn-assets/halftone/', '/engine/'));
 const HANDOVER_FROM = ['https://board.tshirtworkshop.com.au', location.origin].filter(o => /^https?:/.test(o));
 let handoverUp = false;
-function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 1}, o); } catch(e){} } }
+function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 2, batch: true}, o); } catch(e){} } }
 window.addEventListener('message', async e => {
   const m = e.data; if (!m || typeof m !== 'object' || !HANDOVER_FROM.includes(e.origin)) return;
   if (m.tsw === 'ge-ping'){ handoverReady(e.source); return; }
+  if (m.tsw === 'ge-batch'){
+    let ans = {ok: false, count: 0, skipped: [], why: 'unsupported'};
+    try { ans = await batchTake(m); } catch(err){ ans = {ok: false, count: 0, skipped: [], why: 'unreadable'}; }
+    try { e.source.postMessage({tsw: 'ge-batched', id: m.id, ...ans}, e.origin); } catch(err){}
+    try { window.focus(); } catch(err){}
+    return;
+  }
   if (m.tsw !== 'ge-open' || !(m.file instanceof Blob)) return;
   const name = String(m.name || m.file.name || 'artwork.png').slice(0, 120);
   let ok = false; const wasFull = docFull();
@@ -3976,7 +4030,7 @@ let dragDepth = 0;
 window.addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')){ dragDepth++; $('drop').hidden = false; } });
 window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('drop').hidden = true; });
 window.addEventListener('dragover', e => { e.preventDefault(); });
-window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const list = [...(e.dataTransfer?.files || [])]; if (list.length) openFiles(list); });
+window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const list = [...(e.dataTransfer?.files || [])]; if (!list.length) return; if (!$('batch').hidden){ batchDrop(list, e.target); return; } openFiles(list); });
 window.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) openFile(it.getAsFile()); });
 
 /* ---------- saving: transparent PNG at 300 dpi, settings written into the file ---------- */
@@ -4888,6 +4942,289 @@ for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el
 if (stage.clientWidth >= 960 && stage.clientWidth >= stage.clientHeight*1.1) setView('split');
 syncFinish();
 cur = {id: ++docSeq, key: newKey()}; docs = [cur]; renderTabs(); // the first tab holds the sample until art is opened
+/* ---------- Batch: groups of files, one set-up each, every file at the same scale, saved as one zip ----------
+   A group keeps its files (no limit of 8: they are not tabs), which are ticked, the settings chosen for it (like a preset)
+   and one scale in cm per pixel of the file, so letters are the same height on every file and a longer name prints wider.
+   The set-up is made in the editor on any file of the group. Saving puts each ticked file through the editor in turn. */
+let batchGroups = [], batchSeq = 0, batchBusy = false, batchStopped = false, batchAddTo = null, batchKeepTimer = 0, batchKeepFailed = false;
+const batchOk = f => /^image\//.test(f.type || '') || /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name || '');
+const batchWidest = g => g.items.reduce((m, it) => Math.max(m, it.w), 0);
+const batchTooBig = (g, it) => !!g.scale && it.w*g.scale > maxWidthFor(it) + 0.001;
+function batchGroup(name, note){
+  const g = {id: ++batchSeq, name: String(name || `Group ${batchGroups.length + 1}`).slice(0, 60), note: String(note || '').slice(0, 80), items: [], snap: null, scale: 0, scaleFrom: '', desc: '', widthMm: 0};
+  batchGroups.push(g); return g;
+}
+async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; answers what happened
+  const out = {count: 0, skipped: [], bad: 0};
+  for (const x of list){
+    const name = String(x.name || x.file.name || 'artwork.png').slice(0, 120);
+    if (x.key && g.items.some(it => it.key === String(x.key))){ out.skipped.push(x.key); continue; }
+    const file = new File([x.file], name, {type: x.file.type || ''});
+    if (!batchOk(file)){ out.bad++; continue; }
+    const im = new Image(); im.decoding = 'async'; const url = URL.createObjectURL(file); im.src = url;
+    try { await im.decode(); } catch(e){ URL.revokeObjectURL(url); out.bad++; continue; }
+    const w = im.naturalWidth, h = im.naturalHeight;
+    if (!w || !h){ URL.revokeObjectURL(url); out.bad++; continue; }
+    const k = Math.min(1, 220/Math.max(w, h)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w*k)); c.height = Math.max(1, Math.round(h*k));
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    let thumb = ''; try { thumb = c.toDataURL('image/png'); } catch(e){}
+    const mm = Math.round(+x.widthMm) || 0;
+    g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), w, h, thumb, file, on: true, mm, kept: false});
+    out.count++;
+  }
+  if (g.scaleFrom !== 'user' && g.items.length){ // the Workboard's width: the widest file prints that wide; or the first file that came with a width
+    const first = g.items.find(it => it.mm > 0);
+    if (g.widthMm > 0){ g.scale = g.widthMm/10/batchWidest(g); g.scaleFrom = 'board'; }
+    else if (first){ g.scale = first.mm/10/first.w; g.scaleFrom = 'board'; }
+  }
+  batchKeepSoon(); renderBatch();
+  return out;
+}
+async function batchTake(m){ // a set from the Workboard
+  const files = (Array.isArray(m.files) ? m.files : []).filter(x => x && x.file instanceof Blob).slice(0, 400);
+  if (!files.length) return {ok: false, count: 0, skipped: [], why: 'unsupported'};
+  const name = String(m.set || 'From the Workboard').slice(0, 60);
+  const g = batchGroups.find(g => g.name === name) || batchGroup(name, m.note);
+  const mm = Math.round(+m.widthMm); if (mm > 0 && g.scaleFrom !== 'user') g.widthMm = mm;
+  const r = await batchAdd(g, files);
+  batchShow();
+  if (!r.count && !r.skipped.length) return {ok: false, count: 0, skipped: [], why: 'unreadable'};
+  toast(`From the Workboard: ${r.count} file${r.count === 1 ? '' : 's'} in “${g.name}”.`);
+  return {ok: true, count: r.count, skipped: r.skipped};
+}
+async function batchDrop(list, target){
+  const card = target && target.closest ? target.closest('.bgroup') : null;
+  const g = (card && batchGroups.find(g => g.id === +card.dataset.g)) || batchGroups[batchGroups.length - 1] || batchGroup();
+  const r = await batchAdd(g, list.map(file => ({file})));
+  toast(r.count ? `${r.count} file${r.count === 1 ? '' : 's'} added to “${g.name}”.` + (r.bad ? ` ${r.bad} couldn’t be opened.` : '') : 'Those files couldn’t be opened. Use PNG, JPG, WebP or SVG.');
+}
+function batchShow(){ $('batch').hidden = false; renderBatch(); }
+function renderBatch(){
+  if ($('batch').hidden) return;
+  if (!batchGroups.length){
+    $('batchBody').innerHTML = '<div class="batch-empty"><b>No groups yet</b><p>A group is a set of files that share one set-up, like the back names of an order. Start a group, then add its files, or drop files here.</p><button class="btn primary" type="button" data-act="first">Start a group and add files</button></div>';
+    return;
+  }
+  $('batchBody').innerHTML = batchGroups.map(g => {
+    const on = g.items.filter(it => it.on), ready = on.filter(it => !batchTooBig(g, it)), widest = batchWidest(g);
+    const set = g.snap ? `<b>${esc(g.desc || 'Set up')}</b>` : '<b>Not set up yet.</b> Choose the print style and size once, on any file.';
+    return `<section class="bgroup" data-g="${g.id}">
+      <div class="bg-head"><input class="bg-name" type="text" value="${esc(g.name)}" maxlength="60" aria-label="Group name">
+        <span class="bg-count">${g.items.length} file${g.items.length === 1 ? '' : 's'} · ${on.length} ticked${g.note ? ' · ' + esc(g.note) : ''}</span><span class="bg-grow"></span>
+        <button class="link" type="button" data-act="all">Tick all</button><button class="link" type="button" data-act="none">Untick all</button>
+        <button class="link" type="button" data-act="add">Add files</button><button class="link" type="button" data-act="del">Remove group</button></div>
+      <div class="bg-set"><span>${set}</span>
+        <label class="bg-w" data-tip="One scale for the whole group: the widest file prints this wide, and every other file follows at the same scale.">Widest file prints <input type="number" inputmode="numeric" min="5" max="500" step="1" data-w value="${g.scale && widest ? toMm(widest*g.scale) : ''}" placeholder="mm"${g.items.length ? '' : ' disabled'}> mm wide</label>
+        <span class="bg-grow"></span>
+        <button class="btn" type="button" data-act="setup"${on.length || g.items.length ? '' : ' disabled'}>${g.snap ? 'Change the set-up' : 'Set up the group'}</button>
+        <button class="btn primary" type="button" data-act="save"${g.snap && g.scale && ready.length ? '' : ' disabled'}>Save ${ready.length || ''} PNG${ready.length === 1 ? '' : 's'} as a zip</button></div>
+      <div class="bg-grid">${g.items.map(it => {
+        const big = batchTooBig(g, it);
+        return `<div class="bitem${it.on ? ' on' : ''}${big ? ' big' : ''}" data-k="${esc(it.key)}">
+          <div class="bi-pic" data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up.">${it.thumb ? `<img src="${it.thumb}" alt="">` : ''}</div>
+          <input class="bi-tick" type="checkbox" ${it.on ? 'checked' : ''} aria-label="Include ${esc(it.name)}">
+          <button class="bi-x" type="button" data-act="drop" aria-label="Remove ${esc(it.name)}">×</button>
+          <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}
+          <div class="bi-row">${big ? '<span class="bi-warn">Over 400 × 500 mm</span>' : `<span>${g.scale ? `${toMm(it.w*g.scale)} × ${toMm(it.h*g.scale)} mm` : `${it.w} × ${it.h} px`}</span>`}${it.saved ? '<span>Saved</span>' : ''}</div></div>`;
+      }).join('')}</div></section>`;
+  }).join('');
+}
+const batchFind = el => { const card = el.closest('.bgroup'), g = card && batchGroups.find(g => g.id === +card.dataset.g), cell = el.closest('.bitem'); return {g, it: g && cell ? g.items.find(it => it.key === cell.dataset.k) : null}; };
+$('batchBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || batchBusy) return;
+  const act = b.dataset.act;
+  if (act === 'first'){ batchAddTo = batchGroup(); renderBatch(); $('batchIn').click(); return; }
+  const {g, it} = batchFind(b); if (!g) return;
+  if (act === 'all' || act === 'none'){ for (const x of g.items) x.on = act === 'all'; }
+  else if (act === 'add'){ batchAddTo = g; $('batchIn').click(); return; }
+  else if (act === 'del'){ batchForget(g.items); batchGroups.splice(batchGroups.indexOf(g), 1); }
+  else if (act === 'drop' && it){ batchForget([it]); g.items.splice(g.items.indexOf(it), 1); }
+  else if (act === 'open' && it){ batchSetup(g, it); return; }
+  else if (act === 'setup'){ const first = g.items.find(x => x.on) || g.items[0]; if (first) batchSetup(g, first); return; }
+  else if (act === 'save'){ batchSave(g); return; }
+  batchKeepSoon(); renderBatch();
+});
+$('batchBody').addEventListener('change', e => {
+  const {g, it} = batchFind(e.target); if (!g) return;
+  if (e.target.classList.contains('bi-tick') && it) it.on = e.target.checked;
+  else if (e.target.classList.contains('bg-name')) g.name = e.target.value.trim().slice(0, 60) || g.name;
+  else if (e.target.hasAttribute('data-w')){
+    const v = parseFloat(e.target.value), widest = batchWidest(g);
+    if (v > 0 && widest){ g.scale = Math.min(v, 500)/10/widest; g.scaleFrom = 'user'; }
+  }
+  batchKeepSoon(); renderBatch();
+});
+$('batchIn').addEventListener('change', async e => {
+  const list = [...e.target.files]; e.target.value = '';
+  const g = batchAddTo && batchGroups.includes(batchAddTo) ? batchAddTo : batchGroups[batchGroups.length - 1]; batchAddTo = null;
+  if (!g || !list.length) return;
+  const r = await batchAdd(g, list.map(file => ({file})));
+  if (r.bad) toast(`${r.bad} file${r.bad === 1 ? '' : 's'} couldn’t be opened. Use PNG, JPG, WebP or SVG.`);
+});
+$('batchBtn').addEventListener('click', batchShow);
+$('batchNew').addEventListener('click', () => { if (batchBusy) return; batchGroup(); batchKeepSoon(); renderBatch(); $('batchBody').scrollTop = $('batchBody').scrollHeight; });
+$('batchClose').addEventListener('click', () => { if (!batchBusy) $('batch').hidden = true; });
+$('batchStop').addEventListener('click', () => { batchStopped = true; $('batchBusyTxt').textContent = 'Stopping…'; });
+
+// the group's settings for one file: the same settings, and the width that keeps the group's scale
+function batchSnapFor(g, a){
+  return {s: {...g.snap.s}, lv: {...g.snap.lv}, rules: g.snap.rules.map(R => ({...R, samples: [...R.samples]})),
+          w: Math.max(0.5, Math.min(a.w*g.scale, maxWidthFor(a))), crop: {x: 0, y: 0, w: a.fullW, h: a.fullH}, n: 0};
+}
+/* Set-up: the file opens in a tab of the editor with the group's set-up so far. Everything works as usual there; a bar
+   above offers "Use for the group", which takes the settings and the scale (print width over the file's pixel width). */
+async function batchSetup(g, it){
+  if (batchBusy || saving) return;
+  if (docFull()){ toast(`Up to ${MAX_DOCS} designs can be open at once. Close a tab in the editor first.`); return; }
+  $('batch').hidden = true;
+  let ok = false; try { ok = !!(await openFile(it.file)); } catch(e){}
+  if (!ok || !cur){ batchShow(); return; }
+  cur.batch = {g: g.id, key: it.key};
+  if (g.snap && g.scale){
+    art.sizeFrom = 'user'; stashDoc();
+    const snap = batchSnapFor(g, art);
+    cur.snap = snap; cur.steps = [{snap, label: `Group “${g.name}”`, at: Date.now()}]; cur.stepPos = 0; cur.unsaved = false;
+    loadDoc(cur);
+  } else if (g.scale){ art.sizeFrom = 'user'; setWidth(art.w*g.scale, true); buildSrcSoon(); resetSteps(`Opened ${art.name}`); }
+  if (it.note){ $('nameSuffix').value = it.note.slice(0, 40); syncFileName(); }
+  syncBatchNote();
+}
+function syncBatchNote(){
+  const b = cur && cur.batch, g = b && batchGroups.find(g => g.id === b.g);
+  $('batchNote').hidden = !g;
+  if (g) $('batchNoteTxt').textContent = `Setting up the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Choose the preset or settings and the print size on this file. Every ticked file gets the same settings at the same scale.`;
+}
+function batchLeaveTab(){ // closes the set-up tab without questions and goes back to the Batch screen
+  const d = cur; if (!d || !d.batch) return;
+  clearTimeout(stepTimer); unsaved = false; d.unsaved = false; d.batch = null;
+  const i = docs.indexOf(d);
+  if (docs.length > 1){ docs.splice(i, 1); cur = null; loadDoc(docs[Math.min(i, docs.length - 1)]); }
+  else { docs = []; cur = null; art = null; renderTabs(); sampleArt().then(c => { if (!art){ setArt(c, c.width, c.height, 'Sample art', true, DPI); art.quiet = true; art.thruTold = true; } }); }
+  forgetDoc(d); d.art = null; d.steps = null;
+  batchShow();
+}
+$('batchNoteBack').addEventListener('click', batchLeaveTab);
+$('batchNoteUse').addEventListener('click', () => {
+  const b = cur && cur.batch, g = b && batchGroups.find(g => g.id === b.g); if (!g || !art) return;
+  commitStep();
+  const src = snapshot(), opt = $('presetSel').selectedOptions[0];
+  g.snap = {s: src.s, lv: src.lv, rules: src.rules.filter(R => !R.area)};
+  g.scale = st.widthCm/art.w; g.scaleFrom = 'user';
+  g.desc = (opt && $('presetSel').value ? opt.textContent.trim() + ' · ' : '') + lookName() + (st.finish === 'cut' ? ' · clean cut' : ` · ${st.lpi} lpi`);
+  for (const it of g.items) it.saved = false;
+  batchKeepSoon(); batchLeaveTab();
+  toast(`“${g.name}” is set up. Tick the files and save.`);
+});
+
+// a zip with the files stored as they are (PNGs are already packed)
+async function makeZip(files){
+  const enc = new TextEncoder(), parts = [], dir = []; let at = 0;
+  const now = new Date(), time = now.getHours() << 11 | now.getMinutes() << 5 | now.getSeconds() >> 1, date = (now.getFullYear() - 1980) << 9 | (now.getMonth() + 1) << 5 | now.getDate();
+  for (const f of files){
+    const data = new Uint8Array(await f.blob.arrayBuffer()), name = enc.encode(f.name), crc = crc32(data);
+    const h = new Uint8Array(30 + name.length), v = new DataView(h.buffer);
+    v.setUint32(0, 0x04034b50, true); v.setUint16(4, 20, true); v.setUint16(6, 0x0800, true); v.setUint16(8, 0, true); v.setUint16(10, time, true); v.setUint16(12, date, true);
+    v.setUint32(14, crc, true); v.setUint32(18, data.length, true); v.setUint32(22, data.length, true); v.setUint16(26, name.length, true); v.setUint16(28, 0, true); h.set(name, 30);
+    const c = new Uint8Array(46 + name.length), w = new DataView(c.buffer);
+    w.setUint32(0, 0x02014b50, true); w.setUint16(4, 20, true); w.setUint16(6, 20, true); w.setUint16(8, 0x0800, true); w.setUint16(10, 0, true); w.setUint16(12, time, true); w.setUint16(14, date, true);
+    w.setUint32(16, crc, true); w.setUint32(20, data.length, true); w.setUint32(24, data.length, true); w.setUint16(28, name.length, true); w.setUint32(42, at, true); c.set(name, 46);
+    parts.push(h, f.blob); dir.push(c); at += h.length + data.length;
+  }
+  const size = dir.reduce((n, c) => n + c.length, 0), end = new Uint8Array(22), ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true); ev.setUint32(12, size, true); ev.setUint32(16, at, true);
+  return new Blob([...parts, ...dir, end], {type: 'application/zip'});
+}
+/* Save: each ticked file is put through the editor in turn (off the tabs, so nothing there changes), worked out at the
+   group's settings and scale, and its full-size PNG goes into one zip named after the group. */
+async function batchSave(g){
+  if (batchBusy || saving || !g.snap || !g.scale) return;
+  const list = g.items.filter(it => it.on && !batchTooBig(g, it)), left = g.items.filter(it => it.on && batchTooBig(g, it)).length;
+  if (!list.length) return;
+  batchBusy = true; batchStopped = false; saving = true; $('saveBtn').disabled = true;
+  $('batchBusyTxt').textContent = `Working out 1 of ${list.length}…`; $('batchBusy').hidden = false;
+  stashDoc(); clearTimeout(stepTimer);
+  const start = cur, wasKeeping = restoringDocs, files = [], names = new Set(); let failed = 0;
+  restoringDocs = true; // nothing here is kept as a tab
+  try {
+    for (let i = 0; i < list.length && !batchStopped; i++){
+      const it = list[i];
+      $('batchBusyTxt').textContent = `Working out ${i + 1} of ${list.length}…`;
+      const im = new Image(); im.decoding = 'async'; const url = URL.createObjectURL(it.file); im.src = url;
+      try {
+        await im.decode();
+        const a = makeArt(im, im.naturalWidth, im.naturalHeight, it.name, false, null, {vector: /svg/i.test(it.file.type) || /\.svg$/i.test(it.name)});
+        Object.assign(a, {quiet: true, sizeFrom: 'user'});
+        const snap = batchSnapFor(g, a);
+        cur = null;
+        loadDoc({id: ++docSeq, key: '', art: a, snap, activeRule: 0, steps: [{snap, label: 'Batch', at: Date.now()}], stepPos: 0, unsaved: false, zoom: 'fit', cx: 0, cy: 0, suffix: (it.note || '').slice(0, 40), done: []});
+        await new Promise(r => setTimeout(r, 30));
+        for (let n = 0; n < 400; n++){ await idle(); if (outReady) break; await new Promise(r => setTimeout(r, 25)); }
+        if (!outReady) throw new Error('not ready');
+        const raw = await new Promise((res, rej) => (traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('no png')), 'image/png'));
+        const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
+        let name = fileName(); for (let n = 2; names.has(name.toLowerCase()); n++) name = fileName().replace(/\.png$/, `-${n}.png`);
+        names.add(name.toLowerCase()); files.push({name, blob: png, it});
+      } catch(err){ failed++; }
+      URL.revokeObjectURL(url);
+    }
+  } finally {
+    clearTimeout(stepTimer); cur = null; art = null;
+    if (start && docs.includes(start)) loadDoc(start);
+    else { renderTabs(); sampleArt().then(c => { if (!art){ setArt(c, c.width, c.height, 'Sample art', true, DPI); art.quiet = true; art.thruTold = true; } }); }
+    restoringDocs = wasKeeping;
+  }
+  let ok = false;
+  if (!batchStopped && files.length){
+    $('batchBusyTxt').textContent = 'Packing the zip…';
+    try {
+      const zip = await makeZip(files), clean = t => t.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
+      ok = await saveFile(zip, `${clean(g.name) || 'batch'}_twedit_${files.length}-files.zip`);
+    } catch(err){ toast('The zip couldn’t be made. Try fewer files at a time.'); }
+  }
+  if (ok) for (const f of files) f.it.saved = true;
+  batchBusy = false; saving = false; $('saveBtn').disabled = !outReady; $('batchBusyTxt').textContent = 'Working…'; $('batchBusy').hidden = true;
+  renderBatch();
+  if (batchStopped) toast('Stopped. Nothing was saved.');
+  else if (ok && (failed || left)) toast(`Saved ${files.length} PNGs in one zip.` + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: over 400 × 500 mm at this scale.` : ''));
+  else if (!files.length) toast('Those files couldn’t be worked out.');
+}
+
+/* Groups are kept in this browser's storage beside the open designs (files under b:key, the list under meta 'batch'),
+   so a refresh brings a batch back. Nothing leaves the computer. */
+function batchKeepSoon(){ clearTimeout(batchKeepTimer); batchKeepTimer = setTimeout(batchKeepNow, 500); }
+async function batchKeepNow(){
+  clearTimeout(batchKeepTimer); batchKeepTimer = 0;
+  const db = await openDb(); if (!db) return;
+  for (const g of batchGroups) for (const it of g.items){
+    if (it.kept || it.keepFailed) continue;
+    try { const tx = db.transaction('files', 'readwrite'); tx.objectStore('files').put(it.file, 'b:' + it.key); await idbDone(tx); it.kept = true; }
+    catch(e){ it.keepFailed = true; if (!batchKeepFailed){ batchKeepFailed = true; toast('This batch is too big to keep for a refresh on this computer. Save it before closing.'); } }
+  }
+  const list = batchGroups.map(g => ({name: g.name, note: g.note, snap: g.snap, scale: g.scale, scaleFrom: g.scaleFrom, desc: g.desc, widthMm: g.widthMm,
+    items: g.items.filter(it => it.kept).map(it => ({key: it.key, name: it.name, note: it.note, w: it.w, h: it.h, thumb: it.thumb, on: it.on, mm: it.mm, saved: !!it.saved}))}));
+  try { const tx = db.transaction('meta', 'readwrite'); tx.objectStore('meta').put({groups: list}, 'batch'); await idbDone(tx); } catch(e){}
+}
+async function batchForget(items){
+  const db = await openDb(); if (!db) return;
+  try { const tx = db.transaction('files', 'readwrite'); for (const it of items) tx.objectStore('files').delete('b:' + it.key); await idbDone(tx); } catch(e){}
+}
+async function batchRestore(){
+  const db = await openDb(); if (!db) return;
+  const meta = await idbGet(db, 'meta', 'batch'); if (!meta || !Array.isArray(meta.groups)) return;
+  for (const r of meta.groups){
+    if (!r || !Array.isArray(r.items)) continue;
+    const g = batchGroup(r.name, r.note);
+    Object.assign(g, {snap: r.snap && r.snap.s && r.snap.lv && Array.isArray(r.snap.rules) ? r.snap : null, scale: +r.scale || 0, scaleFrom: r.scaleFrom || '', desc: String(r.desc || ''), widthMm: +r.widthMm || 0});
+    for (const x of r.items){
+      const file = await idbGet(db, 'files', 'b:' + x.key);
+      if (!(file instanceof Blob) || !(x.w > 0) || !(x.h > 0)) continue;
+      g.items.push({key: String(x.key), name: String(x.name || 'artwork.png'), note: String(x.note || ''), w: x.w, h: x.h, thumb: /^data:image\/png;base64,/.test(x.thumb || '') ? x.thumb : '', file, on: x.on !== false, mm: +x.mm || 0, kept: true, saved: !!x.saved});
+    }
+  }
+  renderBatch();
+}
+window.addEventListener('pagehide', () => { if (batchKeepTimer) batchKeepNow(); });
+batchRestore().catch(() => 0);
 restoreDocs().catch(() => 0).then(n => { handoverUp = true; handoverReady(window.opener); if (!n) sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); }); });
 })();
 </script>
