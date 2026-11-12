@@ -3940,7 +3940,27 @@ async function openFile(f){
   setArt(im, im.naturalWidth, im.naturalHeight, f.name || 'Pasted art', false, dpi,
          {vector: /svg/i.test(f.type) || /\.svg$/i.test(f.name || ''), jpegQ});
   art.file = f; persistSoon();
+  return true;
 }
+const HANDOVER_FROM = ['https://board.tshirtworkshop.com.au', location.origin].filter(o => /^https?:/.test(o));
+let handoverUp = false;
+function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 1}, o); } catch(e){} } }
+window.addEventListener('message', async e => {
+  const m = e.data; if (!m || typeof m !== 'object' || !HANDOVER_FROM.includes(e.origin)) return;
+  if (m.tsw === 'ge-ping'){ handoverReady(e.source); return; }
+  if (m.tsw !== 'ge-open' || !(m.file instanceof Blob)) return;
+  const name = String(m.name || m.file.name || 'artwork.png').slice(0, 120);
+  let ok = false;
+  try { ok = !!(await openFile(new File([m.file], name, {type: m.file.type || ''}))); } catch(err){}
+  if (ok){
+    if (m.note){ $('nameSuffix').value = String(m.note).slice(0, 40); syncFileName(); persistSoon(); }
+    const mm = Math.round(+m.widthMm);
+    if (mm > 0){ const el = $('wcm'); el.value = mm; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); }
+    toast(`Opened from the Workboard: ${name}`);
+  }
+  try { e.source.postMessage({tsw: 'ge-opened', ok, id: m.id}, e.origin); } catch(err){}
+  try { window.focus(); } catch(err){}
+});
 $('fileIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; openFiles(list); });
 $('openBtn').addEventListener('click', openArt);
 let dragDepth = 0;
@@ -4859,7 +4879,7 @@ for (const [sel, t] of TIPS) for (const el of document.querySelectorAll(sel)) el
 if (stage.clientWidth >= 960 && stage.clientWidth >= stage.clientHeight*1.1) setView('split');
 syncFinish();
 cur = {id: ++docSeq, key: newKey()}; docs = [cur]; renderTabs(); // the first tab holds the sample until art is opened
-restoreDocs().catch(() => 0).then(n => { if (!n) sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); }); });
+restoreDocs().catch(() => 0).then(n => { handoverUp = true; handoverReady(window.opener); if (!n) sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); }); });
 })();
 </script>
 </body>
