@@ -1905,7 +1905,14 @@ const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, k
             edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','areaV'];
-try { const saved = JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null'); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
+const cleanStr = v => v.replace(/[<>"'&`();\\]/g, '');
+function cleanDeep(o, d = 0){ // in place; anything nested too deep to be a real setting is dropped
+  if (!o || typeof o !== 'object') return typeof o === 'string' ? cleanStr(o) : o;
+  if (d > 6) return null;
+  for (const k of Object.keys(o)){ const v = o[k]; if (typeof v === 'string') o[k] = cleanStr(v); else if (v && typeof v === 'object') o[k] = cleanDeep(v, d + 1); }
+  return o;
+}
+try { const saved = cleanDeep(JSON.parse(localStorage.getItem('tsw-dtf-halftone') || 'null')); if (saved) for (const k of KEEP) if (k in saved) st[k] = saved[k]; } catch(e){}
 var cleanReset = false; // v51 had Clean colour dots on by default
 try { if (!localStorage.getItem('tsw-dtf-clean0')){ cleanReset = true; st.clean = false; localStorage.setItem('tsw-dtf-clean0', '1'); } } catch(e){}
 try { if (!localStorage.getItem('tsw-dtf-dens1')){ if ([[15, 92], [15, 90], [15, 96]].some(([d, v]) => st.drop === d && st.solid === v)) Object.assign(st, densVals('std')); localStorage.setItem('tsw-dtf-dens1', '1'); } } catch(e){}
@@ -3942,6 +3949,7 @@ async function openFile(f){
   art.file = f; persistSoon();
   return true;
 }
+if (/^https?:$/.test(location.protocol) && location.pathname.startsWith('/engine/')) for (const a of document.querySelectorAll('a[href^="https://24davo.github.io/tsw-dn-assets/halftone/"]')) a.setAttribute('href', a.getAttribute('href').replace('https://24davo.github.io/tsw-dn-assets/halftone/', '/engine/'));
 const HANDOVER_FROM = ['https://board.tshirtworkshop.com.au', location.origin].filter(o => /^https?:/.test(o));
 let handoverUp = false;
 function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 1}, o); } catch(e){} } }
@@ -4106,7 +4114,7 @@ const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't 
 const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
-const isPreset = x => x && typeof x.name === 'string' && x.s && typeof x.s === 'object';
+const isPreset = x => { if (!(x && typeof x.name === 'string' && x.s && typeof x.s === 'object')) return false; cleanDeep(x.s); x.rules = cleanDeep(x.rules); x.levels = cleanDeep(x.levels); return true; };
 const sameName = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 let presets = [].concat(readJSON('tsw-dtf-presets', [])).filter(isPreset);                 // this computer only
 let shared = SYNC_URL ? [].concat(readJSON('tsw-dtf-shared', [])).filter(isPreset) : [];   // the last copy of the shared list
