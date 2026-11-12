@@ -4131,6 +4131,10 @@ const STARTERS = [ // v65: tuned on the owner's example designs (sky collage, da
   {name: 'Vintage full halftone · dark tee', desc: 'The whole design becomes dots by brightness, in rich colour, for a worn, vintage feel on dark tees.',
    s: {look: 'full', shirt: '#111111', k0: 0, k1: 55, rich: true, drop: 18, solid: 92}} // full ink from 55%: at 100% a dark design (Elefus) nearly vanished
 ];
+const RECIPES = [
+  {name: 'Elefus · flames fade, skull stays solid', desc: 'From the Elefus job (red flames, grey skull, black tee). Flames fade into the shirt through rich dots; the grey skull stays solid, a little brighter, with dots only in its shadows. For solid lettering in the same colour as the flames, add a part: Everything (in a marked area), box the word, Own dots 6 to 30.',
+   s: {look: 'knock', shirt: '#111111', k0: 5, k1: 72, rich: true}, rules: [{type: 'greys', action: 'ramp', k0: 10, k1: 24, bri: 18}]}
+];
 let starterLv = null; // Brightness and Contrast the last starter set, so the next starter can take them off again
 function starterPreset(b){ // a starter as a full preset: today's settings, with the starter's halftone style on top
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
@@ -4166,19 +4170,19 @@ function applyPreset(p){
   noteChange(`Preset “${p.name}”`);
   toast(p.desc ? `${p.name}: ${p.desc}` : `Applied “${p.name}”.`);
 }
-function chosen(){ const v = $('presetSel').value; if (!v) return null; const where = v[0], list = where === 's' ? shared : where === 'b' ? STARTERS : presets, p = list[+v.slice(1)]; return p ? {p, where} : null; }
+function chosen(){ const v = $('presetSel').value; if (!v) return null; const where = v[0], list = where === 's' ? shared : where === 'b' ? STARTERS : where === 'c' ? RECIPES : presets, p = list[+v.slice(1)]; return p ? {p, where} : null; }
 function syncPresets(selName, where){
   const opt = (p, key) => `<option value="${key}">${esc(p.name)}</option>`;
   const fits = p => !p.s || !p.s.finish || routeOf(p.s.finish) === routeOf(st.finish); // this print style's presets (older ones without one show in both)
   const opts = (list, w) => list.map((p, i) => fits(p) ? opt(p, w + i) : '').join('');
-  let html = '<option value="">Choose a preset…</option>' + (st.finish === 'cut' ? '' : `<optgroup label="Starters · 30 lpi">${STARTERS.map((p, i) => opt(p, 'b' + i)).join('')}</optgroup>`), any = st.finish !== 'cut';
+  let html = '<option value="">Choose a preset…</option>' + (st.finish === 'cut' ? '' : `<optgroup label="Starters · 30 lpi">${STARTERS.map((p, i) => opt(p, 'b' + i)).join('')}</optgroup><optgroup label="Claude recipes">${RECIPES.map((p, i) => opt(p, 'c' + i)).join('')}</optgroup>`), any = st.finish !== 'cut';
   const add = (label, o) => { if (o){ html += `<optgroup label="${label}">${o}</optgroup>`; any = true; } };
   if (SYNC_URL){ add('Shared with all computers', opts(shared, 's')); add('This computer only', opts(presets, 'l')); }
   else add('Saved on this computer', opts(presets, 'l'));
   if (!any) html += '<option value="" disabled>No Clean cut presets yet: Save new keeps this set-up</option>';
   $('presetSel').innerHTML = html;
   let key = '';
-  if (selName != null){ const list = where === 's' ? shared : where === 'b' ? STARTERS : presets, i = list.findIndex(p => sameName(p.name, selName)); if (i >= 0) key = where + i; }
+  if (selName != null){ const list = where === 's' ? shared : where === 'b' ? STARTERS : where === 'c' ? RECIPES : presets, i = list.findIndex(p => sameName(p.name, selName)); if (i >= 0) key = where + i; }
   $('presetSel').value = key;
   if ($('presetSel').value !== key) $('presetSel').value = ''; // the chosen one is the other style's
   $('presetConfirm').hidden = true;
@@ -4187,7 +4191,7 @@ function syncPresets(selName, where){
 function keepChosenPreset(){ const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); }
 function syncPresetButtons(){
   const c = chosen();
-  $('presetUpdate').disabled = $('presetDelete').disabled = !c || c.where === 'b' || syncBusy; // starters are built in
+  $('presetUpdate').disabled = $('presetDelete').disabled = !c || c.where === 'b' || c.where === 'c' || syncBusy; // starters are built in
   $('presetNew').disabled = syncBusy;
   $('presetShare').hidden = !(SYNC_URL && c && c.where === 'l'); $('presetShare').disabled = syncBusy;
 }
@@ -4243,7 +4247,7 @@ function remoteProblem(d){
                big: 'That preset is too big to share.', code: 'That team code isn’t right.'};
   return say[d.error] || 'The shared presets didn’t take that. Try again.';
 }
-$('presetSel').addEventListener('change', () => { const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); if (c) applyPreset(c.where === 'b' ? starterPreset(c.p) : c.p); });
+$('presetSel').addEventListener('change', () => { const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); if (c) applyPreset(c.where === 'b' || c.where === 'c' ? starterPreset(c.p) : c.p); });
 $('presetNew').addEventListener('click', () => {
   const look = lookName();
   const shirt = (SHIRTS.find(([, hex]) => hex.toLowerCase() === st.shirt.toLowerCase()) || ['custom shirt'])[0];
