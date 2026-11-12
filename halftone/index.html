@@ -346,6 +346,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     <div class="actions">
       <button class="btn" id="undoBtn" type="button" disabled>Undo</button>
       <button class="btn" id="redoBtn" type="button" disabled>Redo</button>
+      <a class="btn" id="helpBtn" href="https://24davo.github.io/tsw-dn-assets/halftone/guide/" target="_blank" rel="noopener" style="text-decoration:none">Guide</a>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
       <button class="btn" type="button" id="openBtn">Open art</button>
       <input type="file" id="fileIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
@@ -4783,6 +4784,7 @@ const TIPS = [
   ['[data-emode="near"]', 'Trim only colours close to the knock-out colour, so the same colour further in keeps its ink.'],
   ['[data-brush="erase"]', 'Brush pixels away to clear film.'], ['[data-brush="paint"]', 'Paint over gaps or rough edges in one colour. Alt-click the art to pick it.'],
   ['[data-brush="restore"]', 'Brush the original art back where you erased or painted.'], ['#paintFromArt', 'Click a colour in the art to paint with.'],
+  ['#helpBtn', 'How to use Graphic Engine, step by step. Opens in a new tab.'],
   ['#openBtn', 'Open art in a new tab. Choose several files to open each in its own tab.'],
   ['#allApplyBtn', 'Copy this tab’s settings to every other open tab, like applying a preset. Crops and touch-ups stay as they are.'],
   ['#allSaveBtn', 'Save a PNG of every open tab, one after another. The browser may ask once to allow several downloads.'],
