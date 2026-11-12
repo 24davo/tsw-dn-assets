@@ -999,6 +999,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
     <span class="batch-sub">Many files, one set-up for each group. Pick a preset on each group (or set it up on a file), tick the groups, then process them all into one zip. Lock a group when it is right.</span>
     <label class="batch-label">Production label <select id="batchLabelMode"><option value="off">Off</option><option value="simple">Simple</option><option value="full">Full info</option></select></label>
     <button class="btn primary" type="button" id="batchRun" disabled data-tip="Works out every ticked group that is set up, and saves one zip with a folder for each group.">Process ticked groups</button>
+    <button class="btn" type="button" id="batchJoin" disabled data-tip="Puts the files of every ticked group into one group, like names that each arrived as a group of their own. Untick the groups to leave out first.">Join ticked groups</button>
+    <button class="btn" type="button" id="batchUndo" disabled>Undo</button>
     <button class="btn" type="button" id="batchNew">New group</button>
     <button class="btn" type="button" id="batchClose">Back to the editor</button>
   </div>
@@ -4722,7 +4724,7 @@ for (const id of ['histUndo', 'undoBtn']) $(id).addEventListener('click', undo);
 for (const id of ['histRedo', 'redoBtn']) $(id).addEventListener('click', redo);
 window.addEventListener('keydown', e => {
   const t = e.target, typing = t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !/^(range|radio|checkbox|button|color)$/.test(t.type));
-  if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'z' && !typing){ e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'z' && !typing){ e.preventDefault(); if (!$('batch').hidden){ if (!e.shiftKey) batchUndoGo(); } else if (e.shiftKey) redo(); else undo(); }
   if (e.key === 'Escape' && !$('askSave').hidden){ pendingGo = null; $('askSave').hidden = true; }
 });
 window.addEventListener('keyup', e => { if (((e.key === 't' || e.key === 'T') && st.view === 'split') || e.key === 'o' || e.key === 'O') cmpOff(); });
@@ -5082,6 +5084,45 @@ async function batchTrims(){ // files kept from before trims were found
   }
   if (any){ batchKeepSoon(); renderBatch(); }
 }
+/* Undo: the groups as they were before each change (which files sit where, ticks, set-up, size, lock). Kept for this
+   visit only. A removed file comes back from memory and is stored again. */
+let batchUndos = [];
+function batchMark(label){
+  batchUndos.push({label, groups: batchGroups.map(g => ({g, f: {...g}, items: g.items.map(it => ({it, on: it.on, saved: it.saved}))}))});
+  if (batchUndos.length > 30) batchUndos.shift();
+  syncBatchTools();
+}
+function batchUndoGo(){
+  if (batchBusy || $('batch').hidden) return;
+  const u = batchUndos.pop(); if (!u) return;
+  const before = new Set(batchGroups.flatMap(g => g.items));
+  batchGroups = u.groups.map(r => {
+    Object.assign(r.g, r.f);
+    r.g.items = r.items.map(x => { x.it.on = x.on; x.it.saved = x.saved; if (!before.has(x.it)){ x.it.kept = false; x.it.keepFailed = false; } return x.it; });
+    return r.g;
+  });
+  const after = new Set(batchGroups.flatMap(g => g.items)), gone = [...before].filter(it => !after.has(it));
+  if (gone.length) batchForget(gone);
+  batchKeepSoon(); renderBatch(); toast(`Undone: ${u.label}.`);
+}
+function syncBatchTools(){
+  const u = batchUndos[batchUndos.length - 1];
+  $('batchUndo').disabled = !u; $('batchUndo').dataset.tip = u ? `Takes back: ${u.label}. Ctrl or ⌘ + Z does the same.` : 'Nothing to undo yet.';
+  $('batchJoin').disabled = batchGroups.filter(g => g.on && !g.locked && g.items.length).length < 2;
+}
+function batchJoin(){ // every ticked group that isn't locked becomes one group, where the first of them was
+  const gs = batchGroups.filter(g => g.on && !g.locked && g.items.length); if (gs.length < 2) return null;
+  const first = gs[0], set = gs.find(g => g.snap), sized = gs.find(g => batchSized(g));
+  const ng = batchGroup(`${first.name.slice(0, 50)} · joined`, '', first.order, first.orderNote);
+  batchGroups.pop();
+  if (set) Object.assign(ng, {snap: set.snap, preset: set.preset, desc: set.desc, quick: set.quick});
+  if (sized) Object.assign(ng, {scale: sized.scale, scaleFrom: 'user', fit: sized.fit, fitMm: sized.fitMm, trim: sized.trim});
+  else Object.assign(ng, {widthMm: first.widthMm, trim: gs.some(g => g.trim)});
+  ng.items = gs.flatMap(g => g.items); for (const it of ng.items) it.saved = false;
+  batchGroups.splice(batchGroups.indexOf(first), 0, ng);
+  batchGroups = batchGroups.filter(g => !gs.includes(g));
+  return {ng, n: gs.length, set};
+}
 function batchGroup(name, note, order, orderNote){
   const g = {id: ++batchSeq, name: String(name || `Group ${batchGroups.length + 1}`).slice(0, 60), note: String(note || '').slice(0, 80), order: String(order || '').slice(0, 40), orderNote: String(orderNote || '').slice(0, 80), on: true, preset: null, items: [], snap: null, scale: 0, scaleFrom: '', desc: '', widthMm: 0, locked: false, open: false, fit: 's', fitMm: 0, trim: false, quick: ''};
   batchGroups.push(g); return g;
@@ -5184,6 +5225,7 @@ async function batchZip(file){
   return n;
 }
 async function batchDrop(list, target){
+  if (list.length) batchMark(`added ${list.length} file${list.length === 1 ? '' : 's'}`);
   const zips = list.filter(isZip); list = list.filter(f => !isZip(f));
   for (const z of zips) await batchZip(z);
   if (!list.length) return;
@@ -5254,6 +5296,7 @@ function batchSplit(g){ // the ticked files leave for a group of their own, righ
 }
 function batchShow(){ $('batch').hidden = false; renderBatch(); }
 function renderBatch(){
+  syncBatchTools();
   const run = batchGroups.filter(g => g.on && batchReady(g)).length;
   $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
   if ($('batch').hidden) return;
@@ -5321,6 +5364,7 @@ $('batchBody').addEventListener('click', e => {
   const head = b.closest('.bo-head');
   if (head){
     const o = batchOrderList()[+head.dataset.o], gs = batchGroups.filter(g => g.order === o);
+    batchMark(act === 'odel' ? `removed ${o ? 'the order ' + o : 'the other groups'}` : `${act === 'oall' ? 'ticked' : 'unticked'} all groups` + (o ? ' in ' + o : ''));
     if (act === 'oall' || act === 'onone') for (const g of gs) g.on = act === 'oall';
     else if (act === 'odel'){
       const gone = gs.filter(g => !g.locked);
@@ -5331,6 +5375,9 @@ $('batchBody').addEventListener('click', e => {
   }
   const {g, it} = batchFind(b); if (!g) return;
   if (g.locked && !['lock', 'files', 'save'].includes(act)) return;
+  const what = {lock: `${g.locked ? 'unlocked' : 'locked'} “${g.name}”`, quick: `the Speed button on “${g.name}”`, split: `moved ticked files out of “${g.name}”`, all: `ticked all files in “${g.name}”`,
+    none: `unticked all files in “${g.name}”`, del: `removed the group “${g.name}”`, drop: it ? `removed ${it.name}` : ''}[act];
+  if (what) batchMark(what);
   if (act === 'lock'){ g.locked = !g.locked; g.open = false; }
   else if (act === 'files') g.open = !g.open;
   else if (act === 'quick'){ batchUseQuick(g, b.dataset.q); }
@@ -5352,6 +5399,9 @@ $('batchBody').addEventListener('click', e => {
 });
 $('batchBody').addEventListener('change', e => {
   const {g, it} = batchFind(e.target); if (!g) return;
+  const T = e.target;
+  if (T.classList.contains('bg-tick') || !g.locked) batchMark(T.classList.contains('bg-tick') ? `the tick on the group “${g.name}”` : T.classList.contains('bi-tick') && it ? `the tick on ${it.name}` : T.classList.contains('bg-name') ? `renamed “${g.name}”`
+    : T.hasAttribute('data-preset') ? `the preset on “${g.name}”` : T.hasAttribute('data-trim') ? `trim on “${g.name}”` : `the print size of “${g.name}”`);
   if (e.target.classList.contains('bg-tick')) g.on = e.target.checked;
   else if (g.locked){ renderBatch(); return; }
   else if (e.target.classList.contains('bi-tick') && it) it.on = e.target.checked;
@@ -5369,6 +5419,7 @@ $('batchIn').addEventListener('change', async e => {
   const list = [...e.target.files]; e.target.value = '';
   const g = batchAddTo && batchGroups.includes(batchAddTo) ? batchAddTo : batchGroups[batchGroups.length - 1]; batchAddTo = null;
   if (!g || !list.length) return;
+  batchMark(`added ${list.length} file${list.length === 1 ? '' : 's'}`);
   const zips = list.filter(isZip), rest = list.filter(f => !isZip(f));
   for (const z of zips) await batchZip(z);
   if (!rest.length){ if (!g.items.length && !g.snap && batchGroups.includes(g)){ batchGroups.splice(batchGroups.indexOf(g), 1); batchKeepSoon(); renderBatch(); } return; } // the zip made its own groups
@@ -5377,7 +5428,16 @@ $('batchIn').addEventListener('change', async e => {
 });
 $('batchBtn').addEventListener('click', batchShow);
 $('batchRun').addEventListener('click', () => batchSave(batchGroups.filter(g => g.on), true));
-$('batchNew').addEventListener('click', () => { if (batchBusy) return; batchGroup(); batchKeepSoon(); renderBatch(); $('batchBody').scrollTop = $('batchBody').scrollHeight; });
+$('batchUndo').addEventListener('click', batchUndoGo);
+$('batchJoin').addEventListener('click', () => {
+  if (batchBusy) return;
+  batchMark('joined the ticked groups');
+  const r = batchJoin(); if (!r){ batchUndos.pop(); syncBatchTools(); return; }
+  batchKeepSoon(); renderBatch();
+  const el = $('batchBody').querySelector(`.bgroup[data-g="${r.ng.id}"] .bg-name`); if (el){ el.scrollIntoView({block: 'center'}); el.focus(); el.select(); }
+  toast(`${r.n} groups joined into one with ${r.ng.items.length} files.` + (r.set ? ` It keeps the set-up of “${r.set.name}”.` : ' Name it, then pick a preset or a Speed button.'));
+});
+$('batchNew').addEventListener('click', () => { if (batchBusy) return; batchMark('a new group'); batchGroup(); batchKeepSoon(); renderBatch(); $('batchBody').scrollTop = $('batchBody').scrollHeight; });
 $('batchClose').addEventListener('click', () => { if (!batchBusy) $('batch').hidden = true; });
 $('batchStop').addEventListener('click', () => { batchStopped = true; $('batchBusyTxt').textContent = 'Stopping…'; });
 
@@ -5428,6 +5488,7 @@ $('batchNoteUse').addEventListener('click', () => {
   const src = snapshot(), opt = $('presetSel').selectedOptions[0];
   g.snap = {s: src.s, lv: src.lv, rules: src.rules.filter(R => !R.area)};
   const it = g.items.find(x => x.key === b.key), f = it ? it.w/art.fullW : 1, full = art.crop.x === 0 && art.crop.y === 0 && art.crop.w >= art.fullW && art.crop.h >= art.fullH;
+  batchMark(`the set-up of “${g.name}”`);
   if (!full) g.trim = true; else if (it && it.tb && (it.tb.w < it.w || it.tb.h < it.h)) g.trim = false; // cropped in here: the group trims; the whole file: it doesn't
   if (g.fit === 'w') g.fitMm = round1(st.widthCm*10); else if (g.fit === 'h') g.fitMm = round1(st.widthCm*10*art.h/art.w); else g.scale = st.widthCm/(art.w*f);
   g.scaleFrom = 'user'; g.preset = null; g.quick = '';
