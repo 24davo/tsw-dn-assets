@@ -3958,7 +3958,7 @@ window.addEventListener('message', async e => {
   if (m.tsw === 'ge-ping'){ handoverReady(e.source); return; }
   if (m.tsw !== 'ge-open' || !(m.file instanceof Blob)) return;
   const name = String(m.name || m.file.name || 'artwork.png').slice(0, 120);
-  let ok = false;
+  let ok = false; const wasFull = docFull();
   try { ok = !!(await openFile(new File([m.file], name, {type: m.file.type || ''}))); } catch(err){}
   if (ok){
     if (m.note){ $('nameSuffix').value = String(m.note).slice(0, 40); syncFileName(); persistSoon(); }
@@ -3966,7 +3966,8 @@ window.addEventListener('message', async e => {
     if (mm > 0){ const el = $('wcm'); el.value = mm; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); }
     toast(`Opened from the Workboard: ${name}`);
   }
-  try { e.source.postMessage({tsw: 'ge-opened', ok, id: m.id}, e.origin); } catch(err){}
+  const room = Math.max(0, MAX_DOCS - docs.length + (art && art.isSample ? 1 : 0));
+  try { e.source.postMessage(ok ? {tsw: 'ge-opened', ok, id: m.id, room} : {tsw: 'ge-opened', ok, id: m.id, why: wasFull ? 'full' : 'unreadable', room}, e.origin); } catch(err){}
   try { window.focus(); } catch(err){}
 });
 $('fileIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; openFiles(list); });
