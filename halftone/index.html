@@ -530,6 +530,35 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .quick-rows{display:grid;gap:16px}
 .quick input[type="range"]{height:28px}
 .quick-ends{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+/* v87: the bar above the art as three boxed groups; Quick start folds to one line */
+.stage-bar{justify-content:flex-start;gap:8px;padding-block:8px}
+.tgroup{position:relative;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 6px 5px 10px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--panel)}
+.tg-label{display:inline-flex;align-items:center;gap:6px;margin-right:4px;padding:0;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.tg-label svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.more-views{position:relative;display:inline-flex}
+#moreViewsBtn::after{content:"";display:inline-block;width:6px;height:6px;margin:0 0 3px 8px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
+.mv-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:7;display:grid;gap:4px;min-width:150px;padding:6px;background:var(--panel);border:1px solid var(--line-strong);border-radius:var(--r)}
+.mv-menu .chip{text-align:left}
+@media (max-width:880px){.stage-bar .tg-label{display:inline-flex}}
+.look-fold{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:8px 14px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.look-fold:hover,.look-fold[aria-expanded="true"]{border-color:var(--ink)}
+.lf-k{flex:none;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.look-fold b{flex:1;min-width:0;font-size:15px;font-weight:800}
+.lf-go{flex:none;font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.look-box{display:grid;gap:12px}
+/* v87: pink for what is chosen */
+.chip[aria-pressed="true"]{background:var(--panel);border-color:var(--accent);color:var(--ink);box-shadow:inset 0 0 0 1px var(--accent)}
+.choice[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.choice[aria-pressed="true"]::after{border-color:var(--accent)}
+.look:has(input:checked){border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.look input:checked{border-color:var(--accent)}
+.trail .cur .dot i{border-color:var(--accent);background:var(--panel);color:var(--ink);box-shadow:inset 0 0 0 1px var(--accent)}
+.check-row:has(input:checked){border-color:var(--accent)}
+.check-row input:checked{background:var(--accent);border-color:var(--accent)}
+.check-row input:checked::after{border-color:#ffffff}
+.bitem.on{border-color:var(--accent)}
+.look-fold[aria-expanded="true"]{border-color:var(--accent)}
+.quick input[type="range"],#wRange{accent-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -574,25 +603,24 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         <div class="tabs-actions" id="tabsActions" hidden><button class="link" type="button" id="allApplyBtn">Copy settings to all</button><button class="link" type="button" id="allSaveBtn">Save all</button></div>
       </div>
       <div class="stage-bar">
-        <div class="tray" role="group" aria-label="View" id="viewTray" title="Press V to step through the views">
-          <span class="tray-label">View</span>
+        <div class="tgroup" role="group" aria-label="Crop" id="cropTray"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1v11h11M1 4h11v11"/></svg>Crop</span>
+          <button class="chip" type="button" id="cropTrim" data-tip="Cuts the empty space off around the art, so the print size measures the art itself.">Trim to the art</button>
+          <button class="chip" type="button" id="cropDraw" aria-pressed="false" data-tip="Drag a box on the art to keep just that part, for example to cut off unwanted marks at the edge.">Draw a crop</button>
+          <button class="chip" type="button" id="cropReset" hidden data-tip="Back to the whole file.">Reset crop</button>
+        </div>
+        <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
-          <button class="chip" type="button" data-view="white" aria-pressed="false">On white</button>
-          <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
-          <button class="chip" type="button" data-view="map" aria-pressed="false">Ink map</button>
-          <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
+          <span class="more-views"><button class="chip" type="button" id="moreViewsBtn" aria-haspopup="true" aria-expanded="false" aria-pressed="false" data-tip="Other views: On white, White base, Ink map.">More</button>
+            <span class="mv-menu" id="moreViews" hidden>
+              <button class="chip" type="button" data-view="white" aria-pressed="false">On white</button>
+              <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
+              <button class="chip" type="button" data-view="map" aria-pressed="false">Ink map</button>
+              <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
+            </span></span>
         </div>
-        <div class="bar-right">
-          <div class="tray" role="group" aria-label="Crop" id="cropTray"><span class="tray-label">Crop</span>
-            <button class="chip" type="button" id="cropTrim" data-tip="Cuts the empty space off around the art, so the print size measures the art itself.">Trim to the art</button>
-            <button class="chip" type="button" id="cropDraw" aria-pressed="false" data-tip="Drag a box on the art to keep just that part, for example to cut off unwanted marks at the edge.">Draw a crop</button>
-            <button class="chip" type="button" id="cropReset" hidden data-tip="Back to the whole file.">Reset crop</button>
-          </div>
-          <button class="chip" type="button" id="edgeBtn" aria-pressed="true" data-tip="Show the edge of the print area on the shirt views (E key).">Print edge</button>
-          <div class="tray" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tray-label">Shirt</span></div>
-        </div>
+        <div class="tgroup" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tg-label tray-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2L1.5 4.5l1.5 3 1.5-.8V14h7V6.700l1.500.800 1.500-3L10.500 2a2.500 2.500 0 01-5 0z"/></svg>Shirt</span></div>
       </div>
     <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
       <canvas id="view"></canvas>
@@ -603,6 +631,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <div class="tray"><span class="readout" id="sizeRead">–</span></div>
         </div>
         <div class="o-right">
+          <div class="tray"><button class="chip" type="button" id="edgeBtn" aria-pressed="true" data-tip="Show the edge of the print area on the shirt views (E key).">Print edge</button></div>
           <div class="tray" role="group" aria-label="Zoom" id="zoomTray" title="Pinch, or Ctrl/Cmd + scroll, to zoom at the pointer. Keys: + − 0">
             <button class="chip" type="button" data-zoom="fit" aria-pressed="true">Fit</button>
             <button class="chip" type="button" data-zoom="life" aria-pressed="false" title="The print at its real size on this screen. Set it up with the ruler button beside it.">Life size</button>
@@ -667,7 +696,8 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="choice" type="button" data-finish="prep"><span class="choice-t">Prep only</span><span class="choice-d">Tidy up and save.</span></button>
           <button class="choice" type="button" data-finish="flat"><span class="choice-t">Trace prep</span><span class="choice-d">Flat colours for tracing.</span></button>
         </div>
-        <div class="lv-sub">Quick start</div>
+        <button class="look-fold" type="button" id="lookFold" aria-expanded="false" aria-controls="lookBox"><span class="lf-k">Quick start</span><b id="lookNow"></b><span class="lf-go" id="lookGo">Change</span></button>
+        <div class="look-box" id="lookBox" hidden>
         <div class="looks" id="looks">
           <label class="look"><input type="radio" name="look" id="lookShadows" value="shadows"><span class="look-t">Remove shadows</span><span class="look-d">Quick clean-up for dark shirts. Shadows drop out and the rest prints solid, with no dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookEdges" value="edges"><span class="look-t">Fix soft edges</span><span class="look-d">Shadows, glows and fades become solid dots. Solid parts stay solid.</span></label>
@@ -676,12 +706,13 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <label class="look"><input type="radio" name="look" id="lookFull" value="full"><span class="look-t">Full halftone</span><span class="look-d">The whole design becomes dots for a soft, vintage print.</span></label>
         </div>
         <div class="ba" id="lookBa"><div id="lookBaB"></div><div class="after" id="lookBaA"></div><span class="ba-bar"></span><span class="tag l">Before</span><span class="tag r">After</span><input type="range" id="lookBaRange" min="0" max="100" value="50" aria-label="Slide to compare before and after"></div>
+        <p class="f-note">A made-up example of what this quick start does. Slide across it to compare. Your own art is on the left.</p>
+        </div>
         <div class="quick" id="quickAdj" hidden>
           <div class="lv-sub">Quick adjust</div>
           <div class="quick-rows" id="quickRows"></div>
           <p class="f-note">Drag to balance the look. These are the same settings as in Fine-tune, where there are more.</p>
         </div>
-        <p class="f-note">A made-up example of what this quick start does. Slide across it to compare. Your own art is on the left.</p>
       </section>
 
       <section class="group step" id="checkGroup">
@@ -2227,7 +2258,9 @@ const LOOK_PICS = { // [before, after] for each Quick start, by print style
   cut: {shadows: [{shadow: 'soft'}, {}], knock: [{dark: 1}, {}], edges: [{glow: 'soft'}, {}]}
 };
 let lookBaKey = '';
+function setLookFold(open){ $('lookBox').hidden = !open; $('lookFold').setAttribute('aria-expanded', String(open)); $('lookGo').textContent = open ? 'Close' : 'Change'; }
 function syncLookPics(){
+  { const el = $('lookNow'), t = lookName(); if (el && el.textContent !== t) el.textContent = t; }
   const r = routeOf(st.finish);
   for (const lab of $('looks').querySelectorAll('.look')){
     const v = lab.querySelector('input').value, pic = LOOK_PICS[r][v], key = r + ':' + v;
@@ -2851,7 +2884,16 @@ for (const id of ['paneA', 'paneB']){
   });
 }
 document.addEventListener('pointerdown', e => { if (paneOpen && !e.target.closest('.pane-pick')) closePaneMenu(); });
-$('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
+$('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b){ setView(b.dataset.view); moreViews(false); } });
+function moreViews(open){ $('moreViews').hidden = !open; $('moreViewsBtn').setAttribute('aria-expanded', String(open)); }
+function syncMoreViews(){
+  const b = $('moreViews').querySelector('[aria-pressed="true"]');
+  $('moreViewsBtn').textContent = b ? b.textContent : 'More'; $('moreViewsBtn').setAttribute('aria-pressed', String(!!b));
+}
+$('moreViewsBtn').addEventListener('click', e => { e.stopPropagation(); moreViews($('moreViews').hidden); });
+document.addEventListener('click', e => { if (!$('moreViews').hidden && !e.target.closest('.more-views')) moreViews(false); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') moreViews(false); });
+new MutationObserver(syncMoreViews).observe($('moreViews'), {subtree: true, attributes: true, attributeFilter: ['aria-pressed']});
 function setEdge(on){ showEdge = on; $('edgeBtn').setAttribute('aria-pressed', String(on)); try { localStorage.setItem('tsw-dtf-edge', on ? 'on' : 'off'); } catch(e){} render(); }
 $('edgeBtn').addEventListener('click', () => setEdge(!showEdge));
 $('edgeBtn').setAttribute('aria-pressed', String(showEdge));
@@ -5341,6 +5383,8 @@ for (const t of ['input', 'change']) $('quickRows').addEventListener(t, e => { /
   new MutationObserver(later).observe($('finishChips'), {subtree: true, attributes: true, attributeFilter: ['aria-pressed']});
   window.addEventListener('keyup', later); }
 syncQuick();
+$('lookFold').addEventListener('click', () => setLookFold($('lookBox').hidden));
+$('looks').addEventListener('change', () => setTimeout(() => setLookFold(false), 250)); // picked: fold it away again
 $('lookBaRange').addEventListener('input', e => $('lookBa').style.setProperty('--cut', e.target.value + '%'));
 $('trail').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b) goStep(b.dataset.step); });
 new MutationObserver(syncTrail).observe(document.querySelector('.panel'), {subtree: true, attributes: true, attributeFilter: ['class', 'hidden']});
