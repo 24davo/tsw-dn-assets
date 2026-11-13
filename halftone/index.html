@@ -384,13 +384,153 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .bg-quick .chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--panel)}
 .bg-trim{display:inline-flex;align-items:center;gap:6px;font-weight:600;cursor:pointer}
 .bg-trim input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+/* v83: the friendlier look, stage 1. Dark and roomy; big, worded controls; a three-step trail. */
+@media (min-width:1280px){.work{grid-template-columns:minmax(0,1fr) 440px}}
+.trail{display:flex;align-items:stretch;padding:20px max(20px,env(safe-area-inset-right,0px)) 18px max(20px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line)}
+.trail button{flex:1;display:grid;gap:4px;justify-items:start;align-content:start;min-width:0;padding:0 8px 0 0;border:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.trail .dot{display:flex;align-items:center;width:100%}
+.trail .dot i{flex:none;display:grid;place-items:center;width:34px;height:34px;border:2px solid var(--line-strong);border-radius:var(--r);background:var(--panel);font-style:normal;font-weight:800;font-size:15px}
+.trail .dot::after{content:"";flex:1;height:2px;margin-left:8px;background:var(--line-strong)}
+.trail button:last-child .dot::after{display:none}
+.trail button:hover .dot i{border-color:var(--ink)}
+.trail b{font-size:15px;font-weight:800;letter-spacing:-.01em}
+.trail small{max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.trail .cur .dot i{border-color:var(--on);background:var(--on);color:var(--on-ink)}
+.trail .is-done .dot i{border-color:var(--good);background:var(--good-bg);color:var(--good)}
+.trail .is-done .dot::after{background:var(--good)}
+.trail .dot .tick{display:none}
+.trail .is-done .dot .tick{display:block}
+.trail .is-done .dot i span{display:none}
+.tick{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.tick path{stroke-dasharray:1}
+@keyframes tickdraw{from{stroke-dashoffset:1}}
+.trail .fresh .tick path,.btn.saved .tick path{animation:tickdraw .28s ease-out}
+/* one step shows at a time, under its question */
+.group.step{gap:16px;padding-block:24px 26px}
+.group.step.folded{display:none}
+.group.step h2{font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:1.08;text-transform:none;color:var(--ink)}
+.group.step .sec-toggle{pointer-events:none;white-space:normal}
+.group.step .sec-toggle::before,.group.step .step-n,.group.step .step-name,.group.step .sec-sum{display:none}
+.group.step .g-head{align-items:flex-start}
+.step-foot{padding-top:6px}
+.step-foot .btn{width:100%;height:50px;font-size:15px}
+.btn.saved,.btn.saved:hover{background:var(--good-bg);border-color:var(--good);color:var(--good);opacity:1}
+.saved-note{font-size:13px}
+.saved-note:empty{display:none}
+.saved-note b{color:var(--ink);font-weight:600;word-break:break-all}
+/* pink is for the main button only */
+.preset-form .btn.primary,.crop-bar .btn.primary,.cal-actions .btn.primary{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.preset-form .btn.primary:hover,.crop-bar .btn.primary:hover,.cal-actions .btn.primary:hover{background:var(--panel);border-color:var(--ink);color:var(--ink)}
+/* the width: a large number with - and + */
+.bignum{display:grid;grid-template-columns:52px 1fr 52px;gap:8px;align-items:center}
+.bn-btn{height:52px;padding:0;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:24px;font-weight:600;line-height:1;cursor:pointer}
+.bn-btn:hover{border-color:var(--ink)}
+.bn-val{display:flex;align-items:baseline;justify-content:center;gap:8px;height:52px;padding:0 10px;border:1.5px solid var(--line);border-radius:var(--r);cursor:text}
+.bn-val:focus-within{border-color:var(--ink)}
+.bn-val input{width:3.2ch;min-width:0;padding:0;border:0;background:transparent;font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;text-align:right;outline:none;-moz-appearance:textfield;appearance:textfield;field-sizing:content}
+.bn-val input::-webkit-outer-spin-button,.bn-val input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.bn-val span{font-size:15px;font-weight:600;color:var(--muted);align-self:center}
+#wRange{height:28px}
+#sizeChips .chip{height:42px;font-size:14px}
+/* tick boxes: a full-width row */
+.check-row{gap:12px;width:100%;min-height:48px;padding:6px 14px;border:1.5px solid var(--line-strong);border-radius:var(--r);font-size:14px}
+.check-row:hover{border-color:var(--ink)}
+.check-row:has(input:checked){border-color:var(--ink);background:var(--soft)}
+.check-row input{-webkit-appearance:none;appearance:none;flex:none;display:grid;place-items:center;width:24px;height:24px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--panel);cursor:pointer}
+.check-row input:checked{background:var(--on);border-color:var(--on)}
+.check-row input:checked::after{content:"";width:12px;height:6px;margin-top:-3px;border-left:2.5px solid var(--on-ink);border-bottom:2.5px solid var(--on-ink);transform:rotate(-45deg)}
+/* choices carry a tick when chosen */
+.choice{position:relative}
+.route .choice{padding:14px 34px 14px 14px}
+.choice[aria-pressed="true"]::after{content:"";position:absolute;top:16px;right:14px;width:12px;height:6px;border-left:2.5px solid var(--ink);border-bottom:2.5px solid var(--ink);transform:rotate(-45deg)}
+.look{padding:12px 14px;grid-template-columns:1fr auto}
+.look input{grid-column:2;grid-row:1/3;-webkit-appearance:none;appearance:none;width:14px;height:8px;margin:4px 2px 0 8px;border:0}
+.look input:checked{border-left:2.5px solid var(--ink);border-bottom:2.5px solid var(--ink);transform:rotate(-45deg)}
+.look-t{grid-column:1;font-size:15px}
+.look-d{grid-column:1}
+/* Speed buttons: shirt colour, name, a line of help, an arrow */
+.speed-grid{grid-template-columns:1fr}
+.speed-btn{display:grid;grid-template-columns:auto 1fr auto;gap:0 12px;align-items:center;min-height:58px;padding:8px 12px;font-size:15px;font-weight:800}
+.speed-btn i{grid-row:1/3;width:32px;height:32px;border-radius:3px;border:1px solid var(--line-strong)}
+.speed-btn i.none{background:repeating-conic-gradient(var(--line-strong) 0 25%,var(--panel) 0 50%) 0 0/12px 12px}
+.speed-btn i.multi{background:conic-gradient(#ff2d55,#ffcc00,#34c759,#0a84ff,#bf5af2,#ff2d55)}
+.speed-btn span{grid-column:2;grid-row:1}
+.speed-btn small{grid-column:2;grid-row:2;font-size:12px;font-weight:500;color:var(--muted)}
+.speed-btn em{grid-column:3;grid-row:1/3;font-style:normal;font-size:20px;font-weight:500}
+.speed-btn.empty,.speed-btn.del{display:block;min-height:46px;font-size:13px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+/* v83 stage 2: the welcome screen, and before/after pictures on the Quick starts */
+.work{position:relative}
+.brand{cursor:pointer}
+.welcome{position:absolute;inset:0;z-index:8;overflow:auto;background:var(--bg)}
+.w-in{display:grid;gap:22px;align-content:center;max-width:1040px;min-height:100%;margin:0 auto;padding:clamp(24px,5vw,56px) max(20px,env(safe-area-inset-right,0px)) clamp(24px,5vw,56px) max(20px,env(safe-area-inset-left,0px))}
+.w-in>*{min-width:0}
+.w-xl{margin:0;font-size:clamp(32px,5vw,60px);font-weight:800;letter-spacing:-.045em;line-height:1}
+.w-drop{display:grid;gap:6px;justify-items:center;width:100%;padding:36px 20px;border:2px dashed var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;text-align:center;cursor:pointer}
+.w-drop:hover,.w-drop.has{border-color:var(--ink)}
+.w-drop.has{border-style:solid}
+.w-arrow{font-size:40px;line-height:1;font-weight:500}
+.w-t{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.w-s{font-size:14px;color:var(--muted)}
+.w-chip{max-width:100%;padding:8px 14px;border:1.5px solid var(--ink);border-radius:var(--r);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.w-q{margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em}
+.w-choices{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+.w-choice{display:grid;gap:6px;align-content:start;padding:18px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.w-choice:hover{border-color:var(--ink)}
+.w-choice b{display:flex;justify-content:space-between;gap:8px;font-size:20px;font-weight:800;letter-spacing:-.02em}
+.w-choice>span:last-child{font-size:14px;color:var(--muted)}
+.w-pic{display:block;width:150px;max-width:100%;margin-bottom:6px;padding:6px;border-radius:3px;background:#24324a}
+.w-tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;aspect-ratio:4/3;align-content:center}
+.w-tiles span{display:grid;place-items:center;height:38px;border-radius:2px;background:#808080;color:#ffffff;font-size:10px;font-weight:800;letter-spacing:.04em}
+.w-foot{display:flex;justify-content:space-between;gap:12px 24px;flex-wrap:wrap}
+.w-foot .link{font-size:14px}
+@media (max-width:880px){.w-in{align-content:start;min-height:0}}
+.demo-art{display:block;width:100%;height:auto}
+.demo-shirt{display:block;border-radius:3px;background:#24324a;overflow:hidden}
+.look{grid-template-columns:148px 1fr auto;align-items:center;padding:8px 14px 8px 8px}
+.look-pair{grid-column:1;grid-row:1/3;display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:center;font-weight:600;color:var(--muted)}
+.look input{grid-column:3;margin-top:0}
+.look-t,.look-d{grid-column:2}
+.ba{position:relative;max-width:300px;border-radius:3px;overflow:hidden;background:#24324a;user-select:none}
+.ba .after{position:absolute;inset:0;background:#24324a;clip-path:inset(0 0 0 var(--cut,50%))}
+.ba .ba-bar{position:absolute;top:0;bottom:0;left:var(--cut,50%);width:2px;margin-left:-1px;background:#ffffff}
+.ba .tag{position:absolute;top:8px;padding:3px 8px;border-radius:3px;background:rgba(0,0,0,.65);color:#ffffff;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;pointer-events:none}
+.ba .tag.l{left:8px}.ba .tag.r{right:8px}
+.ba input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:ew-resize}
+/* v83 stage 3: Batch. Locked groups on one line, moving files, the Undo bar. */
+.bgroup{transition:border-color .15s,background .15s}
+.bgroup.over{border-style:dashed;border-color:var(--ink);background:var(--soft)}
+.bgroup:not(.locked) .bitem{cursor:grab}
+.bgroup.locked{padding:10px 16px}
+.bgroup.locked .bg-head{gap:8px 14px}
+.bgroup.locked .bg-name{width:auto;max-width:100%;height:32px;padding:0;border:0;background:none;opacity:1;-webkit-text-fill-color:var(--ink)}
+.bg-lock{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px}
+.bg-lock svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bg-lset{font-size:13px}
+.bg-strip{display:flex;gap:4px;flex-wrap:wrap}
+.bg-strip span{padding:3px 7px;border-radius:2px;background:#808080;color:#ffffff;font-size:11px;font-weight:800;letter-spacing:.03em;white-space:nowrap}
+.bg-strip span.off{opacity:.45;text-decoration:line-through}
+.bg-strip span.more{background:none;color:var(--muted)}
+.bg-move{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.bg-move:hover{background:var(--panel);border-color:var(--ink);color:var(--ink)}
+@keyframes land{from{opacity:0;transform:translateY(-24px) scale(.9)}}
+@keyframes flash{from{border-color:var(--accent)}}
+@keyframes drain{to{transform:scaleX(0)}}
+.bitem.land{animation:land .34s cubic-bezier(.2,.9,.3,1.15)}
+.bgroup.flash{animation:flash .7s ease-out}
+.batch-bar2{position:absolute;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:1;display:flex;align-items:center;gap:16px;max-width:calc(100% - 32px);padding:10px 12px 10px 16px;border-radius:var(--r);background:var(--toast);color:var(--toast-ink);font-size:14px;font-weight:600;overflow:hidden}
+body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+.batch-bar2 button{flex:none;height:34px;padding:0 14px;border:1.5px solid var(--toast-ink);border-radius:var(--r);background:none;color:var(--toast-ink);font:inherit;font-weight:700;cursor:pointer}
+.batch-bar2 button:hover{background:var(--toast-ink);color:var(--toast)}
+.batch-bar2::after{content:"";position:absolute;left:0;bottom:0;width:100%;height:3px;background:var(--toast-ink);opacity:.45;transform-origin:left}
+.batch-bar2.run::after{animation:drain 5.2s linear forwards}
 </style>
 </head>
 <body>
 
 <div class="app">
   <header class="bar">
-    <div class="brand">
+    <div class="brand" id="brand" role="button" tabindex="0" data-tip="Back to the start screen. Your open designs stay as they are.">
       <svg class="logo-mark" viewBox="0 0 529.96 529.96" aria-hidden="true"><path fill="#ea0a8c" d="M495.87,67.07h-32.98V1.1h-164.92v65.97h-65.97v164.92H67.07v65.97H1.1v164.92h65.97v65.97h461.79V67.07h-32.98ZM441.53,418.26h0l-23.43,23.43h0l-23.74,23.74-.16-.15-23.43-23.43-.16-.16-23.27-23.27-.16-.16-23.27-23.27-.16-.16-23.11-23.11-22.87,22.87h0l-23.43,23.43h0l-23.74,23.74-.16-.15-23.43-23.43-.16-.16-23.27-23.27-.16-.16-23.43-23.43,23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43.16-.16,23.27-23.27h0l23.43-23.43h0l23.74-23.74.16.15,23.43,23.43.16.16,23.43,23.43,23.42,23.43-.16.16-23.27,23.27-.16.16-23.27,23.27h0l-23.43,23.43h0l-.12.12,23.27,23.27h0s23.43,23.43,23.43,23.43l.16.16,23.27,23.27.16.16,23.43,23.43-23.55,23.55Z"/></svg>
       <div class="brand-t">
         <span class="kicker">Tshirt Workshop · Staff tool</span>
@@ -412,6 +552,16 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
   <div class="batch-note" id="batchNote" hidden><span id="batchNoteTxt"></span><button class="btn" type="button" id="batchNoteBack">Back to Batch, no change</button><button class="btn primary" type="button" id="batchNoteUse">Use for the group</button></div>
 
   <main class="work">
+    <section class="welcome" id="welcome" aria-labelledby="wTitle" hidden>
+      <div class="w-in">
+        <p class="w-xl" id="wTitle">What are we making today?</p>
+        <button class="w-drop" type="button" id="wDrop"></button>
+        <input type="file" id="wIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,application/zip,.png,.jpg,.jpeg,.webp,.gif,.svg,.zip" hidden>
+        <p class="w-q" id="wQ">What do you want to do?</p>
+        <div class="w-choices" id="wChoices"></div>
+        <div class="w-foot"><button class="link" type="button" id="wSample">No file handy? Practise on the sample art</button><button class="link" type="button" id="wSkip"></button></div>
+      </div>
+    </section>
     <div class="stage-col">
       <div class="tabs" id="tabs">
         <div class="tabs-list" id="tabsList" role="tablist" aria-label="Open designs"></div>
@@ -470,51 +620,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="revertBtn">Revert</button><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
-
-      <section class="group" id="speedGroup" aria-label="Speed buttons">
-        <div class="speed-head"><span class="kicker"><button class="sec-toggle" type="button" id="speedFold" aria-expanded="true" data-tip="One-click set-ups for everyday jobs. Click to fold them away or bring them back.">Speed buttons</button></span><button class="chip" type="button" data-speedtab="ours" aria-pressed="false">Ours</button><button class="chip" type="button" data-speedtab="built" aria-pressed="false">Built in</button></div>
-        <div class="speed-grid" id="speedGrid"></div>
-        <form class="preset-form" id="speedForm" hidden>
-          <select class="preset-sel" id="speedFrom" aria-label="What the button does"></select>
-          <input type="text" id="speedName" maxlength="32" placeholder="Button name, e.g. Logo on black" aria-label="Button name" autocomplete="off">
-          <label class="check-row"><input type="checkbox" id="speedTrim"> Also trim to the art</label>
-          <div class="preset-actions"><button class="btn small primary" type="submit">Save button</button><button class="btn small" type="button" id="speedCancel">Cancel</button></div>
-        </form>
-        <p class="f-note" id="speedNote"></p>
-      </section>
-
-      <section class="group" id="historyGroup">
-        <h2>History</h2>
-        <div class="preset-actions"><button class="chip" type="button" id="histUndo" disabled>Undo</button><button class="chip" type="button" id="histRedo" disabled>Redo</button></div>
-        <ol class="history" id="historyList"></ol>
-        <p class="f-note"><span>Click a step to go back to it.</span><span class="more-x" hidden> The last 40 changes to this design. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes. History starts again when you open new art.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
-      </section>
-
-      <section class="group" id="presetGroup">
-        <h2>Presets</h2>
-        <select class="preset-sel" id="presetSel" aria-label="Choose a preset"><option value="">Choose a preset…</option></select>
-        <div class="preset-actions">
-          <button class="chip" type="button" id="presetNew">Save new</button>
-          <button class="chip" type="button" id="presetUpdate" disabled title="Save the current settings over the chosen preset">Update</button>
-          <button class="chip" type="button" id="presetDelete" disabled>Delete</button>
-          <button class="chip" type="button" id="presetShare" hidden>Share with all computers</button>
-        </div>
-        <form class="preset-form" id="presetForm" hidden>
-          <input type="text" id="presetName" maxlength="48" placeholder="e.g. Black tee, shadows out" aria-label="Preset name" autocomplete="off">
-          <label class="check-row"><input type="checkbox" id="presetSize"> <span id="presetSizeTxt">Include the print size</span></label>
-          <div class="preset-actions"><button class="btn small primary" type="submit">Save preset</button><button class="btn small" type="button" id="presetCancel">Cancel</button></div>
-        </form>
-        <form class="preset-form" id="codeForm" hidden>
-          <div class="f-head"><label for="teamCode">Team code</label></div>
-          <input type="password" id="teamCode" autocomplete="off" aria-describedby="codeNote">
-          <p class="f-note" id="codeNote">Needed once on each computer to change the shared presets. It’s in the Settings tab of the “DTF Halftone Presets” Google Sheet.</p>
-          <div class="preset-actions"><button class="btn small primary" type="submit">OK</button><button class="btn small" type="button" id="codeCancel">Cancel</button></div>
-        </form>
-        <div class="preset-confirm" id="presetConfirm" hidden><span id="presetConfirmTxt"></span><button class="link" type="button" id="presetYes">Delete</button><button class="link" type="button" id="presetNo">Keep it</button></div>
-        <p class="f-note" id="syncNote" hidden></p>
-        <p class="f-note" id="presetHelp"></p>
-        <input type="file" id="presetFile" accept=".json,application/json" hidden>
-      </section>
+      <nav class="trail" id="trail" aria-label="The three steps"></nav>
 
       <section class="group step" id="sizeGroup">
         <h2>Print size</h2>
@@ -525,8 +631,13 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <button class="chip" type="button" data-w="330" data-tip="330 mm wide: a full back print.">Back 330</button>
           <button class="chip" type="button" data-w="max">Largest</button>
         </div>
+        <div class="bignum">
+          <button type="button" class="bn-btn" id="wLess" aria-label="10 mm narrower">−</button>
+          <label class="bn-val"><input type="number" id="wcm" min="5" max="500" step="1" value="250" aria-label="Print width in millimetres"><span>mm wide</span></label>
+          <button type="button" class="bn-btn" id="wMore" aria-label="10 mm wider">+</button>
+        </div>
+        <input type="range" id="wRange" min="20" max="400" step="5" value="250" aria-label="Print width in millimetres, by slider">
         <div class="size">
-          <div class="num"><input type="number" id="wcm" min="5" max="500" step="1" value="250" aria-label="Print width in millimetres"><span>mm wide</span></div>
           <span class="by">×</span>
           <div class="num"><input type="number" id="hcm" min="5" max="500" step="1" value="250" aria-label="Print height in millimetres"><span>mm high</span></div>
         </div>
@@ -553,6 +664,42 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
           <label class="look"><input type="radio" name="look" id="lookDeep" value="deep"><span class="look-t">Shadows to dots</span><span class="look-d">Only the deepest shadows turn into dots.</span></label>
           <label class="look"><input type="radio" name="look" id="lookFull" value="full"><span class="look-t">Full halftone</span><span class="look-d">The whole design becomes dots for a soft, vintage print.</span></label>
         </div>
+        <div class="ba" id="lookBa"><div id="lookBaB"></div><div class="after" id="lookBaA"></div><span class="ba-bar"></span><span class="tag l">Before</span><span class="tag r">After</span><input type="range" id="lookBaRange" min="0" max="100" value="50" aria-label="Slide to compare before and after"></div>
+        <p class="f-note">A made-up example of what this quick start does. Slide across it to compare. Your own art is on the left.</p>
+      </section>
+
+      <section class="group step" id="checkGroup">
+        <h2>Check &amp; save</h2>
+        <div class="checks" id="checks"></div>
+        <div class="field name-field">
+          <div class="f-head"><label for="nameSuffix">Add to the file name</label><span class="opt">Optional</span></div>
+          <input type="text" id="nameSuffix" maxlength="40" placeholder="e.g. order 57615, front" aria-describedby="nameNote" autocomplete="off" spellcheck="false">
+          <p class="f-note" id="nameNote">Saves as –</p>
+        </div>
+        <div class="field name-field">
+          <div class="f-head"><label for="labelMode">Production label</label><span class="opt">Cut it off after printing</span></div>
+          <div class="label-row">
+            <select id="labelMode"><option value="off">Off</option><option value="simple">Simple</option><option value="full">Full info</option></select>
+            <select id="labelCol" aria-label="Label colour"><option value="red">Red</option><option value="yellow">Yellow</option></select>
+          </div>
+          <div id="labelBox" hidden>
+            <input type="text" id="labelShort" maxlength="60" aria-label="Simple label words" autocomplete="off" spellcheck="false">
+            <input type="text" id="labelFull" maxlength="160" aria-label="Full info label words" autocomplete="off" spellcheck="false">
+            <p class="f-note" id="labelNote"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="group" id="speedGroup" aria-label="Speed buttons">
+        <div class="speed-head"><span class="kicker"><button class="sec-toggle" type="button" id="speedFold" aria-expanded="true" data-tip="One-click set-ups for everyday jobs. Click to fold them away or bring them back.">Speed buttons</button></span><button class="chip" type="button" data-speedtab="ours" aria-pressed="false">Ours</button><button class="chip" type="button" data-speedtab="built" aria-pressed="false">Built in</button></div>
+        <div class="speed-grid" id="speedGrid"></div>
+        <form class="preset-form" id="speedForm" hidden>
+          <select class="preset-sel" id="speedFrom" aria-label="What the button does"></select>
+          <input type="text" id="speedName" maxlength="32" placeholder="Button name, e.g. Logo on black" aria-label="Button name" autocomplete="off">
+          <label class="check-row"><input type="checkbox" id="speedTrim"> Also trim to the art</label>
+          <div class="preset-actions"><button class="btn small primary" type="submit">Save button</button><button class="btn small" type="button" id="speedCancel">Cancel</button></div>
+        </form>
+        <p class="f-note" id="speedNote"></p>
       </section>
 
       <div class="tune-head" id="tuneHead"><button class="tune-toggle" type="button" id="tuneToggle" aria-expanded="false"><span class="tune-t">Fine-tune</span><span class="tune-d">only if needed</span><span class="tune-n" id="tuneSum"></span></button></div>
@@ -916,26 +1063,37 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
         <p class="f-note"><span>Choose a brush, then drag on the preview.</span><span class="more-x" hidden> [ and ] change the size, hold Space to move around, Esc puts the brush down.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
       </section>
 
-      <section class="group step" id="checkGroup">
-        <h2>Check &amp; save</h2>
-        <div class="checks" id="checks"></div>
-        <div class="field name-field">
-          <div class="f-head"><label for="nameSuffix">Add to the file name</label><span class="opt">Optional</span></div>
-          <input type="text" id="nameSuffix" maxlength="40" placeholder="e.g. order 57615, front" aria-describedby="nameNote" autocomplete="off" spellcheck="false">
-          <p class="f-note" id="nameNote">Saves as –</p>
+      <section class="group" id="presetGroup">
+        <h2>Presets</h2>
+        <select class="preset-sel" id="presetSel" aria-label="Choose a preset"><option value="">Choose a preset…</option></select>
+        <div class="preset-actions">
+          <button class="chip" type="button" id="presetNew">Save new</button>
+          <button class="chip" type="button" id="presetUpdate" disabled title="Save the current settings over the chosen preset">Update</button>
+          <button class="chip" type="button" id="presetDelete" disabled>Delete</button>
+          <button class="chip" type="button" id="presetShare" hidden>Share with all computers</button>
         </div>
-        <div class="field name-field">
-          <div class="f-head"><label for="labelMode">Production label</label><span class="opt">Cut it off after printing</span></div>
-          <div class="label-row">
-            <select id="labelMode"><option value="off">Off</option><option value="simple">Simple</option><option value="full">Full info</option></select>
-            <select id="labelCol" aria-label="Label colour"><option value="red">Red</option><option value="yellow">Yellow</option></select>
-          </div>
-          <div id="labelBox" hidden>
-            <input type="text" id="labelShort" maxlength="60" aria-label="Simple label words" autocomplete="off" spellcheck="false">
-            <input type="text" id="labelFull" maxlength="160" aria-label="Full info label words" autocomplete="off" spellcheck="false">
-            <p class="f-note" id="labelNote"></p>
-          </div>
-        </div>
+        <form class="preset-form" id="presetForm" hidden>
+          <input type="text" id="presetName" maxlength="48" placeholder="e.g. Black tee, shadows out" aria-label="Preset name" autocomplete="off">
+          <label class="check-row"><input type="checkbox" id="presetSize"> <span id="presetSizeTxt">Include the print size</span></label>
+          <div class="preset-actions"><button class="btn small primary" type="submit">Save preset</button><button class="btn small" type="button" id="presetCancel">Cancel</button></div>
+        </form>
+        <form class="preset-form" id="codeForm" hidden>
+          <div class="f-head"><label for="teamCode">Team code</label></div>
+          <input type="password" id="teamCode" autocomplete="off" aria-describedby="codeNote">
+          <p class="f-note" id="codeNote">Needed once on each computer to change the shared presets. It’s in the Settings tab of the “DTF Halftone Presets” Google Sheet.</p>
+          <div class="preset-actions"><button class="btn small primary" type="submit">OK</button><button class="btn small" type="button" id="codeCancel">Cancel</button></div>
+        </form>
+        <div class="preset-confirm" id="presetConfirm" hidden><span id="presetConfirmTxt"></span><button class="link" type="button" id="presetYes">Delete</button><button class="link" type="button" id="presetNo">Keep it</button></div>
+        <p class="f-note" id="syncNote" hidden></p>
+        <p class="f-note" id="presetHelp"></p>
+        <input type="file" id="presetFile" accept=".json,application/json" hidden>
+      </section>
+
+      <section class="group" id="historyGroup">
+        <h2>History</h2>
+        <div class="preset-actions"><button class="chip" type="button" id="histUndo" disabled>Undo</button><button class="chip" type="button" id="histRedo" disabled>Redo</button></div>
+        <ol class="history" id="historyList"></ol>
+        <p class="f-note"><span>Click a step to go back to it.</span><span class="more-x" hidden> The last 40 changes to this design. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes. History starts again when you open new art.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
       </section>
 
       <section class="group">
@@ -1006,6 +1164,7 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
   </div>
   <div class="batch-body" id="batchBody"></div>
   <input type="file" id="batchIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,application/zip,.png,.jpg,.jpeg,.webp,.gif,.svg,.zip" hidden>
+  <div class="batch-bar2" id="batchBar" role="status" hidden><span id="batchBarTxt"></span><button type="button" id="batchBarUndo">Undo</button></div>
   <div class="batch-busy" id="batchBusy" hidden><div><span id="batchBusyTxt">Working…</span><button class="btn" type="button" id="batchStop">Stop</button></div></div>
 </div>
 <div class="cal" id="allDlg" role="dialog" aria-modal="true" aria-labelledby="allTitle" hidden>
@@ -1982,6 +2141,47 @@ const LOOK_TEXT = {
         knock: ['Knock out the shirt colour', 'Colours near the shirt colour drop out.', 'Colours close to the shirt drop out. Everything else prints solid.'],
         edges: ['Clean up only', 'Soft edges print solid or are removed.', 'Nothing is knocked out. Glows, fades and soft edges print solid or are removed at the threshold.']}
 };
+let demoUid = 0;
+function demoDots(x0, y0, x1, y1, tone, col){
+  const sp = 6, c = Math.cos(.3927), sn = Math.sin(.3927), cx = (x0 + x1)/2, cy = (y0 + y1)/2, n = Math.ceil(Math.hypot(x1 - x0, y1 - y0)/sp/2) + 1; let o = '';
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++){
+    const x = cx + (i*c - j*sn)*sp, y = cy + (i*sn + j*c)*sp; if (x < x0 || x > x1 || y < y0 || y > y1) continue;
+    const t = tone(x, y); if (t <= 0) continue; const r = sp*.66*Math.sqrt(Math.min(1, t)); if (r < .7) continue;
+    o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}"/>`;
+  }
+  return `<g fill="${col}">${o}</g>`;
+}
+function demoArt(o){ // o: glow / shadow 'soft' | 'dots', body 'dots', dark (a block close to the shirt colour), bg, name
+  o = Object.assign({glow: 0, shadow: 0, body: 'solid', dark: 0, name: 'LEE', bg: 0}, o || {});
+  const id = 'da' + (++demoUid), cx = 100, cy = 56, R = 36;
+  let v = `<svg class="demo-art" viewBox="0 0 200 150" aria-hidden="true"><defs><radialGradient id="${id}g"><stop offset=".58" stop-color="#ff8a1f" stop-opacity=".95"/><stop offset="1" stop-color="#ff8a1f" stop-opacity="0"/></radialGradient><radialGradient id="${id}s"><stop offset="0" stop-color="#000000" stop-opacity=".8"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient></defs>`;
+  if (o.bg) v += `<rect width="200" height="150" fill="${o.bg}"/>`;
+  if (o.shadow === 'soft') v += `<ellipse cx="108" cy="134" rx="80" ry="15" fill="url(#${id}s)"/>`;
+  if (o.shadow === 'dots') v += demoDots(26, 118, 190, 150, (x, y) => .9*(1 - Math.pow((x - 108)/80, 2) - Math.pow((y - 134)/15, 2)), '#000000');
+  if (o.glow === 'soft') v += `<circle cx="${cx}" cy="${cy}" r="56" fill="url(#${id}g)"/>`;
+  if (o.glow === 'dots') v += demoDots(40, 0, 160, 116, (x, y) => { const d = Math.hypot(x - cx, y - cy); return d < R - 2 || d > 56 ? 0 : 1 - (d - R)/(56 - R); }, '#ff8a1f');
+  if (o.dark) v += `<rect x="30" y="100" width="140" height="38" rx="3" fill="#121b2e"/>`;
+  if (o.body === 'dots') v += demoDots(cx - R, cy - R, cx + R, cy + R, (x, y) => Math.hypot(x - cx, y - cy) > R ? 0 : .3 + .7*(y - (cy - R))/(2*R), '#ffc928');
+  else v += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="#ffc928"/><path d="M${cx} ${cy - 22}l6.5 14.5 15.5 1.6-11.6 10.6 3.3 15.4L${cx} ${cy + 14}l-13.7 7.7 3.3-15.4-11.6-10.6 15.5-1.6z" fill="#e8472b"/>`;
+  return v + `<text x="100" y="129" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="27" letter-spacing="2" fill="#ffffff">${o.name}</text></svg>`;
+}
+const LOOK_PICS = { // [before, after] for each Quick start, by print style
+  dots: {deep: [{shadow: 'soft'}, {shadow: 'dots'}], edges: [{glow: 'soft'}, {glow: 'dots'}], knock: [{dark: 1}, {}], full: [{glow: 'soft'}, {glow: 'dots', body: 'dots'}]},
+  cut: {shadows: [{shadow: 'soft'}, {}], knock: [{dark: 1}, {}], edges: [{glow: 'soft'}, {}]}
+};
+let lookBaKey = '';
+function syncLookPics(){
+  const r = routeOf(st.finish);
+  for (const lab of $('looks').querySelectorAll('.look')){
+    const v = lab.querySelector('input').value, pic = LOOK_PICS[r][v], key = r + ':' + v;
+    let pair = lab.querySelector('.look-pair');
+    if (!pair){ pair = document.createElement('span'); pair.className = 'look-pair'; pair.setAttribute('aria-hidden', 'true'); lab.insertBefore(pair, lab.firstChild); }
+    if (pic && pair.dataset.key !== key){ pair.dataset.key = key; pair.innerHTML = `<span class="demo-shirt">${demoArt(pic[0])}</span><span>→</span><span class="demo-shirt">${demoArt(pic[1])}</span>`; }
+  }
+  const pic = LOOK_PICS[r][st.look], key = r + ':' + st.look;
+  $('lookBa').hidden = !pic; $('lookBa').nextElementSibling.hidden = !pic;
+  if (pic && key !== lookBaKey){ lookBaKey = key; $('lookBaB').innerHTML = demoArt({...pic[0], name: 'SMITH'}); $('lookBaA').innerHTML = demoArt({...pic[1], name: 'SMITH'}); }
+}
 const FLAT_KEYS = {flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // Trace prep: flat colours, how many (0 = found from the art), pure white and black, smallest detail (mm), colours left out
 const isFlat = () => st.finish === 'cut' && !!st.flat;
 const routeOf = f => f === 'cut' ? 'cut' : 'dots';
@@ -2187,6 +2387,7 @@ function setWidth(cm, quiet, typing){
   if (!quiet && cm > max + 0.001) toast(`Largest print is 400 × 500 mm, so it’s set to ${toMm(w)} × ${toMm(h)} mm.`);
   st.widthCm = w;
   if (typing !== $('wcm')) $('wcm').value = toMm(w);
+  $('wRange').max = toMm(max); $('wRange').value = toMm(w);
   if (typing !== $('hcm')) $('hcm').value = toMm(h);
   syncSizeText();
   syncSums();
@@ -3182,7 +3383,7 @@ $('looks').addEventListener('change', e => {
   if (st.look === 'shadows') ensureShadowRule();
   syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
-function syncLook(){ for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = !knockLook(st.look); syncFinChips(); syncStepButtons(); syncRouteSum(); }
+function syncLook(){ syncLookPics(); for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = !knockLook(st.look); syncFinChips(); syncStepButtons(); syncRouteSum(); }
 function syncRouteSum(){ syncSums(); }
 $('finishChips').addEventListener('click', e => {
   const b = e.target.closest('[data-finish]'); if (!b) return;
@@ -3270,6 +3471,7 @@ function syncFinish(){
     lab.hidden = i < 0; lab.style.order = i;
     if (i >= 0){ lab.querySelector('.look-t').textContent = LOOK_TEXT[r][v][0]; lab.querySelector('.look-d').textContent = LOOK_TEXT[r][v][1]; lab.dataset.tip = LOOK_TEXT[r][v][2]; }
   }
+  syncLookPics();
   nameGroup('finishGroup', isFlat() ? 'Flat colours' : cut ? 'Threshold' : 'Halftone dots',
     isFlat() ? 'How many flat colours the art is reduced to, and how small a detail is kept. For tracing in Illustrator.' :
     cut ? 'How solid a pixel must be to print. Anything less solid is removed, so the film has no haze.'
@@ -3588,6 +3790,14 @@ for (const id of ['wcm', 'hcm']){
   $(id).addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0) || !art) return; clearTimeout(wTimer); wTimer = setTimeout(() => { art.sizeFrom = 'user'; setWidth(fromBox(id, v), false, e.target); buildSrcSoon(); updateChecks(); }, 450); });
   $(id).addEventListener('change', e => { const v = parseFloat(e.target.value); clearTimeout(wTimer); if (!art) return; if (v > 0) art.sizeFrom = 'user'; setWidth(v > 0 ? fromBox(id, v) : st.widthCm); buildSrcSoon(); updateChecks(); });
 }
+function nudgeWidth(mm){ // the - and + buttons and the slider type the new width into the box, so one path does the work
+  const el = $('wcm'); el.value = Math.max(5, Math.min(Math.round(mm), toMm(maxWidthCm())));
+  el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true}));
+}
+$('wLess').addEventListener('click', () => { if (art) nudgeWidth((Math.ceil(toMm(st.widthCm)/10) - 1)*10); });
+$('wMore').addEventListener('click', () => { if (art) nudgeWidth((Math.floor(toMm(st.widthCm)/10) + 1)*10); });
+$('wRange').addEventListener('input', e => { $('wcm').value = e.target.value; });
+$('wRange').addEventListener('change', e => { if (art) nudgeWidth(+e.target.value); });
 $('sizeChips').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b || !art) return; art.sizeFrom = 'user'; setWidth(b.dataset.w === 'max' ? maxWidthCm() : +b.dataset.w/10, b.dataset.w === 'max'); buildSrcSoon(); updateChecks(); });
 
 /* ---------- notes and the film check ---------- */
@@ -3786,6 +3996,7 @@ function cleanStart(){ // a new design starts clean: fixes made for the last des
   rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule();
 }
 function setArt(el, w, h, name, isSample, dpi, kind){
+  if (!isSample) hideWelcome();
   if (cropping) endCrop(false);
   endBrush(); shownStrokes = [];
   art = makeArt(el, w, h, name, isSample, dpi, kind);
@@ -4076,12 +4287,60 @@ window.addEventListener('message', async e => {
   try { window.focus(); } catch(err){}
 });
 $('fileIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; openFiles(list); });
+/* ---------- welcome: the first screen when no design is open ---------- */
+const W_JOBS = [
+  {k: 'one', t: 'Get one design ready', d: 'Set the size, pick a look, save a print-ready PNG.', pic: () => demoArt({glow: 'dots', name: 'SMITH'})},
+  {k: 'batch', t: 'Do a whole order', d: 'Lots of files at once, like names and numbers.', pic: () => `<span class="w-tiles">${['LEE', 'KAUR', 'JONES'].map(n => `<span>${n}</span>`).join('')}</span>`},
+  {k: 'tidy', t: 'Just tidy a file', d: 'Remove a background or flatten colours for tracing. No dots.', pic: () => demoArt({bg: '#ffffff', name: 'LEE'})}
+];
+let wFiles = [], wJob = '';
+const welcomeSkipped = () => { try { return localStorage.getItem('tsw-ge-welcome') === 'skip'; } catch(e){ return false; } };
+const welcomeOk = f => isZip(f) || /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name || '');
+function syncWelcome(){
+  const n = wFiles.length, one = n === 1;
+  $('wTitle').textContent = n ? 'Nice. Now, what is the job?' : 'What are we making today?';
+  $('wDrop').classList.toggle('has', n > 0);
+  $('wDrop').innerHTML = n ? `<span class="w-chip">${esc(one ? wFiles[0].name : `${n} files`)}</span><span class="w-s">Got ${one ? 'it' : 'them'}. Click to choose ${one ? 'a different file' : 'different files'}.</span>`
+    : '<span class="w-arrow" aria-hidden="true">↘</span><span class="w-t">Drop the art here, or click to choose it</span><span class="w-s">One file, a few files, or a zip of a whole order. Nothing is uploaded: it stays on this computer.</span>';
+  $('wQ').textContent = n ? `What do you want to do with ${one ? 'it' : 'them'}?` : 'What do you want to do?';
+  $('wSkip').textContent = welcomeSkipped() ? 'Show this screen at the start again' : 'Skip this screen from now on';
+  $('wSample').hidden = n > 0;
+}
+function showWelcome(){
+  if (!$('wChoices').children.length) $('wChoices').innerHTML = W_JOBS.map(c => `<button class="w-choice" type="button" data-job="${c.k}"><span class="w-pic">${c.pic()}</span><b>${c.t} <span aria-hidden="true">→</span></b><span>${c.d}</span></button>`).join('');
+  wFiles = []; wJob = ''; syncWelcome(); $('welcome').hidden = false; $('welcome').scrollTop = 0;
+}
+function hideWelcome(){ if ($('welcome').hidden) return; $('welcome').hidden = true; wFiles = []; wJob = ''; }
+function welcomeFiles(list, picked){ // files dropped on, or chosen from, the welcome screen
+  const ok = list.filter(welcomeOk);
+  if (!ok.length){ toast('Use a PNG, JPG, WebP or SVG, or a zip of them. Save PDFs and Photoshop files as PNG first.'); return; }
+  wFiles = ok;
+  if (picked && wJob){ welcomeGo(wJob); return; }
+  wJob = ''; syncWelcome();
+}
+async function welcomeGo(job){
+  if (job === 'batch'){ const fs = wFiles; batchShow(); if (fs.length) batchDrop(fs, null); return; }
+  if (!wFiles.length){ wJob = job; $('wIn').click(); return; } // choose the file first, then carry on
+  const fs = wFiles; wFiles = []; wJob = '';
+  if (fs.some(isZip)){ batchShow(); batchDrop(fs, null); toast('A zip opens in Batch, where its files become groups.'); return; }
+  await openFiles(fs);
+  if (!art || art.isSample){ syncWelcome(); return; } // nothing opened: stay here
+  if (job === 'tidy'){ const b = $('finishChips').querySelector('[data-finish="prep"]'); if (b) b.click(); }
+  goStep('sizeGroup');
+}
+$('wDrop').addEventListener('click', () => { wJob = ''; $('wIn').click(); });
+$('wIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; if (list.length) welcomeFiles(list, true); });
+$('wChoices').addEventListener('click', e => { const b = e.target.closest('[data-job]'); if (b) welcomeGo(b.dataset.job); });
+$('wSample').addEventListener('click', () => { hideWelcome(); goStep('sizeGroup'); });
+$('wSkip').addEventListener('click', () => { try { if (welcomeSkipped()) localStorage.removeItem('tsw-ge-welcome'); else localStorage.setItem('tsw-ge-welcome', 'skip'); } catch(e){} syncWelcome(); if (welcomeSkipped()){ hideWelcome(); toast('Skipped from now on. Click the logo to see it again.'); } });
+$('brand').addEventListener('click', showWelcome);
+$('brand').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); showWelcome(); } });
 $('openBtn').addEventListener('click', openArt);
 let dragDepth = 0;
 window.addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')){ dragDepth++; $('drop').hidden = false; } });
 window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('drop').hidden = true; });
 window.addEventListener('dragover', e => { e.preventDefault(); });
-window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const list = [...(e.dataTransfer?.files || [])]; if (!list.length) return; if (!$('batch').hidden){ batchDrop(list, e.target); return; } if (list.some(isZip)){ batchShow(); batchDrop(list, null); return; } openFiles(list); });
+window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const list = [...(e.dataTransfer?.files || [])]; if (!list.length) return; if (!$('batch').hidden){ batchDrop(list, e.target); return; } if (!$('welcome').hidden){ welcomeFiles(list); return; } if (list.some(isZip)){ batchShow(); batchDrop(list, null); return; } openFiles(list); });
 window.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) openFile(it.getAsFile()); });
 
 /* ---------- saving: transparent PNG at 300 dpi, settings written into the file ---------- */
@@ -4201,8 +4460,18 @@ async function savePng(){ // answers true once the PNG is saved
   } finally {
     $('busyTxt').textContent = 'Updating…'; saving = false; $('saveBtn').disabled = !outReady;
   }
-  if (ok){ commitStep(); unsaved = false; renderTabs(); }
+  if (ok){ commitStep(); unsaved = false; renderTabs(); savedMoment(fileName()); }
   return ok;
+}
+let savedTimer = 0;
+function savedMoment(name){ // the save buttons turn to a green Saved with a drawn tick, and a line says where the file went
+  const bs = [$('saveBtn'), document.querySelector('#checkGroup .step-next')].filter(Boolean);
+  let note = $('savedNote');
+  if (!note){ note = document.createElement('p'); note.id = 'savedNote'; note.className = 'f-note saved-note'; note.setAttribute('aria-live', 'polite'); $('checkGroup').appendChild(note); }
+  for (const b of bs){ b.classList.add('saved'); b.innerHTML = TICK + ' Saved'; }
+  note.innerHTML = `<b>${esc(name)}</b> is saved. Look in your Downloads folder.`;
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => { for (const b of bs) b.classList.remove('saved'); $('saveBtn').textContent = 'Save PNG'; syncStepButtons(); }, 3200);
 }
 $('saveBtn').addEventListener('click', () => { savePng(); });
 async function downloadsCap(){
@@ -4451,12 +4720,12 @@ function quickCut(){ // the everyday basic job: solid print with a hard edge, ba
   return {name: 'Quick clean cut', desc: 'solid print with a hard edge, background removed, trimmed to the art. Check the print size', v: 1, s, levels: {}, rules: [], trim: true};
 }
 const SPEED_BUILT = [
-  {label: 'Quick clean cut', tip: 'Clean cut with a hard edge: the background is removed and the file is trimmed to the art. Then check the print size.', make: quickCut},
-  {label: 'Black tee', starter: 'Black tee · everyday'},
-  {label: 'White tee', starter: 'White tee · everyday'},
-  {label: 'Coloured tee', starter: 'Coloured tee · everyday'},
-  {label: 'Dark photo on black', starter: 'Black tee · dark photo, brightened'},
-  {label: 'Glows & soft shadows', starter: 'Glows & soft shadows · any tee'}
+  {label: 'Quick clean cut', short: 'Solid ink, background off, trimmed', tip: 'Clean cut with a hard edge: the background is removed and the file is trimmed to the art. Then check the print size.', make: quickCut},
+  {label: 'Black tee', short: 'Everyday prints on black', starter: 'Black tee · everyday'},
+  {label: 'White tee', short: 'Everyday prints on white', starter: 'White tee · everyday'},
+  {label: 'Coloured tee', swatch: 'multi', short: 'Everyday prints on a colour', starter: 'Coloured tee · everyday'},
+  {label: 'Dark photo on black', short: 'Brightens a dim photo', starter: 'Black tee · dark photo, brightened'},
+  {label: 'Glows & soft shadows', short: 'Soft glows become dots', starter: 'Glows & soft shadows · any tee'}
 ];
 const SPEED_N = 6;
 let slots = (() => { const a = [].concat(readJSON('tsw-dtf-slots', [])); return Array.from({length: SPEED_N}, (_, i) => a[i] && isPreset(a[i]) ? a[i] : null); })();
@@ -4481,14 +4750,15 @@ async function shareSlots(){ // after a change to the Ours buttons
   else toast(d.error === 'cancelled' ? 'Kept on this computer only. Click Share now when you have the team code.' : `${remoteProblem(d).replace('That preset is', 'These buttons are')} The buttons are kept on this computer for now.`);
   const c = chosen(); syncPresets(c ? c.p.name : null, c ? c.where : null); syncSpeed();
 }
+const speedFace = (name, line, shirt) => `<i${/^#[0-9a-f]{6}$/i.test(shirt || '') ? ` style="background:${shirt}"` : shirt === 'multi' ? ' class="multi"' : ' class="none"'}></i><span>${esc(name)}</span><small>${esc(line || '')}</small><em aria-hidden="true">→</em>`;
 function syncSpeed(){
   for (const b of document.querySelectorAll('[data-speedtab]')) b.setAttribute('aria-pressed', String(b.dataset.speedtab === speedTab));
   const any = slots.some(Boolean); if (!any) speedEdit = false;
   let html = '';
-  if (speedTab === 'built') html = SPEED_BUILT.map((B, i) => { const S = B.starter && STARTERS.find(x => x.name === B.starter); return `<button class="speed-btn" type="button" data-built="${i}" data-tip="${esc(B.tip || (S && S.desc) || '')}">${esc(B.label)}</button>`; }).join('');
+  if (speedTab === 'built') html = SPEED_BUILT.map((B, i) => { const S = B.starter && STARTERS.find(x => x.name === B.starter); return `<button class="speed-btn" type="button" data-built="${i}" data-tip="${esc(B.tip || (S && S.desc) || '')}">${speedFace(B.label, B.short, B.swatch || (S && S.s && S.s.shirt))}</button>`; }).join('');
   else html = slots.map((p, i) => !p ? `<button class="speed-btn empty" type="button" data-slot="${i}" data-tip="Add a button of your own here.">+ Add</button>`
     : speedEdit ? `<button class="speed-btn del" type="button" data-slot="${i}" data-tip="Take this button away. Saved presets stay.">Remove: ${esc(p.name)}</button>`
-    : `<button class="speed-btn" type="button" data-slot="${i}" data-tip="${esc(p.linked ? 'Applies the saved preset' : 'Applies the set-up saved in this button')}${p.trim ? ', then trims to the art' : ''}.">${esc(p.name)}</button>`).join('');
+    : `<button class="speed-btn" type="button" data-slot="${i}" data-tip="${esc(p.linked ? 'Applies the saved preset' : 'Applies the set-up saved in this button')}${p.trim ? ', then trims to the art' : ''}.">${speedFace(p.name, (p.linked ? 'A saved preset' : 'Your own set-up') + (p.trim ? ', trims to the art' : ''), p.s && p.s.shirt)}</button>`).join('');
   $('speedGrid').innerHTML = html;
   $('speedForm').hidden = speedTab !== 'ours' || speedAdd < 0;
   $('speedNote').innerHTML = speedTab === 'built' ? 'One click sets the whole job up. Check the print size after.'
@@ -4522,14 +4792,20 @@ $('speedGroup').addEventListener('click', e => {
   if (b.dataset.built != null){
     const B = SPEED_BUILT[+b.dataset.built], S = B.starter && STARTERS.find(x => x.name === B.starter);
     if (!B.make && !S) return;
-    syncPresets(null); applyPreset(B.make ? B.make() : starterPreset(S)); return;
+    syncPresets(null); applyPreset(B.make ? B.make() : starterPreset(S)); speedDone(); return;
   }
   const i = +b.dataset.slot, p = slots[i];
   if (!p){ openSpeedForm(i); return; }
   if (speedEdit){ slots[i] = null; keepSlots(); syncSpeed(); toast(`Removed the “${p.name}” button.`); shareSlots(); return; }
   const fresh = p.linked && shared.concat(presets).find(x => sameName(x.name, p.name)); // a saved preset that's been updated since: use it as it is now
-  syncPresets(null); applyPreset(fresh ? {...fresh, trim: p.trim} : p);
+  syncPresets(null); applyPreset(fresh ? {...fresh, trim: p.trim} : p); speedDone();
 });
+function speedDone(){
+  if (!art) return;
+  $('routeGroup').classList.add('done'); $('checkGroup').classList.remove('done'); // a new set-up: not saved yet
+  if (art.sizeFrom === 'guess'){ goStep('sizeGroup'); return; } // nobody has chosen a size yet: that comes first
+  $('sizeGroup').classList.add('done'); goStep('checkGroup');
+}
 syncSpeed();
 
 $('presetForm').addEventListener('submit', async e => {
@@ -4782,9 +5058,27 @@ const SUMS = { // short, so a title stays on one line
   touchGroup: () => art && art.strokesN ? `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}` : 'None',
   checkGroup: () => checkWarns ? `${checkWarns} to check` : 'Ready'
 };
+const STEP_Q = {sizeGroup: 'How wide is the print?', routeGroup: 'How should it print?', checkGroup: 'Check it, then save'};
+const TRAIL_SUB = {sizeGroup: 'How wide in mm', routeGroup: 'Pick a look', checkGroup: 'Look it over'};
+const TICK = '<svg class="tick" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" pathLength="1"/></svg>';
+let trailWas = '', trailDone = {};
+function syncTrail(){ // the three steps across the top of the panel: where you are, what is done, and how each is set
+  const el = $('trail'); if (!el || !folds.length) return;
+  const vs = visibleSteps(), cur = vs.find(f => !f.g.classList.contains('folded'));
+  const html = vs.map((f, i) => {
+    const id = f.g.id, done = f.g.classList.contains('done'), sum = $('sum-' + id), fresh = done && !trailDone[id]; trailDone[id] = done;
+    return `<button type="button" data-step="${id}" class="${done ? 'is-done ' : ''}${fresh ? 'fresh ' : ''}${f === cur ? 'cur' : ''}"${f === cur ? ' aria-current="step"' : ''}><span class="dot"><i><span>${i + 1}</span>${TICK}</i></span><b>${esc(f.g.dataset.name)}</b><small>${esc(id === 'checkGroup' && done ? 'Saved' : (done || id === 'checkGroup') && sum && sum.textContent ? sum.textContent : TRAIL_SUB[id] || '')}</small></button>`;
+  }).join('');
+  if (html !== trailWas){ trailWas = html; el.innerHTML = html; }
+}
+function goStep(id){ // one step shows at a time
+  for (const f of visibleSteps()) f.set(f.g.id === id);
+  syncFoldAll(); document.querySelector('.panel').scrollTo({top: 0, behavior: 'smooth'}); if (id === 'checkGroup') drawHisto();
+}
 function syncSums(){
   if (!folds.length) return;
   for (const id in SUMS){ const el = $('sum-' + id); if (!el) continue; let t = ''; try { t = SUMS[id](); } catch(e){} if (el.textContent !== t){ el.textContent = t; el.title = t; } }
+  syncTrail();
   syncTune();
 }
 /* ---------- sections start folded; Expand all opens every one ---------- */
@@ -4819,7 +5113,8 @@ for (const g of document.querySelectorAll('.panel > .group')){
   g.dataset.name = h.textContent.trim();
   b.type = 'button'; b.className = 'sec-toggle';
   if (g.classList.contains('step')){ const n = document.createElement('span'); n.className = 'step-n'; n.setAttribute('aria-hidden', 'true'); b.appendChild(n); }
-  b.appendChild(document.createTextNode(h.textContent));
+  if (STEP_Q[g.id]){ b.insertAdjacentHTML('beforeend', `<span class="step-name">${esc(h.textContent)}</span><span class="step-q">${STEP_Q[g.id]}</span>`); b.tabIndex = -1; }
+  else b.appendChild(document.createTextNode(h.textContent));
   if (SUMS[g.id]) b.insertAdjacentHTML('beforeend', `<span class="sec-sum" id="sum-${g.id}"></span>`); // what's inside or how it's set, shown while folded
   if (SECTION_TIPS[g.id]) b.dataset.tip = SECTION_TIPS[g.id];
   h.textContent = ''; h.appendChild(b);
@@ -4828,7 +5123,7 @@ for (const g of document.querySelectorAll('.panel > .group')){
   b.addEventListener('click', () => { const open = g.classList.contains('folded'); set(open); syncFoldAll(); if (open) drawHisto(); });
   if (g.classList.contains('step')){
     const foot = document.createElement('div'); foot.className = 'step-foot';
-    foot.innerHTML = '<button class="btn small step-next" type="button" data-tip="Tick this step and open the next one."></button>';
+    foot.innerHTML = '<button class="btn primary step-next" type="button" data-tip="Tick this step and open the next one."></button>';
     g.appendChild(foot);
     foot.firstChild.addEventListener('click', () => stepDone(g));
   }
@@ -4872,16 +5167,16 @@ function syncStepButtons(){ // each step's button names the next step; the last 
   vs.forEach((f, i) => {
     const b = f.g.querySelector('.step-next'), next = vs[i + 1];
     if (!b) return;
-    b.textContent = next ? `Done · next: ${next.g.dataset.name}` : 'Done · Save PNG';
-    b.classList.toggle('primary', !next);
+    if (b.classList.contains('saved')) return;
+    b.textContent = next ? 'Done · next →' : 'Save PNG'; b.dataset.tip = next ? `Ticks this step and opens the next one: ${next.g.dataset.name}.` : 'Saves the PNG, ready to print.';
   });
 }
 function stepDone(g){
   const vs = visibleSteps(), i = vs.findIndex(f => f.g === g), next = vs[i + 1];
   g.classList.add('done');
   if (g.id === 'sizeGroup' && art && art.sizeFrom === 'guess'){ art.sizeFrom = 'user'; syncSizeAsk(); updateChecks(); persistSoon(); } // the size it opened at is the one wanted
-  if (i >= 0) vs[i].set(false);
-  if (next){ next.set(true); next.g.scrollIntoView({block: 'nearest', behavior: 'smooth'}); }
+  if (i >= 0 && next) vs[i].set(false); // the last step stays open while it saves
+  if (next){ next.set(true); document.querySelector('.panel').scrollTo({top: 0, behavior: 'smooth'}); }
   else savePng();
   syncFoldAll();
 }
@@ -4946,9 +5241,13 @@ document.querySelector('.panel').addEventListener('click', e => { // More / Less
   const x = b.parentNode.querySelector('.more-x'), open = x.hidden;
   x.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? 'Less' : 'More';
 });
-function clearDoneMarks(){ for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
-$('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); if (open) setSpeedFold(true, true); if (!open) setTune(false); syncFoldAll(); if (open) drawHisto(); });
+function clearDoneMarks(){ const n = $('savedNote'); if (n) n.textContent = ''; for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
+$('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); if (open) setSpeedFold(true, true); if (!open){ setTune(false); const vs = visibleSteps(), f = vs.find(f => !f.g.classList.contains('done')) || vs[0]; if (f) f.set(true); } syncFoldAll(); if (open) drawHisto(); });
 syncFoldAll(); syncStepButtons(); syncBrush();
+$('lookBaRange').addEventListener('input', e => $('lookBa').style.setProperty('--cut', e.target.value + '%'));
+$('trail').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b) goStep(b.dataset.step); });
+new MutationObserver(syncTrail).observe(document.querySelector('.panel'), {subtree: true, attributes: true, attributeFilter: ['class', 'hidden']});
+syncTrail();
 
 /* ---------- rollover help: a short tip on hover, or on keyboard focus ---------- */
 const TIPS = [
@@ -5092,7 +5391,32 @@ function batchMark(label){
   if (batchUndos.length > 30) batchUndos.shift();
   syncBatchTools();
 }
+/* Moving files between groups: drag a file (or the ticked ones) onto another group, or tick some and use "Move N here". */
+let batchLand = new Set(), batchDrag = null, batchBarTimer = 0;
+const batchPicked = () => batchGroups.filter(g => !g.locked && g.items.some(x => x.on) && g.items.some(x => !x.on)).flatMap(g => g.items.filter(x => x.on)); // ticked files in groups where only some are ticked
+function batchLandSet(items){ batchLand = new Set(items.map(x => x.key)); setTimeout(() => { batchLand = new Set(); }, 60); }
+function batchFlash(g){ const el = $('batchBody').querySelector(`.bgroup[data-g="${g.id}"]`); if (el){ el.classList.add('flash'); el.addEventListener('animationend', () => el.classList.remove('flash'), {once: true}); } }
+function batchBar(msg){ // what just happened, with Undo beside it for a few seconds
+  const el = $('batchBar'); $('batchBarTxt').textContent = msg; el.hidden = false;
+  el.classList.remove('run'); void el.offsetWidth; el.classList.add('run');
+  clearTimeout(batchBarTimer); batchBarTimer = setTimeout(() => { el.hidden = true; }, 5200);
+}
+function batchMove(items, to){
+  if (!to || to.locked) return;
+  items = items.filter(it => !to.items.includes(it) && batchGroups.some(g => !g.locked && g.items.includes(it))); if (!items.length) return;
+  batchMark(`moved ${items.length} file${items.length === 1 ? '' : 's'} to “${to.name}”`);
+  for (const g of [...batchGroups]){
+    if (g === to || g.locked || !g.items.some(it => items.includes(it))) continue;
+    g.items = g.items.filter(it => !items.includes(it)); for (const x of g.items){ x.on = true; }
+    if (!g.items.length) batchGroups.splice(batchGroups.indexOf(g), 1); // nothing left in it
+  }
+  for (const it of items){ it.on = true; it.saved = false; }
+  to.items.push(...items);
+  batchLandSet(items); batchKeepSoon(); renderBatch(); batchFlash(to);
+  batchBar(`Moved ${items.length} file${items.length === 1 ? '' : 's'} to “${to.name}”.`);
+}
 function batchUndoGo(){
+  clearTimeout(batchBarTimer); $('batchBar').hidden = true;
   if (batchBusy || $('batch').hidden) return;
   const u = batchUndos.pop(); if (!u) return;
   const before = new Set(batchGroups.flatMap(g => g.items));
@@ -5294,7 +5618,7 @@ function batchSplit(g){ // the ticked files leave for a group of their own, righ
   for (const x of g.items) x.on = true;
   return ng;
 }
-function batchShow(){ $('batch').hidden = false; renderBatch(); }
+function batchShow(){ hideWelcome(); $('batch').hidden = false; renderBatch(); }
 function renderBatch(){
   syncBatchTools();
   const run = batchGroups.filter(g => g.on && batchReady(g)).length;
@@ -5304,7 +5628,7 @@ function renderBatch(){
     $('batchBody').innerHTML = '<div class="batch-empty"><b>No groups yet</b><p>A group is a set of files that share one set-up, like the back names of an order. An order sent from the Workboard arrives here already in its groups. For anything else, start a group and add its files, or drop files or a zip here.</p><button class="btn primary" type="button" data-act="first">Start a group and add files</button></div>';
     return;
   }
-  const quicks = batchQuicks();
+  const quicks = batchQuicks(), picked = batchPicked();
   const card = g => {
     const L = g.locked, sized = batchSized(g), on = g.items.filter(it => it.on), ready = on.filter(it => !batchTooBig(g, it)), W = batchWidestIt(g), some = on.length > 0 && on.length < g.items.length;
     const set = g.snap ? `<b>${esc(g.desc || 'Set up')}</b>` : '<b>Not set up yet.</b>' + (L ? '' : ' Pick a preset or a Speed button, or set it up on a file.');
@@ -5312,8 +5636,8 @@ function renderBatch(){
     const save = `<button class="btn" type="button" data-act="save"${g.snap && sized && ready.length ? '' : ' disabled'}>Save ${ready.length || ''} PNG${ready.length === 1 ? '' : 's'} as a zip</button>`;
     const grid = L && !g.open ? '' : `<div class="bg-grid">${g.items.map(it => {
         const big = batchTooBig(g, it), cm = sized ? batchCm(g, it) : 0, b = batchBox(g, it);
-        return `<div class="bitem${it.on ? ' on' : ''}${big ? ' big' : ''}" data-k="${esc(it.key)}">
-          <div class="bi-pic"${L ? '' : ' data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up."'}>${it.thumb ? `<img src="${it.thumb}" alt="">` : ''}</div>
+        return `<div class="bitem${it.on ? ' on' : ''}${big ? ' big' : ''}${batchLand.has(it.key) ? ' land' : ''}" data-k="${esc(it.key)}"${L ? '' : ' draggable="true"'}>
+          <div class="bi-pic"${L ? '' : ' data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up."'}>${it.thumb ? `<img src="${it.thumb}" alt="" draggable="false">` : ''}</div>
           <input class="bi-tick" type="checkbox" ${it.on ? 'checked' : ''}${L ? ' disabled' : ''} aria-label="Include ${esc(it.name)}">
           ${L ? '' : `<button class="bi-x" type="button" data-act="drop" aria-label="Remove ${esc(it.name)}">×</button>`}
           <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}
@@ -5322,14 +5646,16 @@ function renderBatch(){
     const tick = `<input class="bg-tick" type="checkbox" ${g.on ? 'checked' : ''} aria-label="Include the group ${esc(g.name)} in Process ticked groups" data-tip="Ticked groups are worked out together by Process ticked groups.">`;
     const count = `<span class="bg-count">${g.items.length} file${g.items.length === 1 ? '' : 's'} · ${on.length} ticked${g.note ? ' · ' + esc(g.note) : ''}</span>`;
     if (L) return `<section class="bgroup locked${g.on ? '' : ' off'}" data-g="${g.id}">
-      <div class="bg-head">${tick}<input class="bg-name" type="text" value="${esc(g.name)}" disabled aria-label="Group name">
-        ${count}<span class="bg-lock">Locked</span><span class="bg-grow"></span>
-        <button class="link" type="button" data-act="files">${g.open ? 'Hide files' : 'Show files'}</button><button class="link" type="button" data-act="lock" data-tip="Unlock to change the set-up, the size or the files.">Unlock</button></div>
-      <div class="bg-set"><span>${set} · ${sizeTxt}${g.trim ? ' · trimmed to the art' : ''}</span><span class="bg-grow"></span>${save}</div>
-      ${grid}</section>`;
+      <div class="bg-head">${tick}<input class="bg-name" type="text" value="${esc(g.name)}" size="${Math.max(4, Math.min(30, g.name.length + 1))}" disabled aria-label="Group name">
+        <span class="bg-count">${g.items.length} file${g.items.length === 1 ? '' : 's'}${on.length < g.items.length ? ` · ${on.length} ticked` : ''}</span>
+        <span class="bg-lock"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg> Locked</span>
+        <span class="bg-lset">${set} · ${sizeTxt}${g.trim ? ' · trimmed to the art' : ''}</span>
+        <span class="bg-strip">${g.items.slice(0, 10).map(it => `<span${it.on ? '' : ' class="off"'} title="${esc(it.name)}">${esc(it.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 14))}</span>`).join('')}${g.items.length > 10 ? `<span class="more">+${g.items.length - 10}</span>` : ''}</span>
+        <span class="bg-grow"></span><button class="btn small" type="button" data-act="lock" data-tip="Unlock to change the set-up, the size or the files. It still saves with Process ticked groups while it is locked.">Unlock to change</button></div></section>`;
     return `<section class="bgroup${g.on ? '' : ' off'}" data-g="${g.id}">
       <div class="bg-head">${tick}<input class="bg-name" type="text" value="${esc(g.name)}" maxlength="60" aria-label="Group name">
         ${count}<span class="bg-grow"></span>
+        ${picked.length && !picked.some(x => g.items.includes(x)) ? `<button class="btn small bg-move" type="button" data-act="movehere" data-tip="Moves the ticked files from the other group into this one.">Move ${picked.length} here ↘</button>` : ''}
         <button class="link" type="button" data-act="all">Tick all</button><button class="link" type="button" data-act="none">Untick all</button>
         <button class="link" type="button" data-act="split"${some ? '' : ' disabled'} data-tip="Pick files out into a group of their own, like the custom names in a set. Untick all, tick the ones that belong together, then click this.">Move ticked to a new group</button>
         <button class="link" type="button" data-act="add">Add files</button>
@@ -5364,6 +5690,7 @@ $('batchBody').addEventListener('click', e => {
   const head = b.closest('.bo-head');
   if (head){
     const o = batchOrderList()[+head.dataset.o], gs = batchGroups.filter(g => g.order === o);
+    if (act === 'odel') batchBar(`Removed ${o ? 'the order ' + o : 'the other groups'}.`);
     batchMark(act === 'odel' ? `removed ${o ? 'the order ' + o : 'the other groups'}` : `${act === 'oall' ? 'ticked' : 'unticked'} all groups` + (o ? ' in ' + o : ''));
     if (act === 'oall' || act === 'onone') for (const g of gs) g.on = act === 'oall';
     else if (act === 'odel'){
@@ -5378,14 +5705,18 @@ $('batchBody').addEventListener('click', e => {
   const what = {lock: `${g.locked ? 'unlocked' : 'locked'} “${g.name}”`, quick: `the Speed button on “${g.name}”`, split: `moved ticked files out of “${g.name}”`, all: `ticked all files in “${g.name}”`,
     none: `unticked all files in “${g.name}”`, del: `removed the group “${g.name}”`, drop: it ? `removed ${it.name}` : ''}[act];
   if (what) batchMark(what);
+  const said = {lock: g.locked ? `“${g.name}” is unlocked.` : `“${g.name}” is locked. It won’t change by accident.`, del: `Removed the group “${g.name}”.`, drop: it ? `Removed ${it.name}.` : ''}[act];
+  if (said) batchBar(said);
+  if (act === 'movehere'){ batchMove(batchPicked(), g); return; }
   if (act === 'lock'){ g.locked = !g.locked; g.open = false; }
   else if (act === 'files') g.open = !g.open;
   else if (act === 'quick'){ batchUseQuick(g, b.dataset.q); }
   else if (act === 'split'){
     const ng = batchSplit(g); if (!ng) return;
+    batchLandSet(ng.items);
     batchKeepSoon(); renderBatch();
     const el = $('batchBody').querySelector(`.bgroup[data-g="${ng.id}"] .bg-name`); if (el){ el.scrollIntoView({block: 'center'}); el.focus(); el.select(); }
-    toast(`${ng.items.length} file${ng.items.length === 1 ? '' : 's'} moved to a new group. Name it, then pick a preset or a Speed button.`);
+    batchFlash(ng); batchBar(`${ng.items.length} file${ng.items.length === 1 ? '' : 's'} moved to a new group. Name it, then pick a preset or a Speed button.`);
     return;
   }
   else if (act === 'all' || act === 'none'){ for (const x of g.items) x.on = act === 'all'; }
@@ -5435,10 +5766,32 @@ $('batchJoin').addEventListener('click', () => {
   const r = batchJoin(); if (!r){ batchUndos.pop(); syncBatchTools(); return; }
   batchKeepSoon(); renderBatch();
   const el = $('batchBody').querySelector(`.bgroup[data-g="${r.ng.id}"] .bg-name`); if (el){ el.scrollIntoView({block: 'center'}); el.focus(); el.select(); }
-  toast(`${r.n} groups joined into one with ${r.ng.items.length} files.` + (r.set ? ` It keeps the set-up of “${r.set.name}”.` : ' Name it, then pick a preset or a Speed button.'));
+  batchFlash(r.ng); batchBar(`${r.n} groups joined into one with ${r.ng.items.length} files.` + (r.set ? ` It keeps the set-up of “${r.set.name}”.` : ' Name it, then pick a preset or a Speed button.'));
 });
 $('batchNew').addEventListener('click', () => { if (batchBusy) return; batchMark('a new group'); batchGroup(); batchKeepSoon(); renderBatch(); $('batchBody').scrollTop = $('batchBody').scrollHeight; });
-$('batchClose').addEventListener('click', () => { if (!batchBusy) $('batch').hidden = true; });
+$('batchClose').addEventListener('click', () => { if (!batchBusy){ $('batch').hidden = true; $('batchBar').hidden = true; } });
+$('batchBarUndo').addEventListener('click', batchUndoGo);
+$('batchBody').addEventListener('dragstart', e => {
+  const cell = e.target.closest ? e.target.closest('.bitem') : null; if (!cell) return;
+  const {g, it} = batchFind(cell); if (batchBusy || !g || !it || g.locked){ e.preventDefault(); return; }
+  const some = g.items.some(x => x.on) && g.items.some(x => !x.on);
+  batchDrag = {from: g.id, items: it.on && some ? g.items.filter(x => x.on) : [it]}; // a ticked file brings the other ticked ones with it
+  try { e.dataTransfer.setData('text/plain', it.name); e.dataTransfer.effectAllowed = 'move'; } catch(err){}
+});
+const batchOverClear = keep => { for (const x of $('batchBody').querySelectorAll('.bgroup.over')) if (x !== keep) x.classList.remove('over'); };
+$('batchBody').addEventListener('dragover', e => {
+  if (!batchDrag) return;
+  const card = e.target.closest ? e.target.closest('.bgroup:not(.locked)') : null, ok = card && +card.dataset.g !== batchDrag.from;
+  batchOverClear(ok ? card : null);
+  if (ok){ e.preventDefault(); card.classList.add('over'); try { e.dataTransfer.dropEffect = 'move'; } catch(err){} }
+});
+$('batchBody').addEventListener('drop', e => {
+  if (!batchDrag) return;
+  const card = e.target.closest ? e.target.closest('.bgroup:not(.locked)') : null, d = batchDrag; batchDrag = null; batchOverClear(null);
+  const to = card && batchGroups.find(g => g.id === +card.dataset.g);
+  if (to && to.id !== d.from){ e.preventDefault(); e.stopPropagation(); batchMove(d.items, to); }
+});
+$('batchBody').addEventListener('dragend', () => { batchDrag = null; batchOverClear(null); });
 $('batchStop').addEventListener('click', () => { batchStopped = true; $('batchBusyTxt').textContent = 'Stopping…'; });
 
 // the group's settings for one file: the same settings, and the width that keeps the group's scale
@@ -5626,7 +5979,7 @@ async function batchRestore(){
 }
 window.addEventListener('pagehide', () => { if (batchKeepTimer) batchKeepNow(); });
 batchRestore().catch(() => 0);
-restoreDocs().catch(() => 0).then(n => { handoverUp = true; handoverReady(window.opener); if (!n) sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); }); });
+restoreDocs().catch(() => 0).then(n => { handoverUp = true; handoverReady(window.opener); if (!n) sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); }); if (!n && !window.opener && !welcomeSkipped() && $('batch').hidden) showWelcome(); });
 })();
 </script>
 </body>
