@@ -559,6 +559,16 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .bitem.on{border-color:var(--accent)}
 .look-fold[aria-expanded="true"]{border-color:var(--accent)}
 .quick input[type="range"],#wRange{accent-color:var(--accent)}
+/* v89: versions of one design */
+.vers{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;padding:12px max(20px,env(safe-area-inset-right,0px)) 12px max(20px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line)}
+.vers-k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.vers-list{display:flex;gap:6px;flex-wrap:wrap}
+.vers-none{font-size:13px;color:var(--muted)}
+.ver{display:inline-flex;align-items:center}
+.ver .chip{border-radius:var(--r) 0 0 var(--r)}
+.ver-x{height:34px;width:26px;margin-left:-1.5px;padding:0;border:1.5px solid var(--line);border-radius:0 var(--r) var(--r) 0;background:var(--panel);color:var(--muted);font:inherit;font-size:15px;line-height:1;cursor:pointer}
+.ver-x:hover{border-color:var(--ink);color:var(--ink)}
+.vers #verNew{margin-left:auto}
 </style>
 </head>
 <body>
@@ -661,6 +671,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="revertBtn">Revert</button><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
       <nav class="trail" id="trail" aria-label="The three steps"></nav>
+      <div class="vers" id="vers"><span class="vers-k">Versions</span><span class="vers-list" id="verList"></span><button class="link" type="button" id="verNew" data-tip="Keeps the design as it is now, and starts a copy to try another way: for example Clean cut as A and Halftone as B. Then flick between them.">Try another way</button></div>
 
       <section class="group step" id="sizeGroup">
         <h2>Print size</h2>
@@ -4313,6 +4324,7 @@ const idbDone = tx => new Promise((res, rej) => { tx.oncomplete = () => res(); t
 function docRecord(d){
   const live = d === cur, a = live ? art : d.art;
   return {name: a.name, dpi: a.dpi, jpegQ: a.jpegQ, isVector: a.isVector, fullW: a.fullW, fullH: a.fullH, smooth: !!a.smooth, sizeFrom: a.sizeFrom,
+    vers: a.vers && a.vers.length > 1 ? a.vers.map((v, i) => ({snap: live && i === a.verOn ? snapshot() : v.snap})) : null, verOn: a.verOn || 0,
     strokes: a.strokes, strokesN: a.strokesN, snap: live ? snapshot() : d.snap, activeRule: live ? activeRule : d.activeRule,
     steps: live ? steps : d.steps, stepPos: live ? stepPos : d.stepPos, unsaved: live ? unsaved : d.unsaved,
     zoom: live ? st.zoom : d.zoom, cx: live ? st.cx : d.cx, cy: live ? st.cy : d.cy, suffix: live ? $('nameSuffix').value : d.suffix, lab: live ? $('labelFull').value : d.lab, labShort: live ? $('labelShort').value : d.labShort,
@@ -4354,6 +4366,7 @@ async function restoreDocs(){ // answers how many designs came back
       try { await im.decode(); } catch(e){ continue; }
       const a = makeArt(im, rec.fullW, rec.fullH, rec.name, false, rec.dpi, {vector: rec.isVector, jpegQ: rec.jpegQ});
       Object.assign(a, {file, quiet: true, sizeFrom: rec.sizeFrom || 'user', smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0});
+      if (Array.isArray(rec.vers) && rec.vers.length > 1 && rec.vers.every(v => v && v.snap && v.snap.s)){ a.vers = rec.vers.slice(0, 6).map(v => ({snap: v.snap})); a.verOn = Math.max(0, Math.min(+rec.verOn || 0, a.vers.length - 1)); }
       if (rec.snap.crop){ a.crop = {...rec.snap.crop}; a.w = a.crop.w; a.h = a.crop.h; }
       if (cleanReset){ for (const x of [rec.snap, ...(rec.steps || []).map(t => t.snap)]) if (x && x.s) x.s.clean = false; }
       if (a.strokesN) rebuildEdits(a);
@@ -5122,6 +5135,58 @@ function applySnap(snap){
   remember(); schedule(); updateChecks();
   restoring = false;
 }
+/* ---------- versions: tries of the same design, to flick between ---------- */
+const VER_MAX = 6, verLetter = i => String.fromCharCode(65 + i);
+function verStyle(sn){ const q = sn.s; return q.flat && q.finish === 'cut' ? 'Trace prep' : q.finish === 'cut' ? (q.look === 'edges' ? 'Prep only' : 'Clean cut') : 'Halftone'; }
+function syncVers(){
+  const box = $('vers'); if (!box) return;
+  const V = art && art.vers, on = V ? art.verOn : -1;
+  if (V && steps[stepPos] && steps[stepPos].ver == null) steps[stepPos].ver = on; // a new step belongs to the version showing
+  box.hidden = !art;
+  $('verNew').hidden = !!V && V.length >= VER_MAX;
+  $('verNew').textContent = V ? 'Add another' : 'Try another way';
+  const html = !V ? '<span class="vers-none">Only one so far.</span>' : V.map((v, i) => `<span class="ver"><button class="chip" type="button" data-ver="${i}" aria-pressed="${i === on}" data-tip="${i === on ? 'This version is showing. Changes you make go into it.' : 'Show this version.'}">${verLetter(i)} · ${verStyle(i === on ? snapshot() : v.snap)}</button>` +
+    `<button class="ver-x" type="button" data-verx="${i}" aria-label="Remove version ${verLetter(i)}" data-tip="Remove this version.">×</button></span>`).join('');
+  if ($('verList').innerHTML !== html) $('verList').innerHTML = html;
+}
+function verNew(){
+  if (!art) return;
+  if (cropping) endCrop(false);
+  commitStep();
+  if (!art.vers || !art.vers.length){ art.vers = [{snap: snapshot()}]; art.verOn = 0; for (const t of steps) t.ver = 0; } // everything so far was A
+  else art.vers[art.verOn].snap = snapshot();
+  if (art.vers.length >= VER_MAX){ toast(`Up to ${VER_MAX} versions of one design. Remove one first.`); return; }
+  const from = art.verOn;
+  art.vers.push({snap: JSON.parse(JSON.stringify(snapshot()))}); art.verOn = art.vers.length - 1;
+  syncVers(); persistSoon();
+  toast(`Version ${verLetter(art.verOn)} is a copy of ${verLetter(from)}. Change it any way you like, then flick between them.`);
+}
+function verShow(i){
+  const V = art && art.vers; if (!V || !V[i] || i === art.verOn) return;
+  if (cropping) endCrop(false);
+  if (picking) endPick();
+  endBrush(); commitStep();
+  V[art.verOn].snap = snapshot(); // the one being left keeps its latest state
+  art.verOn = i;
+  applySnap(V[i].snap);
+  stepLabel = `Version ${verLetter(i)}`; commitStep();
+  syncVers(); persistSoon();
+}
+function verDrop(i){
+  const V = art && art.vers; if (!V || !V[i]) return;
+  if (i === art.verOn) verShow(i ? i - 1 : 1);
+  const on = V[art.verOn];
+  V.splice(i, 1); art.verOn = V.indexOf(on);
+  for (const t of steps){ if (t.ver === i) t.ver = null; else if (t.ver > i) t.ver--; }
+  if (V.length < 2){ art.vers = null; art.verOn = 0; for (const t of steps) delete t.ver; }
+  syncVers(); persistSoon();
+  toast(`Version removed.${art.vers ? '' : ' Back to one.'}`);
+}
+$('verNew').addEventListener('click', verNew);
+$('verList').addEventListener('click', e => {
+  const x = e.target.closest('[data-verx]'); if (x){ verDrop(+x.dataset.verx); return; }
+  const b = e.target.closest('[data-ver]'); if (b) verShow(+b.dataset.ver);
+});
 function revertToOpened(){ // back to History's first line, as a new step, so Undo brings the work back
   if (!art || !steps.length) return;
   if (cropping) endCrop(false);
@@ -5138,7 +5203,10 @@ function revertToOpened(){ // back to History's first line, as a new step, so Un
   toast('Back to the design as it was opened. Undo (Cmd/Ctrl+Z) brings your changes back.');
 }
 $('revertBtn').addEventListener('click', revertToOpened);
-function goStep(i){ if (i < 0 || i >= steps.length || i === stepPos) return; stepPos = i; applySnap(steps[i].snap); unsaved = true; renderSteps(); }
+function goStep(i){ if (i < 0 || i >= steps.length || i === stepPos) return;
+  const V = art && art.vers, t = steps[i];
+  if (V && t.ver != null && V[t.ver] && t.ver !== art.verOn){ V[art.verOn].snap = snapshot(); art.verOn = t.ver; }
+  stepPos = i; applySnap(steps[i].snap); unsaved = true; renderSteps(); }
 function undo(){ commitStep(); goStep(stepPos - 1); }
 function redo(){ commitStep(); goStep(stepPos + 1); }
 function renderSteps(){
@@ -5234,7 +5302,7 @@ function showStep(id){ // one step shows at a time (not goStep: that name is His
 function syncSums(){
   if (!folds.length) return;
   for (const id in SUMS){ const el = $('sum-' + id); if (!el) continue; let t = ''; try { t = SUMS[id](); } catch(e){} if (el.textContent !== t){ el.textContent = t; el.title = t; } }
-  syncTrail();
+  syncTrail(); syncVers();
   syncTune();
 }
 /* ---------- sections start folded; Expand all opens every one ---------- */
