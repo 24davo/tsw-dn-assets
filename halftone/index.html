@@ -608,6 +608,10 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .lf-go::after{content:"";width:7px;height:7px;margin-top:-4px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg)}
 .look-fold[aria-expanded="true"] .lf-go::after{transform:rotate(-135deg);margin-top:4px}
 .quick{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* v96: the step boxes show when the panel is scrolled under them */
+.trail.scrolled{border-bottom:2px solid var(--line-strong)}
+.trail.scrolled::after{content:"";position:absolute;left:0;right:0;top:calc(100% + 2px);height:14px;background:linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,0));pointer-events:none}
+:root.ui-light .trail.scrolled::after{background:linear-gradient(rgba(0,0,0,.14),rgba(0,0,0,0))}
 </style>
 </head>
 <body>
@@ -5554,6 +5558,8 @@ document.querySelector('.panel').addEventListener('click', e => { // More / Less
 function clearDoneMarks(){ const n = $('savedNote'); if (n) n.textContent = ''; for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
 $('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); if (open) setSpeedFold(true, true); if (!open){ setTune(false); const vs = visibleSteps(), f = vs.find(f => !f.g.classList.contains('done')) || vs[0]; if (f) f.set(true); } syncFoldAll(); if (open) drawHisto(); });
 syncFoldAll(); syncStepButtons(); syncBrush();
+{ const pan = document.querySelector('.panel'), mark = () => $('trail').classList.toggle('scrolled', pan.scrollTop > 4 || pan.getBoundingClientRect().top < -4);
+  pan.addEventListener('scroll', mark, {passive: true}); window.addEventListener('scroll', mark, {passive: true}); mark(); }
 for (const t of ['input', 'change']) $('quickRows').addEventListener(t, e => { // a quick slider types into its Fine-tune slider
   const id = e.target.dataset.buddy, el = id && $(id); if (!el) return;
   e.stopPropagation(); el.value = e.target.value; el.dispatchEvent(new Event(t, {bubbles: true}));
