@@ -2297,7 +2297,7 @@ let showEdge = true; // the dashed print-area edge on the shirt views
 let resetsReady = false; // each step's Reset link, set up near the end
 // tabs: every open design, each with its own art, settings, crop, touch-ups and history; cur is the one on screen
 let docs = [], cur = null, docSeq = 0;
-const MAX_DOCS = 8;
+const MAX_DOCS = 16; // v86 (owner): up from 8. Each open design keeps its full-size art in memory, so many big prints at once can be slow
 try { showEdge = localStorage.getItem('tsw-dtf-edge') !== 'off'; } catch(e){}
 // colour ranges; not saved between visits, because sampled colours belong to one piece of art
 let rules = [], activeRule = 0, lastSel = null, selKey = -1, selMips = null, pickFor = null, viewBeforeSel = 'shirt', viewBeforeClear = 'shirt';
