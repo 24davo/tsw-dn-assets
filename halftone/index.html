@@ -524,6 +524,12 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .batch-bar2 button:hover{background:var(--toast-ink);color:var(--toast)}
 .batch-bar2::after{content:"";position:absolute;left:0;bottom:0;width:100%;height:3px;background:var(--toast-ink);opacity:.45;transform-origin:left}
 .batch-bar2.run::after{animation:drain 5.2s linear forwards}
+/* v84: quick sliders in the Print style step; Crop in the bar above the art */
+.quick{display:grid;gap:12px;padding:14px;border:1.5px solid var(--line);border-radius:var(--r)}
+.quick .lv-sub{margin-top:0;font-size:15px;font-weight:800}
+.quick-rows{display:grid;gap:16px}
+.quick input[type="range"]{height:28px}
+.quick-ends{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -579,6 +585,11 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
         </div>
         <div class="bar-right">
+          <div class="tray" role="group" aria-label="Crop" id="cropTray"><span class="tray-label">Crop</span>
+            <button class="chip" type="button" id="cropTrim" data-tip="Cuts the empty space off around the art, so the print size measures the art itself.">Trim to the art</button>
+            <button class="chip" type="button" id="cropDraw" aria-pressed="false" data-tip="Drag a box on the art to keep just that part, for example to cut off unwanted marks at the edge.">Draw a crop</button>
+            <button class="chip" type="button" id="cropReset" hidden data-tip="Back to the whole file.">Reset crop</button>
+          </div>
           <button class="chip" type="button" id="edgeBtn" aria-pressed="true" data-tip="Show the edge of the print area on the shirt views (E key).">Print edge</button>
           <div class="tray" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tray-label">Shirt</span></div>
         </div>
@@ -665,6 +676,11 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <label class="look"><input type="radio" name="look" id="lookFull" value="full"><span class="look-t">Full halftone</span><span class="look-d">The whole design becomes dots for a soft, vintage print.</span></label>
         </div>
         <div class="ba" id="lookBa"><div id="lookBaB"></div><div class="after" id="lookBaA"></div><span class="ba-bar"></span><span class="tag l">Before</span><span class="tag r">After</span><input type="range" id="lookBaRange" min="0" max="100" value="50" aria-label="Slide to compare before and after"></div>
+        <div class="quick" id="quickAdj" hidden>
+          <div class="lv-sub">Quick adjust</div>
+          <div class="quick-rows" id="quickRows"></div>
+          <p class="f-note">Drag to balance the look. These are the same settings as in Fine-tune, where there are more.</p>
+        </div>
         <p class="f-note">A made-up example of what this quick start does. Slide across it to compare. Your own art is on the left.</p>
       </section>
 
@@ -704,12 +720,9 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 
       <div class="tune-head" id="tuneHead"><button class="tune-toggle" type="button" id="tuneToggle" aria-expanded="false"><span class="tune-t">Fine-tune</span><span class="tune-d">only if needed</span><span class="tune-n" id="tuneSum"></span></button></div>
 
-      <section class="group tune" id="cropGroup">
+      <section class="group tune" id="cropGroup" hidden>
         <h2>Crop</h2>
         <div class="preset-actions">
-          <button class="chip" type="button" id="cropTrim">Trim to the art</button>
-          <button class="chip" type="button" id="cropDraw" aria-pressed="false">Draw a crop</button>
-          <button class="chip" type="button" id="cropReset" hidden>Reset crop</button>
         </div>
         <p class="f-note" id="cropNote">No crop: the whole file is used.</p>
       </section>
@@ -799,7 +812,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
       </section>
 
       <section class="group tune" id="sharpGroup">
-        <h2>Sharpen</h2>
+        <h2>Sharpen &amp; smooth</h2>
         <p class="f-note"><span>Brings back crispness lost in resizing or a soft file.</span><span class="more-x" hidden> Like Photoshop’s Unsharp Mask, on the art at print size, before the dots. Too much leaves bright and dark halos along edges.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="chips" id="sharpChips" role="group" aria-label="Sharpen">
           <button class="chip" type="button" data-sharp="0" data-sr="1" aria-pressed="true">Off</button>
@@ -816,6 +829,14 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <input type="range" id="sradius" min="0.3" max="2" step="0.1" value="1">
           <p class="f-note"><span>How wide a band along each edge it works on.</span><span class="more-x" hidden> 1 px suits most art at 300 dpi; go smaller for fine detail.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         </div>
+        <div class="lv-sub">Smooth out noise</div>
+        <div class="chips" id="noiseChips" role="group" aria-label="Smooth out noise">
+          <button class="chip" type="button" data-noise="0" aria-pressed="true">Off</button>
+          <button class="chip" type="button" data-noise="1" aria-pressed="false">Light</button>
+          <button class="chip" type="button" data-noise="2" aria-pressed="false">Medium</button>
+          <button class="chip" type="button" data-noise="3" aria-pressed="false">Strong</button>
+        </div>
+        <p class="f-note"><span>Evens out speckle, blotches and patchy colour, and keeps the edges sharp.</span><span class="more-x" hidden> For small pictures that were enlarged, JPEG blocks, and AI art with washy fills. It runs before Sharpen and before the dots. Strong can soften fine texture such as hair or fabric, so check at 1:1.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
       </section>
 
       <section class="group tune" id="levelsGroup">
@@ -1329,6 +1350,41 @@ function engine(){
           if (diff > -2 && diff < 2) continue;
           const delta = amt*diff, i = j*4;
           d[i] += delta; d[i+1] += delta; d[i+2] += delta; // the clamped array keeps every value in 0–255
+        }
+      }
+    }
+  }
+  const NOISE = [null, {R: 1, T: 14, passes: 1}, {R: 2, T: 24, passes: 1}, {R: 2, T: 38, passes: 2}];
+  function denoiseData(d, w, h, level){
+    const N = NOISE[level]; if (!N) return;
+    const R = N.R, T2 = N.T*N.T*3, SH = 64, row = w*4, buf = new Uint8ClampedArray((SH + 2*R)*row);
+    for (let pass = 0; pass < N.passes; pass++){
+      let tail = null, tailRows = 0;
+      for (let y0 = 0; y0 < h; y0 += SH){ // in strips: buf holds the rows as they were before this pass touched them
+        const y1 = Math.min(h, y0 + SH), r0 = Math.max(0, y0 - R), r1 = Math.min(h, y1 + R), top = y0 - r0;
+        if (top) buf.set(tail.subarray((tailRows - top)*row, tailRows*row), 0);
+        buf.set(d.subarray(y0*row, r1*row), top*row);
+        tailRows = Math.min(R, y1 - r0); tail = buf.slice((y1 - r0 - tailRows)*row, (y1 - r0)*row);
+        for (let y = y0; y < y1; y++){
+          const ya = y - R < r0 ? r0 : y - R, yb = y + R >= r1 ? r1 - 1 : y + R;
+          for (let x = 0; x < w; x++){
+            const c = ((y - r0)*w + x)*4, a = buf[c + 3];
+            if (!a) continue;
+            const r = buf[c], g = buf[c + 1], b = buf[c + 2], xa = x < R ? 0 : x - R, xb = x + R >= w ? w - 1 : x + R;
+            let sr = 0, sg = 0, sb = 0, sa = 0, n = 0, ar = 0, ag = 0, ab = 0, aa = 0, an = 0;
+            for (let v = ya; v <= yb; v++){
+              let q = ((v - r0)*w + xa)*4;
+              for (let u = xa; u <= xb; u++, q += 4){
+                const qa = buf[q + 3]; if (!qa) continue;
+                const qr = buf[q], qg = buf[q + 1], qb = buf[q + 2], dr = qr - r, dg = qg - g, db = qb - b, da = qa - a;
+                if (q !== c){ ar += qr; ag += qg; ab += qb; aa += qa; an++; }
+                if (dr*dr + dg*dg + db*db + da*da <= T2){ sr += qr; sg += qg; sb += qb; sa += qa; n++; }
+              }
+            }
+            const o = (y*w + x)*4;
+            if (n <= 1 && R > 1 && an >= 6){ d[o] = ar/an; d[o + 1] = ag/an; d[o + 2] = ab/an; d[o + 3] = Math.max(a, aa/an); } // a lone speck
+            else if (n > 1){ d[o] = sr/n; d[o + 1] = sg/n; d[o + 2] = sb/n; d[o + 3] = sa/n; }
+          }
         }
       }
     }
@@ -2094,6 +2150,7 @@ function engine(){
   function handle(m){
     if (m.type === 'mask'){ masks.set(m.id, {w: m.w, h: m.h, d: new Uint8Array(m.buf)}); return {msg: {type: 'mask'}}; }
     if (m.type === 'src'){
+      if (m.noise) denoiseData(new Uint8ClampedArray(m.buf), m.w, m.h, m.noise);
       if (m.sharp) sharpenData(new Uint8ClampedArray(m.buf), m.w, m.h, m.sharp.amount, m.sharp.sigma);
       return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
     }
@@ -2152,7 +2209,7 @@ function demoDots(x0, y0, x1, y1, tone, col){
   return `<g fill="${col}">${o}</g>`;
 }
 function demoArt(o){ // o: glow / shadow 'soft' | 'dots', body 'dots', dark (a block close to the shirt colour), bg, name
-  o = Object.assign({glow: 0, shadow: 0, body: 'solid', dark: 0, name: 'LEE', bg: 0}, o || {});
+  o = Object.assign({glow: 0, shadow: 0, body: 'solid', dark: 0, name: 'SWEET', bg: 0}, o || {});
   const id = 'da' + (++demoUid), cx = 100, cy = 56, R = 36;
   let v = `<svg class="demo-art" viewBox="0 0 200 150" aria-hidden="true"><defs><radialGradient id="${id}g"><stop offset=".58" stop-color="#ff8a1f" stop-opacity=".95"/><stop offset="1" stop-color="#ff8a1f" stop-opacity="0"/></radialGradient><radialGradient id="${id}s"><stop offset="0" stop-color="#000000" stop-opacity=".8"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient></defs>`;
   if (o.bg) v += `<rect width="200" height="150" fill="${o.bg}"/>`;
@@ -2163,7 +2220,7 @@ function demoArt(o){ // o: glow / shadow 'soft' | 'dots', body 'dots', dark (a b
   if (o.dark) v += `<rect x="30" y="100" width="140" height="38" rx="3" fill="#121b2e"/>`;
   if (o.body === 'dots') v += demoDots(cx - R, cy - R, cx + R, cy + R, (x, y) => Math.hypot(x - cx, y - cy) > R ? 0 : .3 + .7*(y - (cy - R))/(2*R), '#ffc928');
   else v += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="#ffc928"/><path d="M${cx} ${cy - 22}l6.5 14.5 15.5 1.6-11.6 10.6 3.3 15.4L${cx} ${cy + 14}l-13.7 7.7 3.3-15.4-11.6-10.6 15.5-1.6z" fill="#e8472b"/>`;
-  return v + `<text x="100" y="129" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="27" letter-spacing="2" fill="#ffffff">${o.name}</text></svg>`;
+  return v + `<text x="100" y="129" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="${o.name.length > 5 ? 24 : 27}" letter-spacing="2" fill="${o.bg === '#ffffff' ? '#1a2540' : '#ffffff'}">${o.name}</text></svg>`;
 }
 const LOOK_PICS = { // [before, after] for each Quick start, by print style
   dots: {deep: [{shadow: 'soft'}, {shadow: 'dots'}], edges: [{glow: 'soft'}, {glow: 'dots'}], knock: [{dark: 1}, {}], full: [{glow: 'soft'}, {glow: 'dots', body: 'dots'}]},
@@ -2180,7 +2237,7 @@ function syncLookPics(){
   }
   const pic = LOOK_PICS[r][st.look], key = r + ':' + st.look;
   $('lookBa').hidden = !pic; $('lookBa').nextElementSibling.hidden = !pic;
-  if (pic && key !== lookBaKey){ lookBaKey = key; $('lookBaB').innerHTML = demoArt({...pic[0], name: 'SMITH'}); $('lookBaA').innerHTML = demoArt({...pic[1], name: 'SMITH'}); }
+  if (pic && key !== lookBaKey){ lookBaKey = key; $('lookBaB').innerHTML = demoArt({...pic[0], name: 'AWESOME'}); $('lookBaA').innerHTML = demoArt({...pic[1], name: 'AWESOME'}); }
 }
 const FLAT_KEYS = {flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // Trace prep: flat colours, how many (0 = found from the art), pure white and black, smallest detail (mm), colours left out
 const isFlat = () => st.finish === 'cut' && !!st.flat;
@@ -2189,7 +2246,7 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, noise: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const ST0 = JSON.parse(JSON.stringify(st)); // the settings a new visit starts with
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','areaV'];
@@ -2527,7 +2584,7 @@ function buildOrigMask(){
 }
 
 let srcTimer = 0, srcW0 = 0, srcH0 = 0, srcSharp = ''; // srcSharp: the sharpening the engine's copy of the art has
-const sharpKey = () => st.sharp ? `${st.sharp}:${st.sradius}` : '';
+const sharpKey = () => (st.sharp ? `${st.sharp}:${st.sradius}` : '') + (st.noise ? `n${st.noise}` : '');
 function buildSrcSoon(){ clearTimeout(srcTimer); srcTimer = setTimeout(buildSrc, 250); }
 function buildSrc(){
   if (!art) return;
@@ -2537,7 +2594,7 @@ function buildSrc(){
   const data = srcCtx.getImageData(0, 0, W, H);
   srcV++; srcStats = null;
   srcSharp = sharpKey();
-  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer, sharp: st.sharp ? {amount: st.sharp, sigma: st.sradius} : null}, [data.data.buffer]);
+  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer, sharp: st.sharp ? {amount: st.sharp, sigma: st.sradius} : null, noise: st.noise || 0}, [data.data.buffer]);
   srcMips = buildMips(srcCanvas);
   prepareViews();
   if (W !== srcW0 || H !== srcH0){ st.cx = W/2; st.cy = H/2; srcW0 = W; srcH0 = H; }
@@ -3296,7 +3353,7 @@ function syncBack(){
 $('backOn').addEventListener('change', e => { st.back = e.target.checked ? backWas : 0; syncSliders(); noteChange(st.back ? `Shirt-colour edge ${pxMm(st.back)}` : 'Shirt-colour edge off'); schedule(); });
 $('backPick').addEventListener('input', e => { st.backHex = e.target.value.toLowerCase(); syncBack(); schedule(); });
 $('backFollow').addEventListener('click', () => { st.backHex = null; syncBack(); noteChange('Edge colour follows the shirt'); schedule(); });
-const SHARP_KEYS = {sharp: 0, sradius: 1};
+const SHARP_KEYS = {sharp: 0, sradius: 1, noise: 0};
 const BG_KEYS = {bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4};
 function thruHex(){ return st.thruHex === 'shirt' ? st.shirt : (st.thruHex || '#ffffff'); } // hoisted: the engine's settings ask early
 const thruPct = () => { const s = srcStats; return s && s.vis ? Math.round((s.mid || 0)/s.vis*100) : null; }; // how much of the design is clearly see-through
@@ -3328,7 +3385,32 @@ $('bgAuto').addEventListener('click', () => { st.bgHex = null; syncBg(); noteCha
 let hardWas = 50; // the hard edge threshold to go back to when it's ticked again
 const SLIDERS = [['fade', v => v ? `${v} mm` : 'Off'], ['back', pxMm], ['bgTol', v => `${v}%`], ['thruFloor', v => `${v}%`], ['sharp', v => v ? `${v}%` : 'Off'], ['sradius', v => `${(+v).toFixed(1)} px`], ['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
                  ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`], ['flatTidy', v => +v ? `${(+v).toFixed(1)} mm` : 'Off'], ['flatSmooth', v => +v ? `${+v}` : 'Off']];
-function syncSliders(){ for (const K of [BG_KEYS, FLAT_KEYS]) for (const k in K) if (st[k] === undefined) st[k] = K[k]; // designs kept from before a setting existed
+/* Quick adjust: which sliders suit each print style. [slider id, name, left end, right end] */
+const QUICK = {
+  dotsKnock: [['k1', 'Shirt showing through', 'Less', 'More'], ['mid', 'Ink amount', 'Less ink', 'More ink']],
+  dots: [['mid', 'Ink amount', 'Less ink', 'More ink'], ['lpi', 'Dot size', 'Bigger dots', 'Finer dots']],
+  cut: [['cut', 'Soft edges', 'Keep more', 'Remove more'], ['bri', 'Brightness', 'Darker', 'Brighter']],
+  prep: [['bri', 'Brightness', 'Darker', 'Brighter'], ['bcon', 'Contrast', 'Softer', 'Stronger']],
+  flat: [['flatSmooth', 'Smoothing', 'Sharper corners', 'Smoother'], ['flatTidy', 'Smallest detail kept', 'Keeps tiny bits', 'Drops tiny bits']]
+};
+let quickKey = '';
+function quickMode(){
+  const b = $('finishChips').querySelector('[aria-pressed="true"]'), f = b ? b.dataset.finish : st.finish;
+  return f === 'prep' ? 'prep' : f === 'flat' ? 'flat' : f === 'cut' ? 'cut' : st.look === 'deep' || st.look === 'knock' ? 'dotsKnock' : 'dots';
+}
+function syncQuick(){
+  const box = $('quickAdj'); if (!box) return;
+  const mode = quickMode(), rows = QUICK[mode].filter(r => $(r[0]));
+  box.hidden = !rows.length;
+  if (mode !== quickKey){
+    quickKey = mode;
+    $('quickRows').innerHTML = rows.map(([id, name, lo, hi]) => `<div class="field"><div class="f-head"><label for="q-${id}">${name}</label><output id="q-${id}-out"></output></div>
+      <input type="range" id="q-${id}" data-buddy="${id}" min="${$(id).min}" max="${$(id).max}" step="${$(id).step}">
+      <div class="quick-ends"><span>${lo}</span><span>${hi}</span></div></div>`).join('');
+  }
+  for (const [id] of rows){ const q = $('q-' + id), o = $(id + 'Out'); if (q.value !== $(id).value) q.value = $(id).value; $('q-' + id + '-out').textContent = o ? o.textContent : $(id).value; }
+}
+function syncSliders(){ if (st.noise === undefined) st.noise = 0; syncChips('noiseChips', 'noise', st.noise); for (const K of [BG_KEYS, FLAT_KEYS]) for (const k in K) if (st[k] === undefined) st[k] = K[k]; // designs kept from before a setting existed
   for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi);
   syncBg(); syncThru();
   for (const b of $('sharpChips').querySelectorAll('[data-sharp]')) b.setAttribute('aria-pressed', String(+b.dataset.sharp === st.sharp && (!st.sharp || Math.abs(+b.dataset.sr - st.sradius) < 1e-6)));
@@ -3336,6 +3418,7 @@ function syncSliders(){ for (const K of [BG_KEYS, FLAT_KEYS]) for (const k in K)
   const near = st.emode === 'near'; syncChips('emodeChips', 'emode', st.emode); $('emodeAny').hidden = near; $('emodeNear').hidden = !near; $('etolField').hidden = !st.edge || !near;
   syncChips('fadeChips', 'fadedir', st.fadeDir); $('fadeInNote').hidden = st.fadeDir !== 'in'; $('fadeOutNote').hidden = st.fadeDir !== 'out'; $('fadeSpreadNote').hidden = st.fadeDir !== 'spread'; syncFadeClip();
   syncDens(); if (typeof syncHlv === 'function' && $('hlvB')) try { syncHlv(); } catch(e){} syncBack(); $('crispOn').checked = !!st.crisp; $('speckOn').checked = !!st.speck; $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
+$('noiseChips').addEventListener('click', e => { const b = e.target.closest('[data-noise]'); if (!b) return; noteChange(`Smooth out noise: ${b.textContent}`); st.noise = +b.dataset.noise; syncSliders(); remember(); schedule(); updateChecks(); });
 $('sharpChips').addEventListener('click', e => { const b = e.target.closest('[data-sharp]'); if (!b) return; st.sharp = +b.dataset.sharp; if (st.sharp) st.sradius = +b.dataset.sr; syncSliders(); remember(); schedule(); });
 $('emodeChips').addEventListener('click', e => { const b = e.target.closest('[data-emode]'); if (!b) return; st.emode = b.dataset.emode; syncSliders(); remember(); schedule(); });
 $('hardOn').addEventListener('change', e => { st.hard = e.target.checked ? hardWas : 0; syncSliders(); remember(); schedule(); });
@@ -3383,7 +3466,7 @@ $('looks').addEventListener('change', e => {
   if (st.look === 'shadows') ensureShadowRule();
   syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
-function syncLook(){ syncLookPics(); for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = !knockLook(st.look); syncFinChips(); syncStepButtons(); syncRouteSum(); }
+function syncLook(){ syncLookPics(); syncQuick(); for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = !knockLook(st.look); syncFinChips(); syncStepButtons(); syncRouteSum(); }
 function syncRouteSum(){ syncSums(); }
 $('finishChips').addEventListener('click', e => {
   const b = e.target.closest('[data-finish]'); if (!b) return;
@@ -3838,6 +3921,7 @@ function updateChecks(){
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (st.bgOn && Array.isArray(bgFound)) rows.push(['info', '✂', `Background removed (${(st.bgHex || rgbHex(bgFound[0], bgFound[1], bgFound[2])).toUpperCase()})`, `Cleared where it joins the outside edge, within ${st.bgTol}%. The same colour inside the design stays.`]);
+  if (st.noise) rows.push(['info', '≈', `Noise smoothed: ${['', 'Light', 'Medium', 'Strong'][st.noise]}`, 'Speckle and patchy colour evened out on the art at print size, before the dots.']);
   if (st.sharp) rows.push(['info', '↗', `Sharpened ${st.sharp}% at ${(+st.sradius).toFixed(1)} px`, 'Unsharp mask on the art at print size, before the dots.']);
   if (st.clean && st.finish !== 'cut' && knockLook(st.look) && st.ink !== 'one' && linY(hexRgb(st.knock || st.shirt)) < linY([70, 70, 70]))
     rows.push(['info', '✦', 'Clean colour dots', 'The dots in fades print in the bright version of their colour, so the fade looks like the art without muddy dark ink.']);
@@ -4289,9 +4373,9 @@ window.addEventListener('message', async e => {
 $('fileIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; openFiles(list); });
 /* ---------- welcome: the first screen when no design is open ---------- */
 const W_JOBS = [
-  {k: 'one', t: 'Get one design ready', d: 'Set the size, pick a look, save a print-ready PNG.', pic: () => demoArt({glow: 'dots', name: 'SMITH'})},
+  {k: 'one', t: 'Get one design ready', d: 'Set the size, pick a look, save a print-ready PNG.', pic: () => demoArt({glow: 'dots', name: 'AWESOME'})},
   {k: 'batch', t: 'Do a whole order', d: 'Lots of files at once, like names and numbers.', pic: () => `<span class="w-tiles">${['LEE', 'KAUR', 'JONES'].map(n => `<span>${n}</span>`).join('')}</span>`},
-  {k: 'tidy', t: 'Just tidy a file', d: 'Remove a background or flatten colours for tracing. No dots.', pic: () => demoArt({bg: '#ffffff', name: 'LEE'})}
+  {k: 'tidy', t: 'Just tidy a file', d: 'Remove a background or flatten colours for tracing. No dots.', pic: () => demoArt({bg: '#ffffff', name: 'SWEET'})}
 ];
 let wFiles = [], wJob = '';
 const welcomeSkipped = () => { try { return localStorage.getItem('tsw-ge-welcome') === 'skip'; } catch(e){ return false; } };
@@ -4537,7 +4621,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => { if (!(x && typeof x.name === 'string' && x.s && typeof x.s === 'object')) return false; cleanDeep(x.s); x.rules = cleanDeep(x.rules); x.levels = cleanDeep(x.levels); return true; };
@@ -5048,7 +5132,7 @@ const SUMS = { // short, so a title stays on one line
   sizeGroup: () => art ? `${toMm(st.widthCm)} × ${toMm(st.widthCm*art.h/art.w)} mm` : '',
   finishGroup: () => isFlat() ? (lastFlat ? (n => `${n} colour${n === 1 ? '' : 's'}`)(lastFlat.pal.filter(c => !c[4]).length) : 'Flat colours') : st.finish === 'cut' ? `Solid from ${st.cut}%` : `${st.lpi} lpi · ${st.angle}° · ${st.shape}`,
   bgGroup: () => { if (!st.bgOn) return st.thruOn ? 'See-through made solid' : 'Off'; const h = st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : ''); return (h ? `Removing ${h.toUpperCase()}` : 'On') + (st.thruOn ? ' · solid' : ''); },
-  sharpGroup: () => st.sharp ? ({50: 'Light', 100: 'Medium', 160: 'Strong'}[st.sharp] || `${st.sharp}%`) : 'Off',
+  sharpGroup: () => [st.sharp ? 'Sharpen ' + ({50: 'Light', 100: 'Medium', 160: 'Strong'}[st.sharp] || `${st.sharp}%`).toLowerCase() : '', st.noise ? 'smooth ' + ['', 'light', 'medium', 'strong'][st.noise] : ''].filter(Boolean).join(' · ') || 'Off',
   levelsGroup: () => lvIdentity() ? 'Unchanged' : 'Adjusted',
   knockGroup: () => `${st.knock ? st.knock.toUpperCase() : 'Shirt colour'} · ${st.finish === 'cut' ? `${st.ktol}%` : `${st.k0}–${st.k1}%` + (st.clean ? ' · clean' : '')}`,
   rangeGroup: () => rules.length ? `${rules.length} part${rules.length === 1 ? '' : 's'}` : 'None',
@@ -5061,10 +5145,12 @@ const SUMS = { // short, so a title stays on one line
 const STEP_Q = {sizeGroup: 'How wide is the print?', routeGroup: 'How should it print?', checkGroup: 'Check it, then save'};
 const TRAIL_SUB = {sizeGroup: 'How wide in mm', routeGroup: 'Pick a look', checkGroup: 'Look it over'};
 const TICK = '<svg class="tick" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" pathLength="1"/></svg>';
-let trailWas = '', trailDone = {};
+let trailWas = '', trailDone = {}, trailLast = '';
 function syncTrail(){ // the three steps across the top of the panel: where you are, what is done, and how each is set
   const el = $('trail'); if (!el || !folds.length) return;
   const vs = visibleSteps(), cur = vs.find(f => !f.g.classList.contains('folded'));
+  if (cur) trailLast = cur.g.id;
+  else if (vs.length){ (vs.find(f => f.g.id === trailLast) || vs.find(f => !f.g.classList.contains('done')) || vs[0]).set(true); return syncTrail(); }
   const html = vs.map((f, i) => {
     const id = f.g.id, done = f.g.classList.contains('done'), sum = $('sum-' + id), fresh = done && !trailDone[id]; trailDone[id] = done;
     return `<button type="button" data-step="${id}" class="${done ? 'is-done ' : ''}${fresh ? 'fresh ' : ''}${f === cur ? 'cur' : ''}"${f === cur ? ' aria-current="step"' : ''}><span class="dot"><i><span>${i + 1}</span>${TICK}</i></span><b>${esc(f.g.dataset.name)}</b><small>${esc(id === 'checkGroup' && done ? 'Saved' : (done || id === 'checkGroup') && sum && sum.textContent ? sum.textContent : TRAIL_SUB[id] || '')}</small></button>`;
@@ -5181,7 +5267,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, noise: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -5215,7 +5301,7 @@ const STEP_RESETS = {
   rangeGroup: {name: 'Parts', same: sameRules, reset: () => { rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule(); else syncRules(); }},
   edgeGroup: {name: 'Edge', vals: () => ({...EDGE_KEYS})},
   bgGroup: {name: 'Background', vals: () => ({...BG_KEYS})},
-  sharpGroup: {name: 'Sharpen', vals: () => ({...SHARP_KEYS})},
+  sharpGroup: {name: 'Sharpen & smooth', vals: () => ({...SHARP_KEYS})},
   touchGroup: {name: 'Touch up', same: () => !art || !art.strokesN, reset: () => { art.strokesN = 0; rebuildEdits(art); buildSrcSoon(); }},
   toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), ...densVals('std'), ...HLV0})},
   inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex})}
@@ -5244,6 +5330,15 @@ document.querySelector('.panel').addEventListener('click', e => { // More / Less
 function clearDoneMarks(){ const n = $('savedNote'); if (n) n.textContent = ''; for (const g of document.querySelectorAll('.panel > .group.done')) g.classList.remove('done'); }
 $('foldAll').addEventListener('click', () => { const open = anyFolded(); for (const f of folds) f.set(open); if (open) setSpeedFold(true, true); if (!open){ setTune(false); const vs = visibleSteps(), f = vs.find(f => !f.g.classList.contains('done')) || vs[0]; if (f) f.set(true); } syncFoldAll(); if (open) drawHisto(); });
 syncFoldAll(); syncStepButtons(); syncBrush();
+for (const t of ['input', 'change']) $('quickRows').addEventListener(t, e => { // a quick slider types into its Fine-tune slider
+  const id = e.target.dataset.buddy, el = id && $(id); if (!el) return;
+  e.stopPropagation(); el.value = e.target.value; el.dispatchEvent(new Event(t, {bubbles: true}));
+});
+{ let quickSoon = 0; const later = () => { clearTimeout(quickSoon); quickSoon = setTimeout(syncQuick, 0); };
+  for (const t of ['input', 'change', 'click']) document.querySelector('.panel').addEventListener(t, later);
+  new MutationObserver(later).observe($('finishChips'), {subtree: true, attributes: true, attributeFilter: ['aria-pressed']});
+  window.addEventListener('keyup', later); }
+syncQuick();
 $('lookBaRange').addEventListener('input', e => $('lookBa').style.setProperty('--cut', e.target.value + '%'));
 $('trail').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b) goStep(b.dataset.step); });
 new MutationObserver(syncTrail).observe(document.querySelector('.panel'), {subtree: true, attributes: true, attributeFilter: ['class', 'hidden']});
