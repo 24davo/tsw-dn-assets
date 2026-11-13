@@ -572,7 +572,10 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 /* v90: On a colour */
 .on-colour{display:inline-flex;align-items:center;gap:4px}
 .on-colour .colorbox{width:30px;height:30px}
-.i-white{background:radial-gradient(circle,#e0168a 0 30%,transparent 32%),#3a3a3a}
+.check-sw{display:inline-flex;align-items:center;gap:5px;margin-left:4px}
+.check-sw .sw{width:24px;height:24px}
+.check-sw .sw[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+.i-white{background:radial-gradient(circle,#e0168a 0 30%,transparent 32%),#3d3d40}
 </style>
 </head>
 <body>
@@ -625,7 +628,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
-          <span class="on-colour"><button class="chip" type="button" data-view="white" aria-pressed="false" data-tip="The print exactly as it is now, over a colour you choose. It only changes what you look at: the print is not worked out again.">On a colour</button><span class="colorbox" data-tip="The colour behind the print in this view."><input type="color" id="checkPick" value="#3a3a3a" aria-label="Colour behind the print in the On a colour view"></span></span>
+          <span class="on-colour"><button class="chip" type="button" data-view="white" aria-pressed="false" data-tip="The print exactly as it is now, over a colour you choose. It only changes what you look at: the print is not worked out again.">On a colour</button><span class="colorbox" data-tip="The colour behind the print in this view."><input type="color" id="checkPick" value="#3d3d40" aria-label="Colour behind the print in the On a colour view"></span><span class="check-sw" id="checkSw" role="group" aria-label="Quick colours" hidden><button class="sw" type="button" data-check="#3d3d40" aria-pressed="false" aria-label="Charcoal" data-tip="Charcoal" style="background:#3d3d40"></button><button class="sw" type="button" data-check="#111111" aria-pressed="false" aria-label="Black" data-tip="Black" style="background:#111111"></button><button class="sw" type="button" data-check="#ffffff" aria-pressed="false" aria-label="White" data-tip="White" style="background:#ffffff"></button><button class="sw" type="button" data-check="#1d2742" aria-pressed="false" aria-label="Navy" data-tip="Navy" style="background:#1d2742"></button><button class="sw" type="button" data-check="#a8a8a8" aria-pressed="false" aria-label="Grey marle" data-tip="Grey marle" style="background:#a8a8a8"></button><button class="sw" type="button" data-check="#c21a26" aria-pressed="false" aria-label="Red" data-tip="Red" style="background:#c21a26"></button></span></span>
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
           <span class="more-views"><button class="chip" type="button" id="moreViewsBtn" aria-haspopup="true" aria-expanded="false" aria-pressed="false" data-tip="Other views: White base, Ink map.">More</button>
             <span class="mv-menu" id="moreViews" hidden>
@@ -2608,7 +2611,7 @@ const isWhite = kind => kind === 'white' || kind === 'origwhite'; // the film ov
 const toClear = kind => kind.startsWith('orig') ? 'origclear' : 'clear'; // Hold Transparent: the same side on the checks
 const toOrig = kind => kind.startsWith('orig') ? kind : ({shirt: 'orig', clear: 'origclear', white: 'origwhite'}[kind] || 'origbase'); // Hold Original: the art before halftoning
 const shownKind = kind => compare === 'clear' ? toClear(kind) : compare === 'orig' ? toOrig(kind) : kind;
-let checkHex = '#3a3a3a'; // the colour behind the print in the On a colour view: for looking only
+let checkHex = '#3d3d40'; // the colour behind the print in the On a colour view: for looking only
 try { const c = localStorage.getItem('tsw-ge-check'); if (/^#[0-9a-f]{6}$/i.test(c || '')) checkHex = c; } catch(e){}
 const WHITE_LEGEND = [[checkHex, 'Colour behind: what shows is what prints']];
 const ORIGWHITE_LEGEND = [[checkHex, 'Original over the colour']];
@@ -2925,12 +2928,21 @@ for (const id of ['paneA', 'paneB']){
   });
 }
 document.addEventListener('pointerdown', e => { if (paneOpen && !e.target.closest('.pane-pick')) closePaneMenu(); });
-$('checkPick').value = checkHex;
-$('checkPick').addEventListener('input', e => {
-  checkHex = e.target.value; WHITE_LEGEND[0][0] = ORIGWHITE_LEGEND[0][0] = checkHex;
+function setCheck(hex){ // the colour behind the print in the On a colour view: looking only, nothing is worked out again
+  checkHex = hex.toLowerCase(); WHITE_LEGEND[0][0] = ORIGWHITE_LEGEND[0][0] = checkHex; $('checkPick').value = checkHex;
   try { localStorage.setItem('tsw-ge-check', checkHex); } catch(err){}
   if (st.view !== 'white' && !(st.view === 'split' && (isWhite(st.paneA) || isWhite(st.paneB)))) setView('white'); else { syncLegend(); render(); }
-});
+  syncCheckSw();
+}
+function syncCheckSw(){
+  $('checkSw').hidden = $('viewTray').querySelector('[data-view="white"]').getAttribute('aria-pressed') !== 'true';
+  for (const b of $('checkSw').querySelectorAll('[data-check]')) b.setAttribute('aria-pressed', String(b.dataset.check === checkHex));
+}
+$('checkPick').value = checkHex;
+$('checkPick').addEventListener('input', e => setCheck(e.target.value));
+$('checkSw').addEventListener('click', e => { const b = e.target.closest('[data-check]'); if (b) setCheck(b.dataset.check); });
+new MutationObserver(syncCheckSw).observe($('viewTray').querySelector('[data-view="white"]'), {attributes: true, attributeFilter: ['aria-pressed']});
+syncCheckSw();
 $('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b){ setView(b.dataset.view); moreViews(false); } });
 function moreViews(open){ $('moreViews').hidden = !open; $('moreViewsBtn').setAttribute('aria-expanded', String(open)); }
 function syncMoreViews(){
