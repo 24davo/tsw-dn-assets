@@ -576,6 +576,22 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .check-sw .sw{width:24px;height:24px}
 .check-sw .sw[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
 .i-white{background:radial-gradient(circle,#e0168a 0 30%,transparent 32%),#3d3d40}
+/* v93: the step trail as three large boxes that stay at the top of the panel */
+.panel-bar{min-height:42px}
+.trail{position:sticky;top:42px;z-index:3;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px max(20px,env(safe-area-inset-right,0px)) 12px max(20px,env(safe-area-inset-left,0px));background:var(--panel)}
+.trail button{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 10px;align-items:center;justify-items:start;padding:10px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--soft)}
+.trail button:hover{border-color:var(--ink)}
+.trail .dot{grid-row:1/3;width:auto}
+.trail .dot::after{display:none}
+.trail b{font-size:15px;line-height:1.2}
+.trail small{grid-column:2}
+.trail button.cur{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--panel)}
+.trail .cur .dot i{background:var(--accent);border-color:var(--accent);color:#ffffff;box-shadow:none}
+.trail .is-done.cur .dot i{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+.trail-all{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
+.trail .trail-all .link{width:auto;padding:0;border:0;background:none;display:inline;text-decoration:underline}
+.group{scroll-margin-top:150px}
+.step-q::before{content:attr(data-n);display:block;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -714,6 +730,11 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="choice" type="button" data-finish="prep"><span class="choice-t">Prep only</span><span class="choice-d">Tidy up and save.</span></button>
           <button class="choice" type="button" data-finish="flat"><span class="choice-t">Trace prep</span><span class="choice-d">Flat colours for tracing.</span></button>
         </div>
+        <div class="quick" id="quickAdj" hidden>
+          <div class="lv-sub">Quick adjust</div>
+          <div class="quick-rows" id="quickRows"></div>
+          <p class="f-note">Drag to balance the look. These are the same settings as in Fine-tune, where there are more.</p>
+        </div>
         <button class="look-fold" type="button" id="lookFold" aria-expanded="false" aria-controls="lookBox"><span class="lf-k">Quick start</span><b id="lookNow"></b><span class="lf-go" id="lookGo">Change</span></button>
         <div class="look-box" id="lookBox" hidden>
         <div class="looks" id="looks">
@@ -725,11 +746,6 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         </div>
         <div class="ba" id="lookBa"><div id="lookBaB"></div><div class="after" id="lookBaA"></div><span class="ba-bar"></span><span class="tag l">Before</span><span class="tag r">After</span><input type="range" id="lookBaRange" min="0" max="100" value="50" aria-label="Slide to compare before and after"></div>
         <p class="f-note">A made-up example of what this quick start does. Slide across it to compare. Your own art is on the left.</p>
-        </div>
-        <div class="quick" id="quickAdj" hidden>
-          <div class="lv-sub">Quick adjust</div>
-          <div class="quick-rows" id="quickRows"></div>
-          <p class="f-note">Drag to balance the look. These are the same settings as in Fine-tune, where there are more.</p>
         </div>
       </section>
 
@@ -5310,13 +5326,14 @@ const TICK = '<svg class="tick" viewBox="0 0 16 16" aria-hidden="true"><path d="
 let trailWas = '', trailDone = {}, trailLast = '';
 function syncTrail(){ // the three steps across the top of the panel: where you are, what is done, and how each is set
   const el = $('trail'); if (!el || !folds.length) return;
-  const vs = visibleSteps(), cur = vs.find(f => !f.g.classList.contains('folded'));
+  const vs = visibleSteps(), open = vs.filter(f => !f.g.classList.contains('folded')), cur = open[0];
+  vs.forEach((f, i) => { const q = f.g.querySelector('.step-q'), t = `Step ${i + 1} of ${vs.length}`; if (q && q.dataset.n !== t) q.dataset.n = t; });
   if (cur) trailLast = cur.g.id;
   else if (vs.length){ (vs.find(f => f.g.id === trailLast) || vs.find(f => !f.g.classList.contains('done')) || vs[0]).set(true); return syncTrail(); }
   const html = vs.map((f, i) => {
     const id = f.g.id, done = f.g.classList.contains('done'), sum = $('sum-' + id), fresh = done && !trailDone[id]; trailDone[id] = done;
-    return `<button type="button" data-step="${id}" class="${done ? 'is-done ' : ''}${fresh ? 'fresh ' : ''}${f === cur ? 'cur' : ''}"${f === cur ? ' aria-current="step"' : ''}><span class="dot"><i><span>${i + 1}</span>${TICK}</i></span><b>${esc(f.g.dataset.name)}</b><small>${esc(id === 'checkGroup' && done ? 'Saved' : (done || id === 'checkGroup') && sum && sum.textContent ? sum.textContent : TRAIL_SUB[id] || '')}</small></button>`;
-  }).join('');
+    return `<button type="button" data-step="${id}" class="${done ? 'is-done ' : ''}${fresh ? 'fresh ' : ''}${open.includes(f) ? 'cur' : ''}"${open.includes(f) ? ' aria-current="step"' : ''}><span class="dot"><i><span>${i + 1}</span>${TICK}</i></span><b>${esc(f.g.dataset.name)}</b><small>${esc(id === 'checkGroup' && done ? 'Saved' : (done || id === 'checkGroup') && sum && sum.textContent ? sum.textContent : TRAIL_SUB[id] || '')}</small></button>`;
+  }).join('') + (open.length > 1 ? `<span class="trail-all">All ${open.length} steps are showing.<button class="link" type="button" data-step="${(vs.find(f => !f.g.classList.contains('done')) || vs[0]).g.id}">One step at a time</button></span>` : '');
   if (html !== trailWas){ trailWas = html; el.innerHTML = html; }
 }
 function showStep(id){ // one step shows at a time (not goStep: that name is History's)
