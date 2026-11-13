@@ -569,6 +569,10 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .ver-x{height:34px;width:26px;margin-left:-1.5px;padding:0;border:1.5px solid var(--line);border-radius:0 var(--r) var(--r) 0;background:var(--panel);color:var(--muted);font:inherit;font-size:15px;line-height:1;cursor:pointer}
 .ver-x:hover{border-color:var(--ink);color:var(--ink)}
 .vers #verNew{margin-left:auto}
+/* v90: On a colour */
+.on-colour{display:inline-flex;align-items:center;gap:4px}
+.on-colour .colorbox{width:30px;height:30px}
+.i-white{background:radial-gradient(circle,#e0168a 0 30%,transparent 32%),#3a3a3a}
 </style>
 </head>
 <body>
@@ -621,10 +625,10 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
+          <span class="on-colour"><button class="chip" type="button" data-view="white" aria-pressed="false" data-tip="The print exactly as it is now, over a colour you choose. It only changes what you look at: the print is not worked out again.">On a colour</button><span class="colorbox" data-tip="The colour behind the print in this view."><input type="color" id="checkPick" value="#3a3a3a" aria-label="Colour behind the print in the On a colour view"></span></span>
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
-          <span class="more-views"><button class="chip" type="button" id="moreViewsBtn" aria-haspopup="true" aria-expanded="false" aria-pressed="false" data-tip="Other views: On white, White base, Ink map.">More</button>
+          <span class="more-views"><button class="chip" type="button" id="moreViewsBtn" aria-haspopup="true" aria-expanded="false" aria-pressed="false" data-tip="Other views: White base, Ink map.">More</button>
             <span class="mv-menu" id="moreViews" hidden>
-              <button class="chip" type="button" data-view="white" aria-pressed="false">On white</button>
               <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
               <button class="chip" type="button" data-view="map" aria-pressed="false">Ink map</button>
               <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
@@ -2586,11 +2590,11 @@ const ORIG_LEGEND = [['#ffffff', 'Original: solid'], ['#808080', 'Original: see-
 const PANES = [ // [kind, group, name, what it shows, picture]
   ['orig', 'before', 'On shirt', 'The original art on the shirt colour.', 'shirt'],
   ['origclear', 'before', 'On transparent', 'The original on checks: see-through parts show the checks.', 'checks'],
-  ['origwhite', 'before', 'On white', 'The original over a white fill: see-through parts show paler.', 'white'],
+  ['origwhite', 'before', 'On a colour', 'The original over the colour chosen beside On a colour.', 'white'],
   ['origbase', 'before', 'Alpha', 'The original’s transparency: white is solid, grey is see-through.', 'alpha'],
   ['shirt', 'after', 'On shirt', 'The print on the shirt colour.', 'shirt'],
   ['clear', 'after', 'On transparent', 'The print on checks: the checks are clear film.', 'checks'],
-  ['white', 'after', 'On white', 'The print over a white fill, like a white layer behind it in Photoshop.', 'white'],
+  ['white', 'after', 'On a colour', 'The print as it is, over the colour chosen beside On a colour. Like a colour layer behind it in Photoshop.', 'white'],
   ['base', 'after', 'White base', 'White shows where ink and its white base print.', 'base'],
   ['map', 'after', 'Ink map', 'White prints solid, pink turns into dots, grey is removed.', 'map'],
   ['sel', 'after', 'Selection', 'The active part: white is selected.', 'sel']
@@ -2604,8 +2608,10 @@ const isWhite = kind => kind === 'white' || kind === 'origwhite'; // the film ov
 const toClear = kind => kind.startsWith('orig') ? 'origclear' : 'clear'; // Hold Transparent: the same side on the checks
 const toOrig = kind => kind.startsWith('orig') ? kind : ({shirt: 'orig', clear: 'origclear', white: 'origwhite'}[kind] || 'origbase'); // Hold Original: the art before halftoning
 const shownKind = kind => compare === 'clear' ? toClear(kind) : compare === 'orig' ? toOrig(kind) : kind;
-const WHITE_LEGEND = [['#ffffff', 'White fill behind: what shows is what prints']];
-const ORIGWHITE_LEGEND = [['#ffffff', 'Original over a white fill']];
+let checkHex = '#3a3a3a'; // the colour behind the print in the On a colour view: for looking only
+try { const c = localStorage.getItem('tsw-ge-check'); if (/^#[0-9a-f]{6}$/i.test(c || '')) checkHex = c; } catch(e){}
+const WHITE_LEGEND = [[checkHex, 'Colour behind: what shows is what prints']];
+const ORIGWHITE_LEGEND = [[checkHex, 'Original over the colour']];
 const selLegend = () => [['#ffffff', `Selected by part ${activeRule + 1}`], ['#808080', 'Partly selected (fuzziness)'], ['#000000', 'Not selected']];
 function buildMask(kind){
   const m = masks[kind];
@@ -2747,7 +2753,7 @@ function drawPane(p, dpr){
     }
     g.OW = OW; g.OH = OH;
     if (isClear(p.kind)){ vctx.fillStyle = checker(dpr); vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // Photoshop-style transparency checks under the art
-    else if (isWhite(p.kind)){ vctx.fillStyle = '#ffffff'; vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // a solid white layer behind the art
+    else if (isWhite(p.kind)){ vctx.fillStyle = checkHex; vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // a solid white layer behind the art
     const k = g.k, L = k < 1 ? Math.min(levels.length - 1, Math.max(0, Math.floor(Math.log2(1/k)))) : 0, mip = levels[L];
     vctx.imageSmoothingEnabled = k < 1; vctx.imageSmoothingQuality = 'high';
     if (inRoom) vctx.drawImage(mip, 0, 0, mip.width, mip.height, g.dx + fadeRoom.l*k, g.dy + fadeRoom.t*k, SW*k, SH*k);
@@ -2919,6 +2925,12 @@ for (const id of ['paneA', 'paneB']){
   });
 }
 document.addEventListener('pointerdown', e => { if (paneOpen && !e.target.closest('.pane-pick')) closePaneMenu(); });
+$('checkPick').value = checkHex;
+$('checkPick').addEventListener('input', e => {
+  checkHex = e.target.value; WHITE_LEGEND[0][0] = ORIGWHITE_LEGEND[0][0] = checkHex;
+  try { localStorage.setItem('tsw-ge-check', checkHex); } catch(err){}
+  if (st.view !== 'white' && !(st.view === 'split' && (isWhite(st.paneA) || isWhite(st.paneB)))) setView('white'); else { syncLegend(); render(); }
+});
 $('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b){ setView(b.dataset.view); moreViews(false); } });
 function moreViews(open){ $('moreViews').hidden = !open; $('moreViewsBtn').setAttribute('aria-expanded', String(open)); }
 function syncMoreViews(){
