@@ -5502,7 +5502,6 @@ for (const t of ['input', 'change']) $('quickRows').addEventListener(t, e => { /
   window.addEventListener('keyup', later); }
 syncQuick();
 $('lookFold').addEventListener('click', () => setLookFold($('lookBox').hidden));
-$('looks').addEventListener('change', () => setTimeout(() => setLookFold(false), 250)); // picked: fold it away again
 $('lookBaRange').addEventListener('input', e => $('lookBa').style.setProperty('--cut', e.target.value + '%'));
 $('trail').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b) showStep(b.dataset.step); });
 new MutationObserver(syncTrail).observe(document.querySelector('.panel'), {subtree: true, attributes: true, attributeFilter: ['class', 'hidden']});
