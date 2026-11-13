@@ -592,6 +592,22 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .trail .trail-all .link{width:auto;padding:0;border:0;background:none;display:inline;text-decoration:underline}
 .group{scroll-margin-top:150px}
 .step-q::before{content:attr(data-n);display:block;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+/* v94: versions in Split; Quick start as a feature; pink outline on Quick adjust */
+.pp-tag.ver{background:var(--accent);border-color:var(--accent);color:#ffffff}
+.vers #verSplit{margin-left:auto}
+.vers #verSplit + #verNew{margin-left:8px}
+.look-fold{gap:12px;min-height:76px;padding:10px 12px;border-width:2px;border-color:var(--ink);background:var(--soft)}
+.look-fold:hover{background:var(--panel)}
+.look-fold[aria-expanded="true"]{border-color:var(--accent);background:var(--panel)}
+.lf-pic{flex:none;display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:center;width:132px;color:var(--muted);font-weight:600}
+.lf-pic:empty{display:none}
+.lf-txt{flex:1;min-width:0;display:grid;gap:2px}
+.lf-k{font-size:20px;font-weight:800;letter-spacing:-.02em;text-transform:none;color:var(--ink);line-height:1.1}
+.look-fold b{font-size:14px;font-weight:600;color:var(--ink)}
+.lf-go{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border:1.5px solid var(--ink);border-radius:var(--r);background:var(--panel);font-size:14px;font-weight:700;text-decoration:none}
+.lf-go::after{content:"";width:7px;height:7px;margin-top:-4px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg)}
+.look-fold[aria-expanded="true"] .lf-go::after{transform:rotate(-135deg);margin-top:4px}
+.quick{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 </style>
 </head>
 <body>
@@ -694,7 +710,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="revertBtn">Revert</button><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
       <nav class="trail" id="trail" aria-label="The three steps"></nav>
-      <div class="vers" id="vers"><span class="vers-k">Versions</span><span class="vers-list" id="verList"></span><button class="link" type="button" id="verNew" data-tip="Keeps the design as it is now, and starts a copy to try another way: for example Clean cut as A and Halftone as B. Then flick between them.">Try another way</button></div>
+      <div class="vers" id="vers"><span class="vers-k">Versions</span><span class="vers-list" id="verList"></span><button class="link" type="button" id="verSplit" hidden data-tip="Shows another version on the left and the one you are working on on the right. Each side’s menu can pick a different version.">Side by side</button><button class="link" type="button" id="verNew" data-tip="Keeps the design as it is now, and starts a copy to try another way: for example Clean cut as A and Halftone as B. Then flick between them.">Try another way</button></div>
 
       <section class="group step" id="sizeGroup">
         <h2>Print size</h2>
@@ -735,7 +751,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <div class="quick-rows" id="quickRows"></div>
           <p class="f-note">Drag to balance the look. These are the same settings as in Fine-tune, where there are more.</p>
         </div>
-        <button class="look-fold" type="button" id="lookFold" aria-expanded="false" aria-controls="lookBox"><span class="lf-k">Quick start</span><b id="lookNow"></b><span class="lf-go" id="lookGo">Change</span></button>
+        <button class="look-fold" type="button" id="lookFold" aria-expanded="false" aria-controls="lookBox"><span class="lf-pic" id="lookNowPic" aria-hidden="true"></span><span class="lf-txt"><span class="lf-k">Quick start</span><b id="lookNow"></b></span><span class="lf-go" id="lookGo">Change</span></button>
         <div class="look-box" id="lookBox" hidden>
         <div class="looks" id="looks">
           <label class="look"><input type="radio" name="look" id="lookShadows" value="shadows"><span class="look-t">Remove shadows</span><span class="look-d">Quick clean-up for dark shirts. Shadows drop out and the rest prints solid, with no dots.</span></label>
@@ -2318,7 +2334,9 @@ const LOOK_PICS = { // [before, after] for each Quick start, by print style
 let lookBaKey = '';
 function setLookFold(open){ $('lookBox').hidden = !open; $('lookFold').setAttribute('aria-expanded', String(open)); $('lookGo').textContent = open ? 'Close' : 'Change'; }
 function syncLookPics(){
-  { const el = $('lookNow'), t = lookName(); if (el && el.textContent !== t) el.textContent = t; }
+  { const el = $('lookNow'), t = lookName(); if (el && el.textContent !== t) el.textContent = t;
+    const r0 = routeOf(st.finish), pc = LOOK_PICS[r0][st.look], key0 = r0 + ':' + st.look, box = $('lookNowPic');
+    if (box && box.dataset.key !== key0){ box.dataset.key = key0; box.innerHTML = pc ? `<span class="demo-shirt">${demoArt(pc[0])}</span><span>→</span><span class="demo-shirt">${demoArt(pc[1])}</span>` : ''; } }
   const r = routeOf(st.finish);
   for (const lab of $('looks').querySelectorAll('.look')){
     const v = lab.querySelector('input').value, pic = LOOK_PICS[r][v], key = r + ':' + v;
@@ -2618,14 +2636,14 @@ const PANES = [ // [kind, group, name, what it shows, picture]
   ['map', 'after', 'Ink map', 'White prints solid, pink turns into dots, grey is removed.', 'map'],
   ['sel', 'after', 'Selection', 'The active part: white is selected.', 'sel']
 ];
-const PANE_GROUPS = {before: 'Before · the original art', after: 'After · the print'};
+const PANE_GROUPS = {before: 'Before · the original art', after: 'After · the print', ver: 'Other versions of this design'};
 const CHECKS = 'repeating-conic-gradient(#cccccc 0 25%, #ffffff 0 50%) 0 0/8px 8px';
 const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? Math.round((1 - lastOn/s.vis)*100) : 0; return [[CHECKS, cut > 0 ? `Clear film · ink area down ${cut}%` : 'Clear film']]; };
 const ORIGCLEAR_LEGEND = [[CHECKS, 'Clear film']];
 const isClear = kind => kind === 'clear' || kind === 'origclear';
 const isWhite = kind => kind === 'white' || kind === 'origwhite'; // the film over a solid white fill
-const toClear = kind => kind.startsWith('orig') ? 'origclear' : 'clear'; // Hold Transparent: the same side on the checks
-const toOrig = kind => kind.startsWith('orig') ? kind : ({shirt: 'orig', clear: 'origclear', white: 'origwhite'}[kind] || 'origbase'); // Hold Original: the art before halftoning
+const toClear = kind => /^ver\d$/.test(kind) ? kind : kind.startsWith('orig') ? 'origclear' : 'clear'; // Hold Transparent: the same side on the checks
+const toOrig = kind => kind.startsWith('orig') ? kind : /^ver\d$/.test(kind) ? 'orig' : ({shirt: 'orig', clear: 'origclear', white: 'origwhite'}[kind] || 'origbase'); // Hold Original: the art before halftoning
 const shownKind = kind => compare === 'clear' ? toClear(kind) : compare === 'orig' ? toOrig(kind) : kind;
 let checkHex = '#3d3d40'; // the colour behind the print in the On a colour view: for looking only
 try { const c = localStorage.getItem('tsw-ge-check'); if (/^#[0-9a-f]{6}$/i.test(c || '')) checkHex = c; } catch(e){}
@@ -2657,6 +2675,7 @@ function prepareViews(){
   if (ks.some(k => isMask(k) && !isClear(k) && !isWhite(k))) buildOrigMask();
 }
 function levelsFor(kind){
+  if (isVer(kind)){ const v = verOf(kind); return v && v.pic ? v.pic.mips : null; }
   if (kind === 'orig' || kind === 'origclear' || kind === 'origwhite') return srcMips;
   if (kind === 'clear') return outMips || srcMips; // the film itself: the PNG's own colours
   if (kind === 'white') return viewMips || outMips || srcMips;
@@ -2665,8 +2684,18 @@ function levelsFor(kind){
   if (kind === 'sel') return rules.length ? selMips : null;
   return masks[kind].mips || outMips;
 }
-const isMask = kind => kind !== 'shirt' && kind !== 'orig';
-const paneBg = kind => isMask(kind) ? '#1a1a1a' : st.shirt;
+const isVer = kind => /^ver\d$/.test(kind || ''); // another version of this design, as it last looked
+const verOf = kind => art && art.vers && isVer(kind) ? art.vers[+kind.slice(3)] : null;
+const isMask = kind => kind !== 'shirt' && kind !== 'orig' && !isVer(kind);
+const paneBg = kind => isMask(kind) ? '#1a1a1a' : isVer(kind) && verOf(kind) && verOf(kind).pic ? verOf(kind).pic.shirt : st.shirt;
+function verKeepPic(v){ // a picture of the version showing, as it looks on the shirt, for comparing later
+  const lv = outReady ? (viewMips || outMips) : null; if (!v || !lv || !lv[0] || !lv[0].width) return;
+  const src = lv[0], k = Math.min(1, 2400/Math.max(src.width, src.height)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(src.width*k)); c.height = Math.max(1, Math.round(src.height*k));
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height);
+  const mips = buildMips(c); mips.scale = k; // scale: this picture's pixels per print pixel
+  v.pic = {mips, shirt: st.shirt};
+}
 function buildOrigMask(){
   if (origFor === srcV || !srcCanvas.width) return;
   const W = srcCanvas.width, H = srcCanvas.height, d = srcCtx.getImageData(0, 0, W, H).data;
@@ -2758,9 +2787,13 @@ function drawPane(p, dpr){
   vctx.save(); vctx.beginPath(); vctx.rect(X, Y, W, H); vctx.clip();
   vctx.fillStyle = paneBg(p.kind); vctx.fillRect(X, Y, W, H);
   const levels = levelsFor(p.kind);
+  if (!levels && isVer(p.kind)){ // nothing to show yet: this version has not been on screen this visit
+    const i = +p.kind.slice(3); vctx.fillStyle = '#e6e6e6'; vctx.textAlign = 'center'; vctx.textBaseline = 'middle'; vctx.font = `600 ${Math.round(14*dpr)}px Inter, Arial, sans-serif`;
+    vctx.fillText(`Click version ${verLetter(i)} once, then come back, to see it here.`, X + W/2, Y + H/2); vctx.textAlign = 'start'; vctx.textBaseline = 'alphabetic';
+  }
   if (levels){
     const roomy = hasRoom() && outReady, inRoom = roomy && (levels === srcMips || levels === origMips); // the original, drawn where it sits in the bigger print
-    const SW = levels[0].width, SH = levels[0].height, OW = inRoom ? SW + fadeRoom.l + fadeRoom.r : SW, OH = inRoom ? SH + fadeRoom.t + fadeRoom.b : SH, side = st.view === 'split' ? 12 : 24;
+    const sc = levels.scale || 1, SW = Math.round(levels[0].width/sc), SH = Math.round(levels[0].height/sc), OW = inRoom ? SW + fadeRoom.l + fadeRoom.r : SW, OH = inRoom ? SH + fadeRoom.t + fadeRoom.b : SH, side = st.view === 'split' ? 12 : 24;
     const bw = Math.max(40, p.w - side*2), bh = Math.max(40, p.h - p.top - p.bottom), s = Math.min(bw/OW, bh/OH);
     g.fitK = s*dpr;
     if (st.zoom === 'fit'){
@@ -2773,7 +2806,7 @@ function drawPane(p, dpr){
     g.OW = OW; g.OH = OH;
     if (isClear(p.kind)){ vctx.fillStyle = checker(dpr); vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // Photoshop-style transparency checks under the art
     else if (isWhite(p.kind)){ vctx.fillStyle = checkHex; vctx.fillRect(g.dx, g.dy, OW*g.k, OH*g.k); } // a solid white layer behind the art
-    const k = g.k, L = k < 1 ? Math.min(levels.length - 1, Math.max(0, Math.floor(Math.log2(1/k)))) : 0, mip = levels[L];
+    const k = g.k, kk = k/sc, L = kk < 1 ? Math.min(levels.length - 1, Math.max(0, Math.floor(Math.log2(1/kk)))) : 0, mip = levels[L];
     vctx.imageSmoothingEnabled = k < 1; vctx.imageSmoothingQuality = 'high';
     if (inRoom) vctx.drawImage(mip, 0, 0, mip.width, mip.height, g.dx + fadeRoom.l*k, g.dy + fadeRoom.t*k, SW*k, SH*k);
     else vctx.drawImage(mip, 0, 0, mip.width, mip.height, g.dx, g.dy, OW*k, OH*k);
@@ -2909,11 +2942,12 @@ function syncLegend(){
   placeLegend();
 }
 function syncPaneOptions(){ // each side's button and menu
-  const list = PANES.filter(([v]) => v !== 'sel' || rules.length);
+  const others = art && art.vers ? art.vers.map((v, i) => i === art.verOn ? null : ['ver' + i, 'ver', `Version ${verLetter(i)} · ${verStyle(v.snap)}`, v.pic ? 'This version as it last looked. Click it in Versions to change it.' : 'Click this version once in Versions and it can be compared here.', 'shirt']).filter(Boolean) : [];
+  const list = PANES.filter(([v]) => v !== 'sel' || rules.length).concat(others);
   for (const id of ['paneA', 'paneB']){
     if (!list.some(([v]) => v === st[id])) st[id] = 'shirt';
-    const [, group, name] = PANES.find(([v]) => v === st[id]);
-    $(id + 'Btn').innerHTML = `<span class="pp-tag ${group}">${group === 'before' ? 'Before' : 'After'}</span><span>${name}</span><span class="pp-chev" aria-hidden="true"></span>`;
+    const [, group, name0] = list.find(([v]) => v === st[id]), live = art && art.vers && st[id] === 'shirt' ? `Version ${verLetter(art.verOn)} · ` : '', name = live + name0;
+    $(id + 'Btn').innerHTML = `<span class="pp-tag ${group}">${group === 'before' ? 'Before' : group === 'ver' ? 'Version' : 'After'}</span><span>${name}</span><span class="pp-chev" aria-hidden="true"></span>`;
     let html = '', last = '';
     for (const [v, g, n, d, pic] of list){
       if (g !== last){ last = g; html += `<div class="pp-group" role="presentation">${PANE_GROUPS[g]}</div>`; }
@@ -5184,7 +5218,7 @@ function syncVers(){
   if (V && steps[stepPos] && steps[stepPos].ver == null) steps[stepPos].ver = on; // a new step belongs to the version showing
   box.hidden = !art;
   $('verNew').hidden = !!V && V.length >= VER_MAX;
-  $('verNew').textContent = V ? 'Add another' : 'Try another way';
+  $('verNew').textContent = V ? 'Add another' : 'Try another way'; $('verSplit').hidden = !V;
   const html = !V ? '<span class="vers-none">Only one so far.</span>' : V.map((v, i) => `<span class="ver"><button class="chip" type="button" data-ver="${i}" aria-pressed="${i === on}" data-tip="${i === on ? 'This version is showing. Changes you make go into it.' : 'Show this version.'}">${verLetter(i)} · ${verStyle(i === on ? snapshot() : v.snap)}</button>` +
     `<button class="ver-x" type="button" data-verx="${i}" aria-label="Remove version ${verLetter(i)}" data-tip="Remove this version.">×</button></span>`).join('');
   if ($('verList').innerHTML !== html) $('verList').innerHTML = html;
@@ -5196,7 +5230,7 @@ function verNew(){
   if (!art.vers || !art.vers.length){ art.vers = [{snap: snapshot()}]; art.verOn = 0; for (const t of steps) t.ver = 0; } // everything so far was A
   else art.vers[art.verOn].snap = snapshot();
   if (art.vers.length >= VER_MAX){ toast(`Up to ${VER_MAX} versions of one design. Remove one first.`); return; }
-  const from = art.verOn;
+  const from = art.verOn; verKeepPic(art.vers[from]);
   art.vers.push({snap: JSON.parse(JSON.stringify(snapshot()))}); art.verOn = art.vers.length - 1;
   syncVers(); persistSoon();
   toast(`Version ${verLetter(art.verOn)} is a copy of ${verLetter(from)}. Change it any way you like, then flick between them.`);
@@ -5207,21 +5241,32 @@ function verShow(i){
   if (picking) endPick();
   endBrush(); commitStep();
   V[art.verOn].snap = snapshot(); // the one being left keeps its latest state
+  verKeepPic(V[art.verOn]);
+  for (const id of ['paneA', 'paneB']) if (st[id] === 'ver' + i) st[id] = 'ver' + art.verOn; // a side that showed the one coming up now shows the one being left
   art.verOn = i;
   applySnap(V[i].snap);
   stepLabel = `Version ${verLetter(i)}`; commitStep();
-  syncVers(); persistSoon();
+  syncVers(); syncPaneOptions(); prepareViews(); render(); persistSoon();
 }
 function verDrop(i){
   const V = art && art.vers; if (!V || !V[i]) return;
   if (i === art.verOn) verShow(i ? i - 1 : 1);
   const on = V[art.verOn];
   V.splice(i, 1); art.verOn = V.indexOf(on);
+  for (const id of ['paneA', 'paneB']) if (isVer(st[id])) st[id] = 'shirt';
   for (const t of steps){ if (t.ver === i) t.ver = null; else if (t.ver > i) t.ver--; }
   if (V.length < 2){ art.vers = null; art.verOn = 0; for (const t of steps) delete t.ver; }
-  syncVers(); persistSoon();
+  syncVers(); syncPaneOptions(); prepareViews(); render(); persistSoon();
   toast(`Version removed.${art.vers ? '' : ' Back to one.'}`);
 }
+function verSideBySide(){
+  const V = art && art.vers; if (!V) return;
+  const other = isVer(st.paneA) && verOf(st.paneA) && +st.paneA.slice(3) !== art.verOn ? +st.paneA.slice(3) : V.findIndex((v, i) => i !== art.verOn);
+  st.paneA = 'ver' + other; st.paneB = 'shirt';
+  setView('split'); syncPaneOptions(); prepareViews(); syncLegend(); render(); remember();
+  if (!V[other].pic) toast(`Click version ${verLetter(other)} once, then come back to ${verLetter(art.verOn)}, to see it on the left.`);
+}
+$('verSplit').addEventListener('click', verSideBySide);
 $('verNew').addEventListener('click', verNew);
 $('verList').addEventListener('click', e => {
   const x = e.target.closest('[data-verx]'); if (x){ verDrop(+x.dataset.verx); return; }
