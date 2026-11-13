@@ -3390,20 +3390,22 @@ const QUICK = {
   dotsKnock: [['k1', 'Shirt showing through', 'Less', 'More'], ['mid', 'Ink amount', 'Less ink', 'More ink']],
   dots: [['mid', 'Ink amount', 'Less ink', 'More ink'], ['lpi', 'Dot size', 'Bigger dots', 'Finer dots']],
   cut: [['cut', 'Soft edges', 'Keep more', 'Remove more'], ['bri', 'Brightness', 'Darker', 'Brighter']],
+  cutShadows: [[() => { const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && !R.off); return i < 0 ? '' : `r${i}range`; }, 'Shadows removed up to', 'Only the darkest', 'Lighter shades too'], ['cut', 'Soft edges', 'Keep more', 'Remove more']],
+  cutKnock: [['ktol', 'Colour cleared near the shirt', 'Only the shirt colour', 'Colours near it too'], ['cut', 'Soft edges', 'Keep more', 'Remove more']],
   prep: [['bri', 'Brightness', 'Darker', 'Brighter'], ['bcon', 'Contrast', 'Softer', 'Stronger']],
   flat: [['flatSmooth', 'Smoothing', 'Sharper corners', 'Smoother'], ['flatTidy', 'Smallest detail kept', 'Keeps tiny bits', 'Drops tiny bits']]
 };
 let quickKey = '';
 function quickMode(){
   const b = $('finishChips').querySelector('[aria-pressed="true"]'), f = b ? b.dataset.finish : st.finish;
-  return f === 'prep' ? 'prep' : f === 'flat' ? 'flat' : f === 'cut' ? 'cut' : st.look === 'deep' || st.look === 'knock' ? 'dotsKnock' : 'dots';
+  return f === 'prep' ? 'prep' : f === 'flat' ? 'flat' : f === 'cut' ? (st.look === 'shadows' ? 'cutShadows' : st.look === 'knock' ? 'cutKnock' : 'cut') : st.look === 'deep' || st.look === 'knock' ? 'dotsKnock' : 'dots';
 }
 function syncQuick(){
   const box = $('quickAdj'); if (!box) return;
-  const mode = quickMode(), rows = QUICK[mode].filter(r => $(r[0]));
+  const mode = quickMode(), rows = QUICK[mode].map(r => [typeof r[0] === 'function' ? r[0]() : r[0], r[1], r[2], r[3]]).filter(r => r[0] && $(r[0])), key = mode + ':' + rows.map(r => r[0]).join(',');
   box.hidden = !rows.length;
-  if (mode !== quickKey){
-    quickKey = mode;
+  if (key !== quickKey){
+    quickKey = key;
     $('quickRows').innerHTML = rows.map(([id, name, lo, hi]) => `<div class="field"><div class="f-head"><label for="q-${id}">${name}</label><output id="q-${id}-out"></output></div>
       <input type="range" id="q-${id}" data-buddy="${id}" min="${$(id).min}" max="${$(id).max}" step="${$(id).step}">
       <div class="quick-ends"><span>${lo}</span><span>${hi}</span></div></div>`).join('');
@@ -3650,7 +3652,7 @@ function renderRules(){
   syncShowChips(); syncPickChips();
 }
 function syncRules(){
-  renderRules();
+  renderRules(); setTimeout(syncQuick, 0);
   $('viewTray').querySelector('[data-view="sel"]').hidden = !rules.length;
   syncPaneOptions();
   if (!rules.length && st.view === 'sel') setView(viewBeforeSel);
