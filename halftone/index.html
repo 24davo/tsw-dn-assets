@@ -882,6 +882,13 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         </div>
         <label class="check-row" data-tip="Like using Brightness/Contrast in Luminosity blend mode in Photoshop: lighter or darker, with colours as strong as before."><input type="checkbox" id="bcLum"> Keep colour strength</label>
         <p class="f-note"><span>Lighter or darker, and more or less contrast, before the dots.</span><span class="more-x" hidden> Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes them apart (or together). They work on each colour channel, as Photoshop does. Tick Keep colour strength to change only lightness, so colours don’t turn grey or pastel. Double-click a slider to put it back to 0.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        <div class="lv-sub">Deepen pale colours</div>
+        <div class="chips" id="paleChips" role="group" aria-label="Deepen pale colours">
+          <button class="chip" type="button" data-pale="0" aria-pressed="true">Off</button>
+          <button class="chip" type="button" data-pale="1" aria-pressed="false">A little</button>
+          <button class="chip" type="button" data-pale="2" aria-pressed="false">More</button>
+        </div>
+        <p class="f-note"><span>For creams and other light tints that print as white. Makes them a little darker and stronger so they hold their colour.</span><span class="more-x" hidden> True white, light greys and all the darker colours stay as they are. The hue stays the same. Print a test before a big run: how much is needed depends on the colour and the shirt.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="lv-sub">Levels</div>
         <p class="f-note"><span>Drag the black point right for more shadow, or the white point left for more highlights.</span><span class="more-x" hidden> Like Photoshop’s Levels. All of this runs first, on the art’s colours, and the adjusted colours are what prints.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="levels">
@@ -1383,6 +1390,22 @@ function engine(){
           d[i] += delta; d[i+1] += delta; d[i+2] += delta; // the clamped array keeps every value in 0–255
         }
       }
+    }
+  }
+  /* Deepen pale colours: a light, tinted pixel moves further from white along its own hue (its distance from white is
+     multiplied). How light it is and how much colour it has decide how much: white and near-greys get none. */
+  const PALE = [0, 1.7, 2.6];
+  function deepenPale(d, w, h, level){
+    const k = PALE[level]; if (!k) return;
+    for (let i = 0, n = w*h*4; i < n; i += 4){
+      if (!d[i + 3]) continue;
+      const r = d[i], g = d[i + 1], b = d[i + 2], mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      const L = (mx + mn)/510; if (L <= 0.62) continue;
+      const c = mx - mn; if (c <= 5) continue;
+      let wl = (L - 0.62)/0.16; if (wl > 1) wl = 1; wl = wl*wl*(3 - 2*wl);
+      let wc = (c - 5)/12; if (wc > 1) wc = 1; wc = wc*wc*(3 - 2*wc);
+      const f = 1 + (k - 1)*wl*wc;
+      d[i] = 255 - (255 - r)*f; d[i + 1] = 255 - (255 - g)*f; d[i + 2] = 255 - (255 - b)*f; // the clamped array keeps 0-255
     }
   }
   const NOISE = [null, {R: 1, T: 14, passes: 1}, {R: 2, T: 24, passes: 1}, {R: 2, T: 38, passes: 2}];
@@ -2182,6 +2205,7 @@ function engine(){
     if (m.type === 'mask'){ masks.set(m.id, {w: m.w, h: m.h, d: new Uint8Array(m.buf)}); return {msg: {type: 'mask'}}; }
     if (m.type === 'src'){
       if (m.noise) denoiseData(new Uint8ClampedArray(m.buf), m.w, m.h, m.noise);
+      if (m.pale) deepenPale(new Uint8ClampedArray(m.buf), m.w, m.h, m.pale);
       if (m.sharp) sharpenData(new Uint8ClampedArray(m.buf), m.w, m.h, m.sharp.amount, m.sharp.sigma);
       return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
     }
@@ -2279,7 +2303,7 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, noise: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, noise: 0, pale: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const ST0 = JSON.parse(JSON.stringify(st)); // the settings a new visit starts with
 const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','areaV'];
@@ -2617,7 +2641,7 @@ function buildOrigMask(){
 }
 
 let srcTimer = 0, srcW0 = 0, srcH0 = 0, srcSharp = ''; // srcSharp: the sharpening the engine's copy of the art has
-const sharpKey = () => (st.sharp ? `${st.sharp}:${st.sradius}` : '') + (st.noise ? `n${st.noise}` : '');
+const sharpKey = () => (st.sharp ? `${st.sharp}:${st.sradius}` : '') + (st.noise ? `n${st.noise}` : '') + (st.pale ? `p${st.pale}` : '');
 function buildSrcSoon(){ clearTimeout(srcTimer); srcTimer = setTimeout(buildSrc, 250); }
 function buildSrc(){
   if (!art) return;
@@ -2627,7 +2651,7 @@ function buildSrc(){
   const data = srcCtx.getImageData(0, 0, W, H);
   srcV++; srcStats = null;
   srcSharp = sharpKey();
-  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer, sharp: st.sharp ? {amount: st.sharp, sigma: st.sradius} : null, noise: st.noise || 0}, [data.data.buffer]);
+  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer, sharp: st.sharp ? {amount: st.sharp, sigma: st.sradius} : null, noise: st.noise || 0, pale: st.pale || 0}, [data.data.buffer]);
   srcMips = buildMips(srcCanvas);
   prepareViews();
   if (W !== srcW0 || H !== srcH0){ st.cx = W/2; st.cy = H/2; srcW0 = W; srcH0 = H; }
@@ -3454,7 +3478,7 @@ function syncQuick(){
   }
   for (const [id] of rows){ const q = $('q-' + id), o = $(id + 'Out'); if (q.value !== $(id).value) q.value = $(id).value; $('q-' + id + '-out').textContent = o ? o.textContent : $(id).value; }
 }
-function syncSliders(){ if (st.noise === undefined) st.noise = 0; syncChips('noiseChips', 'noise', st.noise); for (const K of [BG_KEYS, FLAT_KEYS]) for (const k in K) if (st[k] === undefined) st[k] = K[k]; // designs kept from before a setting existed
+function syncSliders(){ if (st.noise === undefined) st.noise = 0; if (st.pale === undefined) st.pale = 0; syncChips('paleChips', 'pale', st.pale); syncChips('noiseChips', 'noise', st.noise); for (const K of [BG_KEYS, FLAT_KEYS]) for (const k in K) if (st[k] === undefined) st[k] = K[k]; // designs kept from before a setting existed
   for (const [id, fmt] of SLIDERS){ $(id).value = st[id]; $(id + 'Out').textContent = fmt(st[id]); } syncChips('lpiChips', 'lpi', st.lpi);
   syncBg(); syncThru();
   for (const b of $('sharpChips').querySelectorAll('[data-sharp]')) b.setAttribute('aria-pressed', String(+b.dataset.sharp === st.sharp && (!st.sharp || Math.abs(+b.dataset.sr - st.sradius) < 1e-6)));
@@ -3462,6 +3486,7 @@ function syncSliders(){ if (st.noise === undefined) st.noise = 0; syncChips('noi
   const near = st.emode === 'near'; syncChips('emodeChips', 'emode', st.emode); $('emodeAny').hidden = near; $('emodeNear').hidden = !near; $('etolField').hidden = !st.edge || !near;
   syncChips('fadeChips', 'fadedir', st.fadeDir); $('fadeInNote').hidden = st.fadeDir !== 'in'; $('fadeOutNote').hidden = st.fadeDir !== 'out'; $('fadeSpreadNote').hidden = st.fadeDir !== 'spread'; syncFadeClip();
   syncDens(); if (typeof syncHlv === 'function' && $('hlvB')) try { syncHlv(); } catch(e){} syncBack(); $('crispOn').checked = !!st.crisp; $('speckOn').checked = !!st.speck; $('hardOn').checked = st.hard > 0; $('hardT').hidden = !st.hard; if (st.hard){ hardWas = st.hard; } else { $('hard').value = hardWas; $('hardOut').textContent = `${hardWas}%`; } }
+$('paleChips').addEventListener('click', e => { const b = e.target.closest('[data-pale]'); if (!b) return; noteChange(`Deepen pale colours: ${b.textContent}`); st.pale = +b.dataset.pale; syncSliders(); syncSums(); remember(); schedule(); updateChecks(); });
 $('noiseChips').addEventListener('click', e => { const b = e.target.closest('[data-noise]'); if (!b) return; noteChange(`Smooth out noise: ${b.textContent}`); st.noise = +b.dataset.noise; syncSliders(); remember(); schedule(); updateChecks(); });
 $('sharpChips').addEventListener('click', e => { const b = e.target.closest('[data-sharp]'); if (!b) return; st.sharp = +b.dataset.sharp; if (st.sharp) st.sradius = +b.dataset.sr; syncSliders(); remember(); schedule(); });
 $('emodeChips').addEventListener('click', e => { const b = e.target.closest('[data-emode]'); if (!b) return; st.emode = b.dataset.emode; syncSliders(); remember(); schedule(); });
@@ -3965,6 +3990,7 @@ function updateChecks(){
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (st.bgOn && Array.isArray(bgFound)) rows.push(['info', '✂', `Background removed (${(st.bgHex || rgbHex(bgFound[0], bgFound[1], bgFound[2])).toUpperCase()})`, `Cleared where it joins the outside edge, within ${st.bgTol}%. The same colour inside the design stays.`]);
+  if (st.pale) rows.push(['info', '◐', `Pale colours deepened: ${['', 'a little', 'more'][st.pale]}`, 'Creams and other light tints are a little darker and stronger so they don’t print as white. White itself is unchanged.']);
   if (st.noise) rows.push(['info', '≈', `Noise smoothed: ${['', 'Light', 'Medium', 'Strong'][st.noise]}`, 'Speckle and patchy colour evened out on the art at print size, before the dots.']);
   if (st.sharp) rows.push(['info', '↗', `Sharpened ${st.sharp}% at ${(+st.sradius).toFixed(1)} px`, 'Unsharp mask on the art at print size, before the dots.']);
   if (st.clean && st.finish !== 'cut' && knockLook(st.look) && st.ink !== 'one' && linY(hexRgb(st.knock || st.shirt)) < linY([70, 70, 70]))
@@ -4454,12 +4480,12 @@ async function welcomeGo(job){
   await openFiles(fs);
   if (!art || art.isSample){ syncWelcome(); return; } // nothing opened: stay here
   if (job === 'tidy'){ const b = $('finishChips').querySelector('[data-finish="prep"]'); if (b) b.click(); }
-  goStep('sizeGroup');
+  showStep('sizeGroup');
 }
 $('wDrop').addEventListener('click', () => { wJob = ''; $('wIn').click(); });
 $('wIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; if (list.length) welcomeFiles(list, true); });
 $('wChoices').addEventListener('click', e => { const b = e.target.closest('[data-job]'); if (b) welcomeGo(b.dataset.job); });
-$('wSample').addEventListener('click', () => { hideWelcome(); goStep('sizeGroup'); });
+$('wSample').addEventListener('click', () => { hideWelcome(); showStep('sizeGroup'); });
 $('wSkip').addEventListener('click', () => { try { if (welcomeSkipped()) localStorage.removeItem('tsw-ge-welcome'); else localStorage.setItem('tsw-ge-welcome', 'skip'); } catch(e){} syncWelcome(); if (welcomeSkipped()){ hideWelcome(); toast('Skipped from now on. Click the logo to see it again.'); } });
 $('brand').addEventListener('click', showWelcome);
 $('brand').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); showWelcome(); } });
@@ -4665,7 +4691,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'pale', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => { if (!(x && typeof x.name === 'string' && x.s && typeof x.s === 'object')) return false; cleanDeep(x.s); x.rules = cleanDeep(x.rules); x.levels = cleanDeep(x.levels); return true; };
@@ -4931,8 +4957,8 @@ $('speedGroup').addEventListener('click', e => {
 function speedDone(){
   if (!art) return;
   $('routeGroup').classList.add('done'); $('checkGroup').classList.remove('done'); // a new set-up: not saved yet
-  if (art.sizeFrom === 'guess'){ goStep('sizeGroup'); return; } // nobody has chosen a size yet: that comes first
-  $('sizeGroup').classList.add('done'); goStep('checkGroup');
+  if (art.sizeFrom === 'guess'){ showStep('sizeGroup'); return; } // nobody has chosen a size yet: that comes first
+  $('sizeGroup').classList.add('done'); showStep('checkGroup');
 }
 syncSpeed();
 
@@ -5201,7 +5227,7 @@ function syncTrail(){ // the three steps across the top of the panel: where you 
   }).join('');
   if (html !== trailWas){ trailWas = html; el.innerHTML = html; }
 }
-function goStep(id){ // one step shows at a time
+function showStep(id){ // one step shows at a time (not goStep: that name is History's)
   for (const f of visibleSteps()) f.set(f.g.id === id);
   syncFoldAll(); document.querySelector('.panel').scrollTo({top: 0, behavior: 'smooth'}); if (id === 'checkGroup') drawHisto();
 }
@@ -5278,7 +5304,7 @@ function syncTune(){ // how many Fine-tune sections this design has changed (the
   let n = 0;
   const c = art.crop; if (!(c.x === 0 && c.y === 0 && c.w === art.fullW && c.h === art.fullH)) n++;
   for (const id of ['bgGroup', 'sharpGroup', 'knockGroup', 'rangeGroup', 'edgeGroup', 'inkGroup', 'touchGroup']) if (!$(id).hidden && !stepIsReset(id)) n++;
-  if (!lvIdentity()) n++;
+  if (!lvIdentity() || st.pale) n++;
   if (!$('toneGroup').hidden && (st.mid !== lookVal('mid') || st.con !== lookVal('con') || Object.keys(HLV0).some(k => st[k] !== HLV0[k]))) n++;
   const t = n ? `${n} changed` : ''; if ($('tuneSum').textContent !== t) $('tuneSum').textContent = t;
 }
@@ -5311,7 +5337,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, noise: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
+                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'dots', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, noise: 0, pale: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -5386,7 +5412,7 @@ syncQuick();
 $('lookFold').addEventListener('click', () => setLookFold($('lookBox').hidden));
 $('looks').addEventListener('change', () => setTimeout(() => setLookFold(false), 250)); // picked: fold it away again
 $('lookBaRange').addEventListener('input', e => $('lookBa').style.setProperty('--cut', e.target.value + '%'));
-$('trail').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b) goStep(b.dataset.step); });
+$('trail').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b) showStep(b.dataset.step); });
 new MutationObserver(syncTrail).observe(document.querySelector('.panel'), {subtree: true, attributes: true, attributeFilter: ['class', 'hidden']});
 syncTrail();
 
