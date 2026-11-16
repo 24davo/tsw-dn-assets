@@ -627,6 +627,12 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .ver .chip{height:52px}
 .ver-x{height:52px}
 .ver.solo{gap:10px}
+/* v99: the Art ready offer */
+.art-bar{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 32px);padding:10px 12px 10px 16px;border-radius:var(--r);background:var(--toast);color:var(--toast-ink);font-size:14px;font-weight:600}
+.art-bar button{flex:none;height:38px;padding:0 14px;border:1.5px solid var(--toast-ink);border-radius:var(--r);background:none;color:var(--toast-ink);font:inherit;font-weight:700;cursor:pointer}
+.art-bar button.yes{background:var(--accent);border-color:var(--accent);color:#ffffff}
+.art-bar button:hover{background:var(--toast-ink);border-color:var(--toast-ink);color:var(--toast)}
+.art-bar button[disabled]{opacity:.5;pointer-events:none}
 </style>
 </head>
 <body>
@@ -1311,6 +1317,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <div class="cal-actions"><button class="btn" type="button" id="askCancel">Cancel</button><button class="btn" type="button" id="askNoSave">Don’t save</button><button class="btn primary" type="button" id="askSaveBtn">Save PNG</button></div>
   </div>
 </div>
+<div class="art-bar" id="artBar" role="status" hidden><span id="artBarTxt"></span><button type="button" class="yes" id="artBarYes">Mark Art ready on the board</button><button type="button" id="artBarNo">Not yet</button></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script>
@@ -4564,9 +4571,49 @@ async function openFile(f){
   return true;
 }
 if (/^https?:$/.test(location.protocol) && location.pathname.startsWith('/engine/')) for (const a of document.querySelectorAll('a[href^="https://24davo.github.io/tsw-dn-assets/halftone/"]')) a.setAttribute('href', a.getAttribute('href').replace('https://24davo.github.io/tsw-dn-assets/halftone/', '/engine/'));
-const HANDOVER_FROM = ['https://board.tshirtworkshop.com.au', location.origin].filter(o => /^https?:/.test(o));
+const HANDOVER_FROM = [...new Set(['https://board.tshirtworkshop.com.au', location.origin])].filter(o => /^https?:/.test(o));
 let handoverUp = false;
-function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 4, batch: true, labels: true, orders: true}, o); } catch(e){} } }
+function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 4, batch: true, labels: true, orders: true, artReady: 'ask'}, o); } catch(e){} } }
+/* ---------- Art ready: an offer to tick the job's step on the Workboard once its print files are saved ---------- */
+const ART_BOARD = 'https://board.tshirtworkshop.com.au', artOn = location.origin === ART_BOARD;
+const artJobs = new Map(); // job id -> {got: designs received for it in this tab, saved: those saved, ticked, hidden}
+const artIds = list => [...new Set((Array.isArray(list) ? list : []).map(x => String(x == null ? '' : x)).filter(x => /^[A-Z]{2,5}\d+$/.test(x)))].slice(0, 8);
+function artGot(ids, key){ for (const id of ids || []){ let j = artJobs.get(id); if (!j) artJobs.set(id, j = {got: new Set(), saved: new Set(), ticked: false, hidden: false}); j.got.add(key); } }
+function artSaved(ids, key){
+  if (!artOn) return;
+  let any = false;
+  for (const id of ids || []){ const j = artJobs.get(id); if (!j || !j.got.has(key)) continue; j.saved.add(key); j.hidden = false; any = true; }
+  if (any) syncArtBar();
+}
+const artReadyJobs = () => [...artJobs].filter(([, j]) => !j.ticked && !j.hidden && j.got.size && [...j.got].every(k => j.saved.has(k))).map(([id]) => id);
+function syncArtBar(){
+  const ids = artOn ? artReadyJobs() : [];
+  $('artBar').hidden = !ids.length; if (!ids.length) return;
+  $('artBarTxt').textContent = `All the print files for ${ids.join(', ')} are saved.`;
+  $('artBarYes').textContent = ids.length > 1 ? `Mark ${ids.length} jobs Art ready on the board` : 'Mark Art ready on the board';
+  $('artBarYes').disabled = false;
+}
+async function artTick(){
+  const ids = artReadyJobs(); if (!ids.length || !artOn) return;
+  $('artBarYes').disabled = true;
+  const ticked = [], notes = [];
+  for (const id of ids){
+    const j = artJobs.get(id);
+    try {
+      const r = await fetch('/api/orders/' + encodeURIComponent(id) + '/art-ready', {method: 'POST', credentials: 'same-origin'});
+      if (r.status === 401){ notes.push('Sign in to the Workboard, then try again.'); break; }
+      const a = r.ok ? await r.json().catch(() => null) : null;
+      if (a && a.ok && a.ticked){ j.ticked = true; ticked.push(id); }
+      else if (a && a.ok){ j.ticked = true; notes.push(a.why === 'started' ? `${id} is already at a step on the board.` : a.why === 'done' ? `${id} is already produced or sent.` : a.why === 'no art step' ? `${id} has no art step on the board.` : `${id} was left as it is on the board.`); }
+      else notes.push(r.status === 404 ? `${id} isn’t on the board.` : `The board couldn’t be reached for ${id}. Tick Art ready on the board instead.`);
+    } catch(err){ notes.push(`The board couldn’t be reached for ${id}. Tick Art ready on the board instead.`); }
+  }
+  for (const id of ids){ const j = artJobs.get(id); if (!j.ticked) j.hidden = true; } // asked once; it comes back after the next save for that job
+  syncArtBar();
+  toast([ticked.length ? `Art ready ticked on the board: ${ticked.join(', ')}.` : '', ...notes].filter(Boolean).join(' '));
+}
+$('artBarYes').addEventListener('click', artTick);
+$('artBarNo').addEventListener('click', () => { for (const id of artReadyJobs()) artJobs.get(id).hidden = true; syncArtBar(); });
 window.addEventListener('message', async e => {
   const m = e.data; if (!m || typeof m !== 'object' || !HANDOVER_FROM.includes(e.origin)) return;
   if (m.tsw === 'ge-ping'){ handoverReady(e.source); return; }
@@ -4596,6 +4643,7 @@ window.addEventListener('message', async e => {
     const mm = Math.round(+m.widthMm);
     if (mm > 0){ const el = $('wcm'); el.value = mm; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); }
     toast(`Opened from the Workboard: ${name}`);
+    const ids = artIds(m.orders); if (ids.length && art){ art.orders = ids; art.artKey = 'd:' + (cur ? cur.id : name); artGot(ids, art.artKey); }
   }
   const room = Math.max(0, MAX_DOCS - docs.length + (art && art.isSample ? 1 : 0));
   try { e.source.postMessage(ok ? {tsw: 'ge-opened', ok, id: m.id, room} : {tsw: 'ge-opened', ok, id: m.id, why: wasFull ? 'full' : 'unreadable', room}, e.origin); } catch(err){}
@@ -4775,7 +4823,7 @@ async function savePng(){ // answers true once the PNG is saved
   } finally {
     $('busyTxt').textContent = 'Updating…'; saving = false; $('saveBtn').disabled = !outReady;
   }
-  if (ok){ commitStep(); unsaved = false; renderTabs(); savedMoment(fileName()); }
+  if (ok){ commitStep(); unsaved = false; renderTabs(); savedMoment(fileName()); if (art && art.orders) artSaved(art.orders, art.artKey); }
   return ok;
 }
 let savedTimer = 0;
@@ -5864,6 +5912,7 @@ async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; ans
     let thumb = ''; try { thumb = c.toDataURL('image/png'); } catch(e){}
     const mm = Math.round(+x.widthMm) || 0;
     g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), lab: String(x.label || '').slice(0, 160), labShort: String(x.labelShort || '').slice(0, 60), w, h, tb, thumb, file, on: true, mm, kept: false});
+    { const it = g.items[g.items.length - 1]; it.orders = artIds(x.orders); if (it.orders.length) artGot(it.orders, 'b:' + it.key); }
     out.count++;
   }
   if (g.scaleFrom !== 'user' && g.items.length){ // the Workboard's width: the widest file prints that wide; or the first file that came with a width
@@ -6331,7 +6380,7 @@ async function batchSave(groups, whole){
       ok = await saveFile(await makeZip(list), `${base}_twedit_${files.length}-files.zip`);
     } catch(err){ toast('The zip couldn’t be made. Try fewer files at a time.'); }
   }
-  if (ok) for (const f of files) f.it.saved = true;
+  if (ok) for (const f of files){ f.it.saved = true; if (f.it.orders && f.it.orders.length) artSaved(f.it.orders, 'b:' + f.it.key); }
   batchBusy = false; saving = false; $('saveBtn').disabled = !outReady; $('batchBusyTxt').textContent = 'Working…'; $('batchBusy').hidden = true;
   batchKeepSoon(); renderBatch();
   if (batchStopped) toast('Stopped. Nothing was saved.');
