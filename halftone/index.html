@@ -1156,6 +1156,11 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         <div class="field">
           <label class="check-row"><input type="checkbox" id="speckOn"> Speck clean-up</label>
           <p class="f-note"><span id="speckNote">Removes specks of ink and fills pinholes too small to print.</span><span class="more-x" hidden> Anything smaller than the smallest dot in Dot limits is a speck: on the film it would lift off or fill in. Proper dots are never touched.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+          <div id="speckSizeBox" hidden>
+            <div class="f-head"><label for="speckMm">Specks cleared up to</label><output id="speckMmOut" for="speckMm">0.3 mm</output></div>
+            <input type="range" id="speckMm" min="0.1" max="2" step="0.1" value="0.3">
+            <p class="f-note"><span>Loose bits of ink smaller than this go, and holes smaller than this fill with the colour around them.</span></p>
+          </div>
         </div>
         <div class="field dotf" id="fadeField">
           <div class="f-head"><label for="fade">Fade the edge</label><output id="fadeOut" for="fade">Off</output></div>
@@ -1823,7 +1828,7 @@ function engine(){
     // to be a gap are filled. The sizes come from Dot limits, so every real dot and gap is kept.
     let speck = 0, pin = 0;
     if (p.speck){
-      const lim = Math.min(p.drop, 1 - p.solid), T = cut ? 3 : lim > 0 ? Math.floor(0.4*lim*cell*cell) : 0;
+      const lim = Math.min(p.drop, 1 - p.solid), T = cut ? Math.max(3, p.speckT | 0) : lim > 0 ? Math.floor(0.4*lim*cell*cell) : 0;
       if (T >= 1){
         const n = w*h, seen = new Uint8Array(n), q = new Int32Array(T + 12);
         for (let s0 = 0; s0 < n; s0++){
@@ -2405,10 +2410,10 @@ function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[rou
 const $ = id => document.getElementById(id);
 const st = {look: 'deep', lpi: 30, angle: 22.5, shape: 'round', k0: 8, k1: 30, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
             ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'dots', cut: 50,
-            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, noise: 0, pale: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, dtg: false, dtgHex: 'shirt', blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
+            edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, noise: 0, pale: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, dtg: false, dtgHex: 'shirt', blkOn: true, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, speckMm: 0.3, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const ST0 = JSON.parse(JSON.stringify(st)); // the settings a new visit starts with
-const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','areaV'];
+const KEEP = ['look','lpi','angle','shape','k0','k1','ktol','mid','con','drop','solid','ink','inkHex','shirt','finish','cut','hard','brushV','paintHex','blkOn','blk','clean','hb','hg','hw','hob','how','rich','crisp','speck','speckMm','areaV'];
 const cleanStr = v => v.replace(/[<>"'&`();\\]/g, '');
 function cleanDeep(o, d = 0){ // in place; anything nested too deep to be a real setting is dropped
   if (!o || typeof o !== 'object') return typeof o === 'string' ? cleanStr(o) : o;
@@ -2528,7 +2533,7 @@ function params(){
           drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(partParams), selOut: rules.length ? activeRule : -1,
           hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
-          rich: st.rich && st.finish !== 'cut', crisp: st.crisp && st.finish !== 'cut' ? 3 : 0, speck: !!st.speck,
+          rich: st.rich && st.finish !== 'cut', crisp: st.crisp && st.finish !== 'cut' ? 3 : 0, speck: !!st.speck, speckT: st.finish === 'cut' ? Math.max(3, Math.round((st.speckMm/25.4*DPI)**2)) : 0,
           flat: isFlat() ? {n: st.flatN, snap: !!st.flatSnap, tidy: Math.round(st.flatTidy/25.4*DPI), smooth: (st.flatSmooth == null ? 4 : +st.flatSmooth)*0.16, up: art ? toMm(st.widthCm)/25.4*DPI/art.w : 1, drop: st.flatDrop ? st.flatDrop.split(',').map(hexRgb) : []} : null,
           clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: blkOnNow() && !isFlat() ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn && !isDtg() ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, thru: st.thruOn ? {rgb: hexRgb(thruHex()), floor: Math.max(1, Math.round((st.thruFloor || 4)*2.55)), r: Math.max(2, Math.min(6, Math.round(1.5*outW()/Math.max(1, art.w))))} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100,
           fade: st.fade && st.finish !== 'cut' ? {px: Math.max(1, Math.round(st.fade/25.4*DPI)), out: st.fadeDir !== 'in', spread: st.fadeDir === 'spread', max: [Math.round(MAX_SHORT/2.54*DPI), Math.round(MAX_LONG/2.54*DPI)]} : null};
@@ -3621,14 +3626,14 @@ $('bgPick').addEventListener('click', () => picking ? endPick() : startPick('bg'
 $('bgAuto').addEventListener('click', () => { st.bgHex = null; syncBg(); noteChange('Background colour found on the edge'); schedule(); });
 let hardWas = 50; // the hard edge threshold to go back to when it's ticked again
 const SLIDERS = [['fade', v => v ? `${v} mm` : 'Off'], ['back', pxMm], ['bgTol', v => `${v}%`], ['thruFloor', v => `${v}%`], ['sharp', v => v ? `${v}%` : 'Off'], ['sradius', v => `${(+v).toFixed(1)} px`], ['hard', v => `${v}%`], ['edge', pxMm], ['etol', v => `${v}%`], ['lpi', v => `${v} lpi`], ['k0', v => `${v}%`], ['k1', v => `${v}%`], ['ktol', v => `${v}%`], ['mid', v => (v > 0 ? `+${v}` : `${v}`)],
-                 ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`], ['flatTidy', v => +v ? `${(+v).toFixed(1)} mm` : 'Off'], ['flatSmooth', v => +v ? `${+v}` : 'Off']];
+                 ['con', v => (v > 0 ? `+${v}` : `${v}`)], ['drop', v => `${v}%`], ['solid', v => `${v}%`], ['cut', v => `${v}%`], ['speckMm', v => `${(+v).toFixed(1)} mm`], ['flatTidy', v => +v ? `${(+v).toFixed(1)} mm` : 'Off'], ['flatSmooth', v => +v ? `${+v}` : 'Off']];
 /* Quick adjust: which sliders suit each print style. [slider id, name, left end, right end] */
 const QUICK = {
   dotsKnock: [['k1', 'Shirt showing through', 'Less', 'More'], ['mid', 'Ink amount', 'Less ink', 'More ink']],
   dots: [['mid', 'Ink amount', 'Less ink', 'More ink'], ['lpi', 'Dot size', 'Bigger dots', 'Finer dots']],
-  cut: [['cut', 'Soft edges', 'Keep more', 'Remove more'], ['bri', 'Brightness', 'Darker', 'Brighter']],
-  cutShadows: [[() => { const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && !R.off); return i < 0 ? '' : `r${i}range`; }, 'Shadows removed up to', 'Only the darkest', 'Lighter shades too'], ['cut', 'Soft edges', 'Keep more', 'Remove more']],
-  cutKnock: [['ktol', 'Colour cleared near the shirt', 'Only the shirt colour', 'Colours near it too'], ['cut', 'Soft edges', 'Keep more', 'Remove more']],
+  cut: [['cut', 'Soft edges', 'Keep more', 'Remove more'], ['bri', 'Brightness', 'Darker', 'Brighter'], ['speckMm', 'Specks cleared up to', 'Tiny only', 'Bigger ones too']],
+  cutShadows: [[() => { const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && !R.off); return i < 0 ? '' : `r${i}range`; }, 'Shadows removed up to', 'Only the darkest', 'Lighter shades too'], ['cut', 'Soft edges', 'Keep more', 'Remove more'], ['speckMm', 'Specks cleared up to', 'Tiny only', 'Bigger ones too']],
+  cutKnock: [['ktol', 'Colour cleared near the shirt', 'Only the shirt colour', 'Colours near it too'], ['cut', 'Soft edges', 'Keep more', 'Remove more'], ['speckMm', 'Specks cleared up to', 'Tiny only', 'Bigger ones too']],
   prep: [['bri', 'Brightness', 'Darker', 'Brighter'], ['bcon', 'Contrast', 'Softer', 'Stronger']],
   flat: [['flatSmooth', 'Smoothing', 'Sharper corners', 'Smoother'], ['flatTidy', 'Smallest detail kept', 'Keeps tiny bits', 'Drops tiny bits']]
 };
@@ -3671,6 +3676,7 @@ for (const [id, fmt] of SLIDERS){
     if (id === 'k1' && v <= st.k0){ st.k0 = Math.max(0, v - 5); }
     if (id === 'lpi'){ const lvl = densLevel(); st.lpi = v; if (lvl) Object.assign(st, densVals(lvl)); } // the dot limits follow the lpi
     else st[id] = v;
+    if (id === 'speckMm' && !st.speck){ st.speck = true; $('speckOn').checked = true; } // moving the size turns the clean-up on
     syncSliders(); updateNotes(); remember(); schedule();
   });
 }
@@ -3799,6 +3805,7 @@ function syncFinish(){
   syncFinChips();
   const cut = st.finish === 'cut', r = routeOf(st.finish), list = ROUTE_LOOKS[r];
   for (const el of document.querySelectorAll('.dotf, .dotk')) el.hidden = cut;
+  $('speckSizeBox').hidden = !cut;
   $('cutField').hidden = !cut; $('ktolField').hidden = !cut; syncFlat();
   $('hardField').hidden = cut;
   $('toneGroup').hidden = cut; // Ink density: dots only
@@ -3834,13 +3841,13 @@ const RULE_DEFAULTS = [['shadows', 'remove'], ['highlights', 'solid'], ['midtone
 const MAX_RULES = 6;
 function newRule(type, action){ return {type, action, samples: [], range: 50, fuzz: 20, keep: 50, cut: 50, k0: 10, k1: 30, invert: false, to: '#ffffff'}; }
 function dropShadowRule(){ // the range Remove shadows added, if it's still as it was added (a changed one is the user's now)
-  const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && R.range === 50 && R.fuzz === 20 && !R.area && !R.off);
+  const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && R.range === 50 && (R.fuzz === 0 || R.fuzz === 20) && !R.area && !R.off);
   if (i < 0) return;
   rules.splice(i, 1); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1)); syncRules();
 }
 function ensureShadowRule(){
   let i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert);
-  if (i < 0){ rules.unshift(newRule('shadows', 'remove')); i = 0; }
+  if (i < 0){ rules.unshift(Object.assign(newRule('shadows', 'remove'), {fuzz: 0})); i = 0; } // a clean cut is hard either way: fuzziness would only take more than the number says
   activeRule = i; syncRules();
 }
 function ruleParams(R){
@@ -4988,7 +4995,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'pale', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'dtg', 'dtgHex', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'speckMm', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'pale', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'dtg', 'dtgHex', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => { if (!(x && typeof x.name === 'string' && x.s && typeof x.s === 'object')) return false; cleanDeep(x.s); x.rules = cleanDeep(x.rules); x.levels = cleanDeep(x.levels); return true; };
