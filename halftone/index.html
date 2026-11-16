@@ -223,6 +223,11 @@ h2{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:u
 .choice[aria-pressed="true"]{border-color:var(--ink);background:var(--soft);box-shadow:inset 0 0 0 1px var(--ink)}
 .choice-t{font-size:15px;font-weight:800;letter-spacing:-.01em}
 .choice-d{font-size:12px;color:var(--muted);line-height:1.4}
+.dtg-hint{display:flex;align-items:center;gap:10px 12px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border:1.5px solid var(--line-strong);border-radius:var(--r);font-size:13px;line-height:1.4}
+.dtg-hint[hidden]{display:none}
+.dtg-hint button{font:inherit;font-weight:800;padding:8px 12px;border:1.5px solid var(--ink);border-radius:var(--r);background:transparent;color:var(--ink);cursor:pointer;white-space:nowrap}
+.dtg-hint button:hover{background:var(--soft)}
+.dtg-hint span{flex:1 1 180px;color:var(--muted)}
 .route{gap:10px}
 .route .choice{padding:14px 12px}
 .route .choice-t{font-size:17px}
@@ -780,6 +785,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="choice" type="button" data-finish="flat"><span class="choice-t">Trace prep</span><span class="choice-d">Flat colours for tracing.</span></button>
           <button class="choice wide" type="button" data-finish="dtg"><span class="choice-t">DTG</span><span class="choice-d">Solid background behind the art. Nothing removed, no dots.</span></button>
         </div>
+        <div class="dtg-hint" id="dtgHint" hidden><button type="button" id="dtgHintBtn">Better as DTG?</button><span id="dtgHintWhy"></span></div>
         <div class="quick" id="quickAdj" hidden>
           <div class="lv-sub">Quick adjust</div>
           <div class="quick-rows" id="quickRows"></div>
@@ -2801,7 +2807,7 @@ function paint(m){
   lastCls = new Uint8Array(m.cls); lastSel = m.sel ? new Uint8Array(m.sel) : null; paintN++;
   chist = m.ch ? new Uint32Array(m.ch) : null; drawHhisto();
   prepareViews();
-  outReady = true; lastOn = m.on; lastSpeck = [m.speck || 0, m.pin || 0]; syncSpeck(); lastFlat = m.flat || null; syncFlat();
+  outReady = true; lastOn = m.on; lastSpeck = [m.speck || 0, m.pin || 0]; syncSpeck(); dtgHintSoon(m.bg, m.on); lastFlat = m.flat || null; syncFlat();
   $('saveBtn').disabled = false;
   render(); updateChecks(); syncLegend();
 }
@@ -3733,6 +3739,43 @@ $('finishChips').addEventListener('click', e => {
 });
 const isPrep = () => st.finish === 'cut' && st.look === 'edges' && !st.flat && !st.dtg;
 function syncFinChips(){ syncChips('finishChips', 'finish', isFlat() ? 'flat' : isDtg() ? 'dtg' : isPrep() ? 'prep' : st.finish); syncDtg(); }
+/* "Better as DTG?": measured on a small copy of the art as it sits on the shirt colour.
+   glow = soft fades and glows as a share of the ink (hard to blend into the shirt with dots: the base ink lifts them).
+   ink = the ink left to print at this size, after the knock-out. */
+const DTG_HINT = {glow: 17, inkCm2: 350};
+let dtgHintKey = '', dtgHintTimer = 0, dtgHintGlow = 0;
+function dtgMeasure(bgRgb){
+  const W = Math.min(700, srcCanvas.width), H = Math.max(1, Math.round(srcCanvas.height*W/srcCanvas.width)), c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(srcCanvas, 0, 0, W, H);
+  const d = x.getImageData(0, 0, W, H).data, n = W*H, raw = new Float32Array(n), lv = new Float32Array(n), sh = hexRgb(st.shirt), tol = bgRgb ? st.bgTol*2.55 + 8 : -1;
+  for (let i = 0, o = 0; i < n; i++, o += 4){ // how strongly each pixel shows on this shirt, 0 to 1
+    if (tol >= 0 && Math.max(Math.abs(d[o] - bgRgb[0]), Math.abs(d[o + 1] - bgRgb[1]), Math.abs(d[o + 2] - bgRgb[2])) <= tol) continue; // the background being removed
+    raw[i] = Math.max(Math.abs(d[o] - sh[0]), Math.abs(d[o + 1] - sh[1]), Math.abs(d[o + 2] - sh[2]))/255*d[o + 3]/255;
+  }
+  for (let y = 1; y < H - 1; y++) for (let px = 1; px < W - 1; px++){ const i = y*W + px; lv[i] = (raw[i - W - 1] + raw[i - W] + raw[i - W + 1] + raw[i - 1] + raw[i] + raw[i + 1] + raw[i + W - 1] + raw[i + W] + raw[i + W + 1])/9; }
+  const mm = st.widthCm*10/W; let ink = 0, fade = 0;
+  for (let i = 0; i < n; i++) if (lv[i] >= 0.1) ink++; // closer to the shirt colour than this counts as shirt (a black background on a near-black tee)
+  // a soft fade: dim, and changing gently from pixel to pixel (a flat dark colour doesn't change; a hard edge changes fast)
+  for (let y = 2; y < H - 2; y++) for (let px = 2; px < W - 2; px++){ const i = y*W + px, v = lv[i]; if (v < 0.03 || v > 0.4) continue;
+    const g = Math.hypot(lv[i + 2] - lv[i - 2], lv[i + 2*W] - lv[i - 2*W])/4; if (g >= 0.008 && g <= 0.08) fade++; }
+  return {glow: ink ? fade/ink*100 : 0, inkCm2: ink*mm*mm/100};
+}
+function dtgHintSoon(bg, on){ clearTimeout(dtgHintTimer); dtgHintTimer = setTimeout(() => dtgHintCheck(bg, on), 60); }
+function dtgHintCheck(bg, on){
+  const box = $('dtgHint'); if (!box) return;
+  if (!art || !srcCanvas.width || isDtg() || isFlat()){ box.hidden = true; dtgHintKey = ''; return; }
+  const bgRgb = st.bgOn && Array.isArray(bg) ? bg : null, key = [srcV, st.shirt, st.widthCm, bgRgb ? bgRgb.join('.') + '/' + st.bgTol : ''].join('|');
+  if (key !== dtgHintKey){ dtgHintKey = key; try { dtgHintGlow = dtgMeasure(bgRgb).glow; } catch(e){ dtgHintGlow = 0; } }
+  // the ink area is what is left to print after the knock-out and shadow removal (owner: a design with lots of
+  // knock-out prints well as DTF at any size), so it comes from the finished result, not the art as opened
+  const m = {glow: dtgHintGlow, inkCm2: (on || 0)/((DPI/2.54)**2)};
+  const why = [];
+  if (m.glow >= DTG_HINT.glow) why.push('Lots of soft glow and fades: hard to blend into the shirt with dots.');
+  if (m.inkCm2 >= DTG_HINT.inkCm2) why.push(`A lot of ink is left to print (about ${Math.round(m.inkCm2/10)*10} cm²).` + (st.finish === 'cut' && st.look === 'shadows' ? '' : ' Try Clean cut with Remove shadows first.'));
+  box.dataset.glow = m.glow.toFixed(1); box.dataset.ink = Math.round(m.inkCm2);
+  $('dtgHintWhy').textContent = why.join(' '); box.hidden = !why.length;
+}
+$('dtgHintBtn').addEventListener('click', () => { const b = $('finishChips').querySelector('[data-finish="dtg"]'); if (b) b.click(); $('dtgHint').hidden = true; });
 function syncDtg(){ // the background colour row, and the Quick start row it replaces
   const on = isDtg(); if (!$('dtgField')) return;
   $('dtgField').hidden = !on; $('lookFold').hidden = on; if (on) $('lookBox').hidden = true; else $('lookBox').hidden = $('lookFold').getAttribute('aria-expanded') !== 'true';
