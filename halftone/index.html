@@ -4775,7 +4775,7 @@ function saveNameOf(t){ // a whole file name as typed: safe for any computer, an
 }
 function fileName(){
   const whole = art ? saveNameOf(art.saveName) : ''; if (whole) return whole;
-  const clean = t => t.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
+  const clean = t => t.replace(/\s*[+&]\s*/g, '-').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
   const words = nameByWords ? $('nameSuffix').value.split(',').map(clean).filter(Boolean) : [];
   if (words.length) return `${words.join('_')}_twedit_${hasRoom() ? pxToMm(printPxW()) : toMm(st.widthCm)}w` + (st.finish === 'cut' && st.flat ? (traceBgHex() ? '_trace' : '_flat') : '') + '.png';
   const base = art.isSample ? 'sample-art' : clean((art.name || 'art').replace(/\.[a-z0-9]+$/i, '').replace(/_twedit(_.*)?$/i, '')) || 'art';
