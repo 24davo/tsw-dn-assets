@@ -799,9 +799,15 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         <h2>Check &amp; save</h2>
         <div class="checks" id="checks"></div>
         <div class="field name-field">
-          <div class="f-head"><label for="nameSuffix">Add to the file name</label><span class="opt">Optional</span></div>
-          <input type="text" id="nameSuffix" maxlength="40" placeholder="e.g. order 57615, front" aria-describedby="nameNote" autocomplete="off" spellcheck="false">
+          <div class="f-head"><label for="nameSuffix">Order and placement</label><span class="opt">Optional</span></div>
+          <input type="text" id="nameSuffix" maxlength="40" placeholder="e.g. 57615, full front" aria-describedby="nameNote" autocomplete="off" spellcheck="false">
+          <label class="check-row" data-tip="On: the file is named by the words above, then the size, like 57615_full-front_twedit_280w.png. Off: the words are added to the end of the file’s own name."><input type="checkbox" id="nameWords"> Name the file by these words</label>
           <p class="f-note" id="nameNote">Saves as –</p>
+          <button class="link" type="button" id="nameFullOpen" aria-expanded="false" aria-controls="nameFullBox" style="justify-self:start">Type the whole name instead</button>
+          <div class="field" id="nameFullBox" hidden>
+            <input type="text" id="nameFull" maxlength="120" placeholder="e.g. club-logo.png" aria-label="The whole file name" autocomplete="off" spellcheck="false">
+            <div class="preset-actions"><button class="chip" type="button" id="nameOrig" data-tip="Saves under the same name as the file you opened, as a PNG. For a cleaned version that replaces the original.">Use the original name</button><button class="link" type="button" id="nameUsual" hidden>Back to the usual name</button></div>
+          </div>
         </div>
         <div class="field name-field">
           <div class="f-head"><label for="labelMode">Production label</label><span class="opt">Cut it off after printing</span></div>
@@ -4482,7 +4488,7 @@ const idbGet = (db, store, key) => new Promise(res => { try { const r = db.trans
 const idbDone = tx => new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => rej(tx.error); });
 function docRecord(d){
   const live = d === cur, a = live ? art : d.art;
-  return {name: a.name, dpi: a.dpi, jpegQ: a.jpegQ, isVector: a.isVector, fullW: a.fullW, fullH: a.fullH, smooth: !!a.smooth, sizeFrom: a.sizeFrom,
+  return {name: a.name, saveName: a.saveName || '', dpi: a.dpi, jpegQ: a.jpegQ, isVector: a.isVector, fullW: a.fullW, fullH: a.fullH, smooth: !!a.smooth, sizeFrom: a.sizeFrom,
     vers: a.vers && a.vers.length > 1 ? a.vers.map((v, i) => ({snap: live && i === a.verOn ? snapshot() : v.snap, thumb: v.thumb || ''})) : null, verOn: a.verOn || 0,
     strokes: a.strokes, strokesN: a.strokesN, snap: live ? snapshot() : d.snap, activeRule: live ? activeRule : d.activeRule,
     steps: live ? steps : d.steps, stepPos: live ? stepPos : d.stepPos, unsaved: live ? unsaved : d.unsaved,
@@ -4524,7 +4530,7 @@ async function restoreDocs(){ // answers how many designs came back
       const im = new Image(); im.decoding = 'async'; im.src = URL.createObjectURL(file);
       try { await im.decode(); } catch(e){ continue; }
       const a = makeArt(im, rec.fullW, rec.fullH, rec.name, false, rec.dpi, {vector: rec.isVector, jpegQ: rec.jpegQ});
-      Object.assign(a, {file, quiet: true, sizeFrom: rec.sizeFrom || 'user', smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0});
+      Object.assign(a, {file, quiet: true, sizeFrom: rec.sizeFrom || 'user', smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0, saveName: String(rec.saveName || '').slice(0, 120)});
       if (Array.isArray(rec.vers) && rec.vers.length > 1 && rec.vers.every(v => v && v.snap && v.snap.s)){ a.vers = rec.vers.slice(0, 6).map(v => ({snap: v.snap, thumb: /^data:image\//.test(v.thumb || '') ? v.thumb : ''})); a.verOn = Math.max(0, Math.min(+rec.verOn || 0, a.vers.length - 1)); }
       if (rec.snap.crop){ a.crop = {...rec.snap.crop}; a.w = a.crop.w; a.h = a.crop.h; }
       if (cleanReset){ for (const x of [rec.snap, ...(rec.steps || []).map(t => t.snap)]) if (x && x.s) x.s.clean = false; }
@@ -4760,13 +4766,33 @@ async function withDpi(blob, dpi, texts){
 /* name_twedit_280w_30lpi.png: the art's name, our mark, the print width in mm, the lines per inch for halftones
    (Clean cut leaves it out), then anything typed in "Add to the file name". Opening a saved edit again starts
    from its first name, so the marks don't pile up. */
+let nameByWords = false; try { nameByWords = localStorage.getItem('tsw-ge-namewords') === 'on'; } catch(err){}
+function saveNameOf(t){ // a whole file name as typed: safe for any computer, and always a PNG
+  let n = String(t || '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^\.+/, '').slice(0, 120);
+  if (!n) return '';
+  n = n.replace(/\.(png|jpe?g|webp|gif|svg|pdf|psd|ai|tiff?|bmp)$/i, '').replace(/[. ]+$/, '');
+  return n ? n + '.png' : '';
+}
 function fileName(){
+  const whole = art ? saveNameOf(art.saveName) : ''; if (whole) return whole;
   const clean = t => t.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
+  const words = nameByWords ? $('nameSuffix').value.split(',').map(clean).filter(Boolean) : [];
+  if (words.length) return `${words.join('_')}_twedit_${hasRoom() ? pxToMm(printPxW()) : toMm(st.widthCm)}w` + (st.finish === 'cut' && st.flat ? (traceBgHex() ? '_trace' : '_flat') : '') + '.png';
   const base = art.isSample ? 'sample-art' : clean((art.name || 'art').replace(/\.[a-z0-9]+$/i, '').replace(/_twedit(_.*)?$/i, '')) || 'art';
   const extra = clean($('nameSuffix').value);
   return `${base}_twedit_${hasRoom() ? pxToMm(printPxW()) : toMm(st.widthCm)}w` + (st.finish === 'cut' ? (st.flat ? (traceBgHex() ? '_trace' : '_flat') : '') : `_${st.lpi}lpi`) + (extra ? `_${extra}` : '') + '.png';
 }
-function syncFileName(){ if (art) $('nameNote').innerHTML = `Saves as <b>${esc(fileName())}</b>`; syncLabel(); }
+function syncFileName(){
+  if (art){
+    const whole = saveNameOf(art.saveName), el = $('nameFull'), words = $('nameSuffix').value.trim();
+    if (el !== document.activeElement && el.value !== (art.saveName || '')) el.value = art.saveName || '';
+    if (whole && $('nameFullBox').hidden){ $('nameFullBox').hidden = false; $('nameFullOpen').setAttribute('aria-expanded', 'true'); }
+    $('nameWords').checked = nameByWords; $('nameSuffix').disabled = $('nameWords').disabled = !!whole;
+    $('nameUsual').hidden = !whole; $('nameOrig').hidden = !!art.isSample;
+    $('nameNote').innerHTML = `Saves as <b>${esc(fileName())}</b>` + (whole ? '. If a file with that name is already in Downloads, the browser adds (1) to it.' : nameByWords && !words ? '. Type the order and placement above to name it by them.' : '');
+  }
+  syncLabel();
+}
 /* ---------- production label: solid words under the design, to cut off after printing ---------- */
 function labelAuto(kind){ // made from what is already known about the design
   if (!art) return '';
@@ -4819,6 +4845,12 @@ function labelled(c){ // the canvas to save: the design, a gap, then the label. 
   return o;
 }
 $('nameSuffix').addEventListener('input', () => { syncFileName(); persistSoon(); });
+$('nameWords').addEventListener('change', e => { nameByWords = e.target.checked; try { localStorage.setItem('tsw-ge-namewords', nameByWords ? 'on' : 'off'); } catch(err){} syncFileName(); });
+$('nameFullOpen').addEventListener('click', () => { const open = $('nameFullBox').hidden; $('nameFullBox').hidden = !open; $('nameFullOpen').setAttribute('aria-expanded', String(open)); if (open) $('nameFull').focus(); });
+$('nameFull').addEventListener('input', e => { if (!art) return; art.saveName = e.target.value.slice(0, 120); syncFileName(); persistSoon(); });
+$('nameFull').addEventListener('blur', () => { if (art){ art.saveName = saveNameOf(art.saveName); syncFileName(); } });
+$('nameOrig').addEventListener('click', () => { if (!art) return; art.saveName = saveNameOf(art.name); syncFileName(); persistSoon(); toast(`It will save as ${art.saveName}, the original’s name as a PNG.`); });
+$('nameUsual').addEventListener('click', () => { if (!art) return; art.saveName = ''; syncFileName(); persistSoon(); });
 function settingsText(){
   const look = lookName();
   const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` + (st.flat ? `; flat colours (${st.flatN || 'auto'}${lastFlat ? ': ' + lastFlat.pal.filter(c => !c[4]).map(c => rgbHex(c[0], c[1], c[2]).toUpperCase()).join(' ') : ''}); tidy under ${st.flatTidy} mm; smooth edges ${st.flatSmooth == null ? 4 : st.flatSmooth}` + (traceBgHex() ? `; tracing background ${traceBgHex().toUpperCase()}` : '') : '') : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
