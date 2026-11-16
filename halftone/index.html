@@ -633,6 +633,8 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .art-bar button.yes{background:var(--accent);border-color:var(--accent);color:#ffffff}
 .art-bar button:hover{background:var(--toast-ink);border-color:var(--toast-ink);color:var(--toast)}
 .art-bar button[disabled]{opacity:.5;pointer-events:none}
+/* v100: Full screen shows as on with the pink outline */
+#fullBtn[aria-pressed="true"],#installBtn{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 </style>
 </head>
 <body>
@@ -651,6 +653,8 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
       <button class="btn" id="undoBtn" type="button" disabled>Undo</button>
       <button class="btn" id="redoBtn" type="button" disabled>Redo</button>
       <a class="btn" id="helpBtn" href="https://24davo.github.io/tsw-dn-assets/halftone/guide/" target="_blank" rel="noopener" style="text-decoration:none">Guide</a>
+      <button class="btn" id="fullBtn" type="button" aria-pressed="false" hidden data-tip="Fills the whole screen with Graphic Engine. The browser’s bars and the taskbar hide until you leave it. Esc leaves.">Full screen</button>
+      <button class="btn" id="installBtn" type="button" hidden data-tip="Puts this in its own window, like a program: no browser tabs or address bar, its own icon on the taskbar, and the taskbar stays in view.">Install app</button>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
       <button class="btn" type="button" id="batchBtn" data-tip="Many files at once: one set-up for a group, every file at the same scale, saved together as full-size PNGs.">Batch</button>
       <button class="btn" type="button" id="openBtn">Open art</button>
@@ -4650,6 +4654,29 @@ window.addEventListener('message', async e => {
   try { window.focus(); } catch(err){}
 });
 $('fileIn').addEventListener('change', e => { const list = [...e.target.files]; e.target.value = ''; openFiles(list); });
+/* ---------- full screen, and installing as an app ---------- */
+{ const fb = $('fullBtn'), root = document.documentElement;
+  const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const syncFull = () => { fb.setAttribute('aria-pressed', String(isFull())); fb.dataset.tip = isFull() ? 'Click to leave full screen. Esc does the same.' : 'Fills the whole screen with Graphic Engine. The browser’s bars and the taskbar hide until you leave it. Esc leaves.'; }; // the label stays short so the bar keeps to one row
+  fb.hidden = !(document.fullscreenEnabled || document.webkitFullscreenEnabled) || !(root.requestFullscreen || root.webkitRequestFullscreen);
+  fb.addEventListener('click', () => {
+    try {
+      if (isFull()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else { const r = (root.requestFullscreen || root.webkitRequestFullscreen).call(root); if (r && r.catch) r.catch(() => toast('Full screen isn’t allowed here. Try F11.')); }
+    } catch(err){ toast('Full screen isn’t allowed here. Try F11.'); }
+  });
+  for (const t of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(t, () => { syncFull(); setTimeout(render, 60); });
+  syncFull();
+  // the app file belongs to the Workboard, so it is only linked there
+  if (location.origin === 'https://board.tshirtworkshop.com.au' && !document.querySelector('link[rel="manifest"]')){
+    const l = document.createElement('link'); l.rel = 'manifest'; l.href = '/app.webmanifest'; l.crossOrigin = 'use-credentials'; document.head.appendChild(l);
+  }
+  let installEvt = null; const ib = $('installBtn');
+  const asApp = () => { try { return matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches; } catch(err){ return false; } };
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; ib.hidden = asApp(); });
+  window.addEventListener('appinstalled', () => { installEvt = null; ib.hidden = true; toast('Installed. Open it from the taskbar or the desktop from now on.'); });
+  ib.addEventListener('click', async () => { if (!installEvt) return; const e = installEvt; installEvt = null; ib.hidden = true; try { await e.prompt(); } catch(err){} });
+}
 /* ---------- welcome: the first screen when no design is open ---------- */
 const W_JOBS = [
   {k: 'one', t: 'Get one design ready', d: 'Set the size, pick a look, save a print-ready PNG.', pic: () => demoArt({glow: 'dots', name: 'AWESOME'})},
