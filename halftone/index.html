@@ -612,6 +612,14 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .trail.scrolled{border-bottom:2px solid var(--line-strong)}
 .trail.scrolled::after{content:"";position:absolute;left:0;right:0;top:calc(100% + 2px);height:14px;background:linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,0));pointer-events:none}
 :root.ui-light .trail.scrolled::after{background:linear-gradient(rgba(0,0,0,.14),rgba(0,0,0,0))}
+/* v97: small pictures on the tabs and the Versions buttons */
+.tab-name{height:40px;gap:8px}
+.tab-pic{flex:none;width:28px;height:28px;border-radius:3px;border:1px solid var(--line-strong);object-fit:cover}
+.tab-x{align-self:center}
+.tab-add{height:42px}
+.ver .chip{display:inline-flex;align-items:center;gap:8px;height:40px;padding-left:6px}
+.ver-pic{flex:none;width:28px;height:28px;border-radius:3px;border:1px solid var(--line-strong)}
+.ver-x{height:40px}
 </style>
 </head>
 <body>
@@ -2692,6 +2700,11 @@ const isVer = kind => /^ver\d$/.test(kind || ''); // another version of this des
 const verOf = kind => art && art.vers && isVer(kind) ? art.vers[+kind.slice(3)] : null;
 const isMask = kind => kind !== 'shirt' && kind !== 'orig' && !isVer(kind);
 const paneBg = kind => isMask(kind) ? '#1a1a1a' : isVer(kind) && verOf(kind) && verOf(kind).pic ? verOf(kind).pic.shirt : st.shirt;
+function verThumbLive(){ // the version showing: its button picture follows the print as it is worked out
+  const V = art && art.vers, lv = viewMips || outMips; if (!V || !V[art.verOn] || !lv || !lv.length) return;
+  const t = smallPic(lv[lv.length - 1], 52, st.shirt); if (!t || t === V[art.verOn].thumb) return;
+  V[art.verOn].thumb = t; syncVers(); persistSoon();
+}
 function verKeepPic(v){ // a picture of the version showing, as it looks on the shirt, for comparing later
   const lv = outReady ? (viewMips || outMips) : null; if (!v || !lv || !lv[0] || !lv[0].width) return;
   const src = lv[0], k = Math.min(1, 2400/Math.max(src.width, src.height)), c = document.createElement('canvas');
@@ -2699,6 +2712,7 @@ function verKeepPic(v){ // a picture of the version showing, as it looks on the 
   const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height);
   const mips = buildMips(c); mips.scale = k; // scale: this picture's pixels per print pixel
   v.pic = {mips, shirt: st.shirt};
+  v.thumb = smallPic(mips[mips.length - 1], 52, st.shirt) || v.thumb;
 }
 function buildOrigMask(){
   if (origFor === srcV || !srcCanvas.width) return;
@@ -2736,7 +2750,7 @@ function paint(m){
   outCanvas.width = m.w; outCanvas.height = m.h;
   const px = new Uint8ClampedArray(m.buf);
   outCtx.putImageData(new ImageData(px, m.w, m.h), 0, 0);
-  outMips = buildMips(outCanvas); buildInkView(px, m.w, m.h);
+  outMips = buildMips(outCanvas); buildInkView(px, m.w, m.h); verThumbLive();
   lastCls = new Uint8Array(m.cls); lastSel = m.sel ? new Uint8Array(m.sel) : null; paintN++;
   chist = m.ch ? new Uint32Array(m.ch) : null; drawHhisto();
   prepareViews();
@@ -4325,13 +4339,25 @@ function closeDoc(d){
   if (d !== cur && d.unsaved && d.art && !d.art.isSample) switchTo(d); // show it, so the question is about what's on screen
   if (d === cur) guardThen(go, false, true); else go();
 }
+function smallPic(src, size, bg){ // a small square picture of a canvas or image, as a data URL
+  const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height; if (!sw || !sh) return '';
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const x = c.getContext('2d'), k = Math.min(size/sw, size/sh), w = Math.max(1, Math.round(sw*k)), h = Math.max(1, Math.round(sh*k));
+  x.fillStyle = bg; x.fillRect(0, 0, size, size); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  try { x.drawImage(src, (size - w) >> 1, (size - h) >> 1, w, h); return c.toDataURL('image/jpeg', 0.82); } catch(e){ return ''; }
+}
+function artThumb(a){ // the file as it was opened, for its tab
+  if (!a || !a.el) return '';
+  if (a.thumb === undefined) a.thumb = smallPic(a.el, 56, '#808080');
+  return a.thumb;
+}
 function renderTabs(){
   persistSoon(); syncBatchNote();
   $('tabsActions').hidden = docs.filter(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample).length < 2;
   $('tabsList').innerHTML = docs.map(d => {
     const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
     return `<div class="tab${d === cur ? ' on' : ''}"><button class="tab-name" type="button" role="tab" aria-selected="${d === cur}" data-doc="${d.id}" title="${esc(name)}${dirty ? ' · not saved' : ''}">` +
-      `${dirty ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}<span class="tab-t">${esc(name)}</span></button>` +
+      `${artThumb(a) ? `<img class="tab-pic" src="${artThumb(a)}" alt="">` : ''}${dirty ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}<span class="tab-t">${esc(name)}</span></button>` +
       (docs.length > 1 ? `<button class="tab-x" type="button" data-close="${d.id}" aria-label="Close ${esc(name)}" data-tip="Close this design">×</button>` : '') + '</div>';
   }).join('') + '<button class="tab-add" type="button" id="tabAdd" aria-label="Open art in a new tab" data-tip="Open art in a new tab. Dropping or pasting art opens a new tab too.">+</button>';
 }
@@ -4402,7 +4428,7 @@ const idbDone = tx => new Promise((res, rej) => { tx.oncomplete = () => res(); t
 function docRecord(d){
   const live = d === cur, a = live ? art : d.art;
   return {name: a.name, dpi: a.dpi, jpegQ: a.jpegQ, isVector: a.isVector, fullW: a.fullW, fullH: a.fullH, smooth: !!a.smooth, sizeFrom: a.sizeFrom,
-    vers: a.vers && a.vers.length > 1 ? a.vers.map((v, i) => ({snap: live && i === a.verOn ? snapshot() : v.snap})) : null, verOn: a.verOn || 0,
+    vers: a.vers && a.vers.length > 1 ? a.vers.map((v, i) => ({snap: live && i === a.verOn ? snapshot() : v.snap, thumb: v.thumb || ''})) : null, verOn: a.verOn || 0,
     strokes: a.strokes, strokesN: a.strokesN, snap: live ? snapshot() : d.snap, activeRule: live ? activeRule : d.activeRule,
     steps: live ? steps : d.steps, stepPos: live ? stepPos : d.stepPos, unsaved: live ? unsaved : d.unsaved,
     zoom: live ? st.zoom : d.zoom, cx: live ? st.cx : d.cx, cy: live ? st.cy : d.cy, suffix: live ? $('nameSuffix').value : d.suffix, lab: live ? $('labelFull').value : d.lab, labShort: live ? $('labelShort').value : d.labShort,
@@ -4444,7 +4470,7 @@ async function restoreDocs(){ // answers how many designs came back
       try { await im.decode(); } catch(e){ continue; }
       const a = makeArt(im, rec.fullW, rec.fullH, rec.name, false, rec.dpi, {vector: rec.isVector, jpegQ: rec.jpegQ});
       Object.assign(a, {file, quiet: true, sizeFrom: rec.sizeFrom || 'user', smooth: !!rec.smooth, strokes: rec.strokes || [], strokesN: rec.strokesN || 0});
-      if (Array.isArray(rec.vers) && rec.vers.length > 1 && rec.vers.every(v => v && v.snap && v.snap.s)){ a.vers = rec.vers.slice(0, 6).map(v => ({snap: v.snap})); a.verOn = Math.max(0, Math.min(+rec.verOn || 0, a.vers.length - 1)); }
+      if (Array.isArray(rec.vers) && rec.vers.length > 1 && rec.vers.every(v => v && v.snap && v.snap.s)){ a.vers = rec.vers.slice(0, 6).map(v => ({snap: v.snap, thumb: /^data:image\//.test(v.thumb || '') ? v.thumb : ''})); a.verOn = Math.max(0, Math.min(+rec.verOn || 0, a.vers.length - 1)); }
       if (rec.snap.crop){ a.crop = {...rec.snap.crop}; a.w = a.crop.w; a.h = a.crop.h; }
       if (cleanReset){ for (const x of [rec.snap, ...(rec.steps || []).map(t => t.snap)]) if (x && x.s) x.s.clean = false; }
       if (a.strokesN) rebuildEdits(a);
@@ -5223,7 +5249,7 @@ function syncVers(){
   box.hidden = !art;
   $('verNew').hidden = !!V && V.length >= VER_MAX;
   $('verNew').textContent = V ? 'Add another' : 'Try another way'; $('verSplit').hidden = !V;
-  const html = !V ? '<span class="vers-none">Only one so far.</span>' : V.map((v, i) => `<span class="ver"><button class="chip" type="button" data-ver="${i}" aria-pressed="${i === on}" data-tip="${i === on ? 'This version is showing. Changes you make go into it.' : 'Show this version.'}">${verLetter(i)} · ${verStyle(i === on ? snapshot() : v.snap)}</button>` +
+  const html = !V ? '<span class="vers-none">Only one so far.</span>' : V.map((v, i) => `<span class="ver"><button class="chip" type="button" data-ver="${i}" aria-pressed="${i === on}" data-tip="${i === on ? 'This version is showing. Changes you make go into it.' : 'Show this version.'}">${v.thumb ? `<img class="ver-pic" src="${v.thumb}" alt="">` : ''}${verLetter(i)} · ${verStyle(i === on ? snapshot() : v.snap)}</button>` +
     `<button class="ver-x" type="button" data-verx="${i}" aria-label="Remove version ${verLetter(i)}" data-tip="Remove this version.">×</button></span>`).join('');
   if ($('verList').innerHTML !== html) $('verList').innerHTML = html;
 }
@@ -5235,7 +5261,7 @@ function verNew(){
   else art.vers[art.verOn].snap = snapshot();
   if (art.vers.length >= VER_MAX){ toast(`Up to ${VER_MAX} versions of one design. Remove one first.`); return; }
   const from = art.verOn; verKeepPic(art.vers[from]);
-  art.vers.push({snap: JSON.parse(JSON.stringify(snapshot()))}); art.verOn = art.vers.length - 1;
+  art.vers.push({snap: JSON.parse(JSON.stringify(snapshot())), thumb: art.vers[from].thumb || ''}); art.verOn = art.vers.length - 1;
   syncVers(); persistSoon();
   toast(`Version ${verLetter(art.verOn)} is a copy of ${verLetter(from)}. Change it any way you like, then flick between them.`);
 }
