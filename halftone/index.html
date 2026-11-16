@@ -620,6 +620,13 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .ver .chip{display:inline-flex;align-items:center;gap:8px;height:40px;padding-left:6px}
 .ver-pic{flex:none;width:28px;height:28px;border-radius:3px;border:1px solid var(--line-strong)}
 .ver-x{height:40px}
+/* v98: the navigator; a bigger picture in the This design row */
+.nav{position:absolute;top:12px;right:12px;z-index:5;display:block;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--panel);cursor:crosshair;touch-action:none}
+.stage.cropping .nav{display:none}
+.ver-pic{width:40px;height:40px}
+.ver .chip{height:52px}
+.ver-x{height:52px}
+.ver.solo{gap:10px}
 </style>
 </head>
 <body>
@@ -685,6 +692,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
       </div>
     <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
       <canvas id="view"></canvas>
+      <canvas class="nav" id="nav" hidden aria-label="Navigator: where you are in the design" data-tip="The whole print. The pink box is the part on screen. Click or drag here to move."></canvas>
       <canvas class="brush-view" id="brushView" aria-hidden="true"></canvas>
       <div class="overlay o-bottom" id="oBottom">
         <div class="stack">
@@ -722,7 +730,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="revertBtn">Revert</button><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
       <nav class="trail" id="trail" aria-label="The three steps"></nav>
-      <div class="vers" id="vers"><span class="vers-k">Versions</span><span class="vers-list" id="verList"></span><button class="link" type="button" id="verSplit" hidden data-tip="Shows another version on the left and the one you are working on on the right. Each side’s menu can pick a different version.">Side by side</button><button class="link" type="button" id="verNew" data-tip="Keeps the design as it is now, and starts a copy to try another way: for example Clean cut as A and Halftone as B. Then flick between them.">Try another way</button></div>
+      <div class="vers" id="vers"><span class="vers-k">This design</span><span class="vers-list" id="verList"></span><button class="link" type="button" id="verSplit" hidden data-tip="Shows another version on the left and the one you are working on on the right. Each side’s menu can pick a different version.">Side by side</button><button class="link" type="button" id="verNew" data-tip="Keeps the design as it is now, and starts a copy to try another way: for example Clean cut as A and Halftone as B. Then flick between them.">Try another way</button></div>
 
       <section class="group step" id="sizeGroup">
         <h2>Print size</h2>
@@ -2700,10 +2708,13 @@ const isVer = kind => /^ver\d$/.test(kind || ''); // another version of this des
 const verOf = kind => art && art.vers && isVer(kind) ? art.vers[+kind.slice(3)] : null;
 const isMask = kind => kind !== 'shirt' && kind !== 'orig' && !isVer(kind);
 const paneBg = kind => isMask(kind) ? '#1a1a1a' : isVer(kind) && verOf(kind) && verOf(kind).pic ? verOf(kind).pic.shirt : st.shirt;
-function verThumbLive(){ // the version showing: its button picture follows the print as it is worked out
-  const V = art && art.vers, lv = viewMips || outMips; if (!V || !V[art.verOn] || !lv || !lv.length) return;
-  const t = smallPic(lv[lv.length - 1], 52, st.shirt); if (!t || t === V[art.verOn].thumb) return;
-  V[art.verOn].thumb = t; syncVers(); persistSoon();
+function verThumbLive(){ // the picture of the print as it stands: on the version showing, or on the design when it has one version
+  const lv = viewMips || outMips; if (!art || !lv || !lv.length) return;
+  const t = smallPic(lv[lv.length - 1], 80, st.shirt); if (!t) return;
+  const V = art.vers;
+  if (V && V[art.verOn]){ if (t === V[art.verOn].thumb) return; V[art.verOn].thumb = t; persistSoon(); }
+  else { if (t === art.nowThumb) return; art.nowThumb = t; }
+  syncVers();
 }
 function verKeepPic(v){ // a picture of the version showing, as it looks on the shirt, for comparing later
   const lv = outReady ? (viewMips || outMips) : null; if (!v || !lv || !lv[0] || !lv[0].width) return;
@@ -2712,7 +2723,7 @@ function verKeepPic(v){ // a picture of the version showing, as it looks on the 
   const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height);
   const mips = buildMips(c); mips.scale = k; // scale: this picture's pixels per print pixel
   v.pic = {mips, shirt: st.shirt};
-  v.thumb = smallPic(mips[mips.length - 1], 52, st.shirt) || v.thumb;
+  v.thumb = smallPic(mips[mips.length - 1], 80, st.shirt) || v.thumb;
 }
 function buildOrigMask(){
   if (origFor === srcV || !srcCanvas.width) return;
@@ -2791,6 +2802,7 @@ function render(){
   stage.style.background = paneBg(panes[0].kind);
   geos = panes.map(p => drawPane(p, dpr));
   geo = geos[0];
+  syncNav();
   if (panes.length > 1){
     const p = panes[1];
     vctx.fillStyle = '#808080'; // mid grey reads on white and black shirts alike
@@ -2860,6 +2872,31 @@ function placeLegend(){ // beside the size, up to the zoom buttons; above the si
   lg.classList.toggle('above', above); lg.style.maxWidth = above ? '' : `${Math.min(560, Math.floor(room))}px`;
 }
 
+function navLevels(){ return viewMips || outMips || srcMips; }
+function syncNav(){ // the whole print, small, with the part on screen boxed
+  const nav = $('nav'), g = geo, lv = navLevels();
+  if (!nav) return;
+  if (cropping || st.zoom === 'fit' || !g || !g.OW || !lv || !lv.length){ nav.hidden = true; return; }
+  const vw = g.w*g.dpr/g.k, vh = g.h*g.dpr/g.k; // the part on screen, in print pixels
+  if (vw >= g.OW*0.985 && vh >= g.OH*0.985){ nav.hidden = true; return; }
+  const M = 170, k = Math.min(M/g.OW, M/g.OH), w = Math.max(24, Math.round(g.OW*k)), h = Math.max(24, Math.round(g.OH*k)), dpr = g.dpr;
+  nav.hidden = false;
+  if (nav.width !== Math.round(w*dpr) || nav.height !== Math.round(h*dpr)){ nav.width = Math.round(w*dpr); nav.height = Math.round(h*dpr); nav.style.width = w + 'px'; nav.style.height = h + 'px'; }
+  const x = nav.getContext('2d'), W = nav.width, H = nav.height, src = lv[lv.length - 1];
+  const draw = () => { x.fillStyle = st.shirt; x.fillRect(0, 0, W, H); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, W, H); };
+  draw(); x.fillStyle = 'rgba(0,0,0,.5)'; x.fillRect(0, 0, W, H);
+  let x0 = (g.x*dpr - g.dx)/g.k, y0 = (g.y*dpr - g.dy)/g.k, x1 = x0 + vw, y1 = y0 + vh;
+  x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(g.OW, x1); y1 = Math.min(g.OH, y1);
+  const rx = x0/g.OW*W, ry = y0/g.OH*H, rw = Math.max(4, (x1 - x0)/g.OW*W), rh = Math.max(4, (y1 - y0)/g.OH*H);
+  x.save(); x.beginPath(); x.rect(rx, ry, rw, rh); x.clip(); draw(); x.restore();
+  const lw = Math.max(2, Math.round(2*dpr)); x.strokeStyle = '#e0168a'; x.lineWidth = lw; x.strokeRect(rx + lw/2, ry + lw/2, Math.max(1, rw - lw), Math.max(1, rh - lw));
+}
+{ const nav = $('nav'); let down = false;
+  const go = e => { const g = geo; if (!g || !g.OW) return; const r = nav.getBoundingClientRect(); st.cx = Math.max(0, Math.min(1, (e.clientX - r.left)/r.width))*g.OW; st.cy = Math.max(0, Math.min(1, (e.clientY - r.top)/r.height))*g.OH; render(); };
+  nav.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); down = true; try { nav.setPointerCapture(e.pointerId); } catch(err){} go(e); });
+  nav.addEventListener('pointermove', e => { if (down){ e.stopPropagation(); go(e); } });
+  for (const t of ['pointerup', 'pointercancel']) nav.addEventListener(t, e => { down = false; e.stopPropagation(); });
+  for (const t of ['wheel', 'dblclick', 'click']) nav.addEventListener(t, e => e.stopPropagation()); }
 function setZoom(z, atX, atY){
   if (z !== 'fit' && geo){
     if (atX != null){ const g = geoAt(atX, atY); st.cx = (atX*g.dpr - g.dx)/g.k; st.cy = (atY*g.dpr - g.dy)/g.k; }
@@ -4328,9 +4365,16 @@ function newDoc(){ // a new tab for the art being opened; the sample's tab is re
 const newKey = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const docFull = () => docs.length >= MAX_DOCS && !(art && art.isSample);
 function closeDoc(d){
-  if (docs.length < 2) return;
+  const last = docs.length < 2;
+  if (last && (!d.art && d !== cur || (d === cur ? art : d.art) && (d === cur ? art : d.art).isSample)) return; // the sample stays: there is nothing to close
   const go = () => {
     const i = docs.indexOf(d); if (i < 0) return;
+    if (last){ // nothing left open: back to the start screen, with the sample art behind it
+      clearTimeout(stepTimer); unsaved = false;
+      docs = []; cur = null; art = null; renderTabs(); forgetDoc(d); d.art = null; d.steps = null;
+      sampleArt().then(c => { if (!art){ setArt(c, c.width, c.height, 'Sample art', true, DPI); art.quiet = true; art.thruTold = true; } showWelcome(); });
+      return;
+    }
     docs.splice(i, 1);
     if (d === cur){ cur = null; loadDoc(docs[Math.min(i, docs.length - 1)]); } else renderTabs();
     forgetDoc(d);
@@ -4358,7 +4402,7 @@ function renderTabs(){
     const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
     return `<div class="tab${d === cur ? ' on' : ''}"><button class="tab-name" type="button" role="tab" aria-selected="${d === cur}" data-doc="${d.id}" title="${esc(name)}${dirty ? ' · not saved' : ''}">` +
       `${artThumb(a) ? `<img class="tab-pic" src="${artThumb(a)}" alt="">` : ''}${dirty ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}<span class="tab-t">${esc(name)}</span></button>` +
-      (docs.length > 1 ? `<button class="tab-x" type="button" data-close="${d.id}" aria-label="Close ${esc(name)}" data-tip="Close this design">×</button>` : '') + '</div>';
+      (docs.length > 1 || (a && !a.isSample) ? `<button class="tab-x" type="button" data-close="${d.id}" aria-label="Close ${esc(name)}" data-tip="Close this design">×</button>` : '') + '</div>';
   }).join('') + '<button class="tab-add" type="button" id="tabAdd" aria-label="Open art in a new tab" data-tip="Open art in a new tab. Dropping or pasting art opens a new tab too.">+</button>';
 }
 $('tabs').addEventListener('click', e => {
@@ -5249,7 +5293,7 @@ function syncVers(){
   box.hidden = !art;
   $('verNew').hidden = !!V && V.length >= VER_MAX;
   $('verNew').textContent = V ? 'Add another' : 'Try another way'; $('verSplit').hidden = !V;
-  const html = !V ? '<span class="vers-none">Only one so far.</span>' : V.map((v, i) => `<span class="ver"><button class="chip" type="button" data-ver="${i}" aria-pressed="${i === on}" data-tip="${i === on ? 'This version is showing. Changes you make go into it.' : 'Show this version.'}">${v.thumb ? `<img class="ver-pic" src="${v.thumb}" alt="">` : ''}${verLetter(i)} · ${verStyle(i === on ? snapshot() : v.snap)}</button>` +
+  const html = !V ? `<span class="ver solo">${art && art.nowThumb ? `<img class="ver-pic" src="${art.nowThumb}" alt="">` : ''}<span class="vers-none">One version so far.</span></span>` : V.map((v, i) => `<span class="ver"><button class="chip" type="button" data-ver="${i}" aria-pressed="${i === on}" data-tip="${i === on ? 'This version is showing. Changes you make go into it.' : 'Show this version.'}">${v.thumb ? `<img class="ver-pic" src="${v.thumb}" alt="">` : ''}${verLetter(i)} · ${verStyle(i === on ? snapshot() : v.snap)}</button>` +
     `<button class="ver-x" type="button" data-verx="${i}" aria-label="Remove version ${verLetter(i)}" data-tip="Remove this version.">×</button></span>`).join('');
   if ($('verList').innerHTML !== html) $('verList').innerHTML = html;
 }
@@ -5257,7 +5301,7 @@ function verNew(){
   if (!art) return;
   if (cropping) endCrop(false);
   commitStep();
-  if (!art.vers || !art.vers.length){ art.vers = [{snap: snapshot()}]; art.verOn = 0; for (const t of steps) t.ver = 0; } // everything so far was A
+  if (!art.vers || !art.vers.length){ art.vers = [{snap: snapshot(), thumb: art.nowThumb || ''}]; art.verOn = 0; for (const t of steps) t.ver = 0; } // everything so far was A
   else art.vers[art.verOn].snap = snapshot();
   if (art.vers.length >= VER_MAX){ toast(`Up to ${VER_MAX} versions of one design. Remove one first.`); return; }
   const from = art.verOn; verKeepPic(art.vers[from]);
