@@ -157,6 +157,9 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .step-foot{display:flex;padding-top:4px}
 .crop-bar{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100% - 24px);padding:6px 6px 6px 12px;font-size:13px;font-weight:600}
 .stage.cropping #view{cursor:crosshair}
+.stage.selecting #view{cursor:crosshair}
+.sel-note{font-size:12px;color:var(--muted);max-width:330px;line-height:1.35}
+.quick-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .stage.cropping .pane-pick,.stage.cropping #legend{display:none!important}
 .g-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .g-head h2{flex:1}
@@ -706,6 +709,12 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="chip" type="button" id="cropDraw" aria-pressed="false" data-tip="Drag a box on the art to keep just that part, for example to cut off unwanted marks at the edge.">Draw a crop</button>
           <button class="chip" type="button" id="cropReset" hidden data-tip="Back to the whole file.">Reset crop</button>
         </div>
+        <div class="tgroup" role="group" aria-label="Select area" id="selTray"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h12v12H2z" stroke-dasharray="2.5 2"/></svg>Select</span>
+          <button class="chip" type="button" id="selBox" aria-pressed="false" data-tip="Drag a box on the art. Skin tones, pale colours, smoothing and sharpen then change only inside it.">Box</button>
+          <button class="chip" type="button" id="selLoop" aria-pressed="false" data-tip="Draw around a part freehand, such as a face.">Loop</button>
+          <button class="chip" type="button" id="selClear" hidden data-tip="Back to changing the whole design.">Clear</button>
+          <span class="sel-note" id="selNote" hidden>Skin tones, pale colours, smoothing and sharpen change only inside the selection.</span>
+        </div>
         <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
@@ -799,7 +808,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         </div>
         <div class="dtg-hint" id="dtgHint" hidden><button type="button" id="dtgHintBtn">Better as DTG?</button><span id="dtgHintWhy"></span></div>
         <div class="quick" id="quickAdj" hidden>
-          <div class="lv-sub">Quick adjust</div>
+          <div class="quick-head"><div class="lv-sub">Quick adjust</div><button class="link" type="button" id="quickReset">Reset to defaults</button></div>
           <div class="quick-rows" id="quickRows"></div>
           <p class="f-note">Drag to balance the look. These are the same settings as in Fine-tune, where there are more.</p>
         </div>
@@ -2353,10 +2362,15 @@ function engine(){
   function handle(m){
     if (m.type === 'mask'){ masks.set(m.id, {w: m.w, h: m.h, d: new Uint8Array(m.buf)}); return {msg: {type: 'mask'}}; }
     if (m.type === 'src'){
+      const selM = m.sel ? new Uint8Array(m.sel) : null, selKeep = selM ? new Uint8ClampedArray(m.buf.slice(0)) : null;
       if (m.noise) denoiseData(new Uint8ClampedArray(m.buf), m.w, m.h, m.noise);
       if (m.skin) calmSkin(new Uint8ClampedArray(m.buf), m.w, m.h, m.skin);
       if (m.pale) deepenPale(new Uint8ClampedArray(m.buf), m.w, m.h, m.pale);
       if (m.sharp) sharpenData(new Uint8ClampedArray(m.buf), m.w, m.h, m.sharp.amount, m.sharp.sigma);
+      if (selM){ const d = new Uint8ClampedArray(m.buf);
+        for (let i = 0, o = 0, n = selM.length; i < n; i++, o += 4){ const a = selM[i]; if (a === 255) continue;
+          if (!a){ d[o] = selKeep[o]; d[o + 1] = selKeep[o + 1]; d[o + 2] = selKeep[o + 2]; d[o + 3] = selKeep[o + 3]; }
+          else { const t = a/255, u = 1 - t; d[o] = d[o]*t + selKeep[o]*u; d[o + 1] = d[o + 1]*t + selKeep[o + 1]*u; d[o + 2] = d[o + 2]*t + selKeep[o + 2]*u; d[o + 3] = d[o + 3]*t + selKeep[o + 3]*u; } } }
       return {msg: {type: 'src', v: m.v, stats: setSrc(m.w, m.h, m.buf)}};
     }
     const r = run(m.p);
@@ -2818,7 +2832,47 @@ function buildOrigMask(){
 }
 
 let srcTimer = 0, srcW0 = 0, srcH0 = 0, srcSharp = ''; // srcSharp: the sharpening the engine's copy of the art has
-const sharpKey = () => (st.sharp ? `${st.sharp}:${st.sradius}` : '') + (st.noise ? `n${st.noise}` : '') + (st.pale ? `p${st.pale}` : '') + (st.skin ? `s${st.skin}` : '') + (isDtg() ? 'd' + dtgColour() : '');
+const sharpKey = () => (st.sharp ? `${st.sharp}:${st.sradius}` : '') + (st.noise ? `n${st.noise}` : '') + (st.pale ? `p${st.pale}` : '') + (st.skin ? `s${st.skin}` : '') + (art && art.sel ? `a${art.selV || 0}` : '') + (isDtg() ? 'd' + dtgColour() : '');
+/* Select area: art.sel = {kind: 'box' | 'loop', pts: [x, y, ...]} in the file's own pixels */
+let selTool = null, selDraw = null;
+const selWorks = () => !!(st.sharp || st.noise || st.pale || st.skin); // the settings a selection limits
+function selPath(ctx, sel, X, Y){
+  const q = sel.pts; ctx.beginPath();
+  if (sel.kind === 'box') ctx.rect(X(Math.min(q[0], q[2])), Y(Math.min(q[1], q[3])), Math.abs(X(q[2]) - X(q[0])), Math.abs(Y(q[3]) - Y(q[1])));
+  else { ctx.moveTo(X(q[0]), Y(q[1])); for (let i = 2; i < q.length; i += 2) ctx.lineTo(X(q[i]), Y(q[i + 1])); ctx.closePath(); }
+}
+function selMask(W, H){ // 255 inside the selection, 0 outside, at the print's pixel size
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', {willReadFrequently: true}), k = art.crop;
+  x.fillStyle = '#fff'; selPath(x, art.sel, v => (v - k.x)/k.w*W, v => (v - k.y)/k.h*H); x.fill();
+  const d = x.getImageData(0, 0, W, H).data, m = new Uint8Array(W*H); for (let i = 0, o = 3; i < m.length; i++, o += 4) m[i] = d[o];
+  return m;
+}
+function syncSel(){
+  const on = !!(art && art.sel); if (!$('selBox')) return;
+  $('selBox').setAttribute('aria-pressed', String(selTool === 'box')); $('selLoop').setAttribute('aria-pressed', String(selTool === 'loop'));
+  if ($('selClear').hidden === on) $('selClear').hidden = !on; if ($('selNote').hidden === on) $('selNote').hidden = !on;
+  stage.classList.toggle('selecting', !!selTool);
+}
+function selStart(kind){
+  if (!art) return;
+  if (selTool === kind){ selTool = null; selDraw = null; syncSel(); drawBrush(); return; }
+  if (cropping) endCrop(false); if (picking) endPick(); if (areaTool) setArea(areaTool.i, null); if (brushTool) setBrush(null);
+  selTool = kind; selDraw = null; syncSel(); toast(kind === 'box' ? 'Drag a box over the part to change.' : 'Draw around the part to change.');
+}
+function selSet(sel){ art.sel = sel; art.selV = (art.selV || 0) + 1; syncSel(); drawBrush(); updateChecks(); if (selWorks()) buildSrc(); }
+function selDown(e){ const p = toFile(e); if (!p) return; selDraw = {kind: selTool, pts: [p.x, p.y, p.x, p.y]}; view.setPointerCapture(e.pointerId); drawBrush(); }
+function selMove(e){ const p = toFile(e); if (!p || !selDraw) return; const q = selDraw.pts;
+  if (selDraw.kind === 'box'){ q[2] = p.x; q[3] = p.y; } else if (Math.hypot(p.x - q[q.length - 2], p.y - q[q.length - 1]) > art.crop.w/400) q.push(p.x, p.y);
+  drawBrush(); }
+function selUp(){
+  const d = selDraw; selDraw = null; if (!d || !art) return;
+  const k = art.crop, q = d.pts; for (let i = 0; i < q.length; i += 2){ q[i] = Math.max(k.x, Math.min(k.x + k.w, q[i])); q[i + 1] = Math.max(k.y, Math.min(k.y + k.h, q[i + 1])); }
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = 0; i < q.length; i += 2){ x0 = Math.min(x0, q[i]); x1 = Math.max(x1, q[i]); y0 = Math.min(y0, q[i + 1]); y1 = Math.max(y1, q[i + 1]); }
+  const tiny = k.w/100;
+  if (x1 - x0 < tiny || y1 - y0 < tiny || (d.kind === 'loop' && q.length < 8)){ drawBrush(); toast('That was too small. Drag a bigger area.'); return; }
+  selTool = null; noteChange('Select area'); selSet({kind: d.kind, pts: q.map(v => Math.round(v*10)/10)});
+  toast(selWorks() ? 'Selected. Skin tones, pale colours, smoothing and sharpen now change only inside it.' : 'Selected. Now set Calm skin tones, Deepen pale colours, Smooth out noise or Sharpen: only the inside changes.');
+}
 function buildSrcSoon(){ clearTimeout(srcTimer); srcTimer = setTimeout(buildSrc, 250); }
 function buildSrc(){
   if (!art) return;
@@ -2829,7 +2883,8 @@ function buildSrc(){
   const data = srcCtx.getImageData(0, 0, W, H);
   srcV++; srcStats = null;
   srcSharp = sharpKey();
-  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer, sharp: st.sharp ? {amount: st.sharp, sigma: st.sradius} : null, noise: st.noise || 0, pale: st.pale || 0, skin: st.skin || 0}, [data.data.buffer]);
+  const selBuf = art.sel && selWorks() ? selMask(W, H) : null;
+  bus.post({type: 'src', v: srcV, w: W, h: H, buf: data.data.buffer, sharp: st.sharp ? {amount: st.sharp, sigma: st.sradius} : null, noise: st.noise || 0, pale: st.pale || 0, skin: st.skin || 0, sel: selBuf ? selBuf.buffer : null}, selBuf ? [data.data.buffer, selBuf.buffer] : [data.data.buffer]);
   srcMips = buildMips(srcCanvas);
   prepareViews();
   if (W !== srcW0 || H !== srcH0){ st.cx = W/2; st.cy = H/2; srcW0 = W; srcH0 = H; }
@@ -2958,6 +3013,7 @@ function placeLegend(){ // beside the size, up to the zoom buttons; above the si
 
 function navLevels(){ return viewMips || outMips || srcMips; }
 function syncNav(){ // the whole print, small, with the part on screen boxed
+  syncSel();
   const nav = $('nav'), g = geo, lv = navLevels();
   if (!nav) return;
   if (cropping || st.zoom === 'fit' || !g || !g.OW || !lv || !lv.length){ nav.hidden = true; return; }
@@ -3302,6 +3358,7 @@ let drag = null;
 view.addEventListener('pointerdown', e => {
   if (cropping){ cropDown(e); return; }
   if (picking){ pickAt(e); return; }
+  if (selTool && !spaceDown){ selDown(e); return; }
   if (areaTool && !spaceDown){ areaDown(e); return; }
   if (brushTool && !spaceDown){ brushDown(e); return; }
   if (st.zoom === 'fit') return;
@@ -3310,13 +3367,14 @@ view.addEventListener('pointerdown', e => {
 });
 view.addEventListener('pointermove', e => {
   if (cropping){ cropMove(e); return; }
+  if (selDraw){ selMove(e); return; }
   if (areaTool && !drag){ areaMove(e); return; }
   if (brushTool && !drag){ brushMove(e); return; }
   if (!drag || !geo) return;
   st.cx = drag.cx - (e.clientX - drag.x)*geo.dpr/geo.k; st.cy = drag.cy - (e.clientY - drag.y)*geo.dpr/geo.k; render();
 });
 view.addEventListener('pointerleave', () => { if (brushAt && !stroke && !aStroke){ brushAt = null; drawBrush(); } });
-const endDrag = () => { if (aStroke) areaUp(); if (stroke) brushUp(); drag = null; stage.classList.remove('panning'); if (cropping) cropping.drag = null; };
+const endDrag = () => { if (selDraw) selUp(); if (aStroke) areaUp(); if (stroke) brushUp(); drag = null; stage.classList.remove('panning'); if (cropping) cropping.drag = null; };
 view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag);
 view.addEventListener('wheel', e => {
   if (!geo || cropping) return;
@@ -3511,6 +3569,11 @@ function drawBrush(){ // the stroke being drawn (and the last ones until the eng
       }
       x.globalAlpha = 1;
     }
+    { const sel = selDraw || art.sel;
+      if (sel && sel.pts.length >= 4){ const lw = Math.max(1, g.dpr);
+        if (selDraw && selDraw.kind === 'loop' && sel.pts.length < 6){} else {
+          x.lineWidth = lw; x.setLineDash([]); x.strokeStyle = 'rgba(0,0,0,0.85)'; selPath(x, sel, X, Y); x.stroke();
+          x.setLineDash([6*lw, 5*lw]); x.strokeStyle = '#ffffff'; selPath(x, sel, X, Y); x.stroke(); x.setLineDash([]); } } }
     if ((brushTool || (areaTool && areaTool.mode !== 'box')) && brushAt && !spaceDown){
       const r = Math.max(2, brushR()*f), cx = X(brushAt.x), cy = Y(brushAt.y), lw = Math.max(1, g.dpr);
       x.lineWidth = lw; x.strokeStyle = 'rgba(0,0,0,0.8)'; x.beginPath(); x.arc(cx, cy, r + lw, 0, 7); x.stroke();
@@ -3564,6 +3627,18 @@ async function stripMake(x, y){
   if (png && await saveFile(png, name)) toast('Test strip saved. Print it, then choose Off, A little or More.');
 }
 document.addEventListener('click', e => { const b = e.target.closest ? e.target.closest('[data-strip]') : null; if (b) stripStart(b.dataset.strip); });
+
+$('selBox').addEventListener('click', () => selStart('box')); $('selLoop').addEventListener('click', () => selStart('loop'));
+$('selClear').addEventListener('click', () => { if (!art || !art.sel) return; selTool = null; selDraw = null; noteChange('Clear selection'); selSet(null); toast('Selection cleared. Changes apply to the whole design again.'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && selTool){ selTool = null; selDraw = null; syncSel(); drawBrush(); } });
+document.addEventListener('click', e => { if (!selTool) return; const b = e.target.closest ? e.target.closest('button') : null; if (b && !b.closest('#selTray')){ selTool = null; selDraw = null; syncSel(); drawBrush(); } }, true);
+$('quickReset').addEventListener('click', () => { // the sliders showing in Quick adjust go back to where the chosen Quick start puts them
+  const look = LOOKS[st.look] || {}; let n = 0;
+  for (const q of $('quickRows').querySelectorAll('input[data-buddy]')){ const id = q.dataset.buddy, el = $(id); if (!el) continue;
+    const def = /^r\d+range$/.test(id) ? 50 : id in look ? look[id] : id in ST0 ? ST0[id] : el.defaultValue;
+    if (+el.value === +def) continue; el.value = def; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); n++; }
+  syncQuick(); toast(n ? 'Quick adjust is back to its defaults.' : 'Quick adjust is already at its defaults.');
+});
 
 /* ---------- knock-out colour picker ---------- */
 function startPick(target){ // target: 'knock', or the number of the colour range being sampled
@@ -4309,6 +4384,7 @@ function updateChecks(){
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (st.bgOn && Array.isArray(bgFound)) rows.push(['info', '✂', `Background removed (${(st.bgHex || rgbHex(bgFound[0], bgFound[1], bgFound[2])).toUpperCase()})`, `Cleared where it joins the outside edge, within ${st.bgTol}%. The same colour inside the design stays.`]);
+  if (art && art.sel) rows.push(['info', '◐', 'A selected area is on', selWorks() ? 'Skin tones, pale colours, smoothing and sharpen change only inside the selection. Clear it (above the art) to change the whole design.' : 'Nothing is using it yet: it limits Calm skin tones, Deepen pale colours, Smooth out noise and Sharpen.']);
   if (st.skin) rows.push(['info', '◐', `Skin tones calmed: ${['', 'a little', 'more'][st.skin]}`, 'Skin-like colours are eased back so faces don’t print too orange or red. Print a test strip to check.']);
   if (st.pale) rows.push(['info', '◐', `Pale colours deepened: ${['', 'a little', 'more'][st.pale]}`, 'Creams and other light tints are a little darker and stronger so they don’t print as white. White itself is unchanged.']);
   if (st.noise) rows.push(['info', '≈', `Noise smoothed: ${['', 'Light', 'Medium', 'Strong'][st.noise]}`, 'Speckle and patchy colour evened out on the art at print size, before the dots.']);
