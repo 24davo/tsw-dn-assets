@@ -158,7 +158,9 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .crop-bar{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100% - 24px);padding:6px 6px 6px 12px;font-size:13px;font-weight:600}
 .stage.cropping #view{cursor:crosshair}
 .stage.selecting #view{cursor:crosshair}
-.sel-note{font-size:12px;color:var(--muted);max-width:330px;line-height:1.35;flex-basis:100%;max-width:none}
+.sel-note{display:none}
+#cropTray,#selTray{flex-wrap:nowrap}
+#selTray .chip,#cropTray .chip{white-space:nowrap}
 .quick-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .stage.cropping .pane-pick,.stage.cropping #legend{display:none!important}
 .g-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -723,9 +725,9 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="chip" type="button" id="selBox" aria-pressed="false" data-tip="Drag a box on the art. Skin tones, pale colours, smoothing and sharpen then change only inside it.">Box</button>
           <button class="chip" type="button" id="selLoop" aria-pressed="false" data-tip="Draw around a part freehand, such as a face.">Loop</button>
           <button class="chip" type="button" id="selClear" hidden data-tip="Back to changing the whole design.">Clear</button>
-          <button class="chip" type="button" id="selShadows" hidden data-tip="Shadows drop out inside the selection only. Adjust how far under Fine-tune, Parts.">Remove shadows here</button>
-          <button class="chip" type="button" id="selKnock" hidden data-tip="Then click a colour inside the selection: it is removed there, and nowhere else.">Knock out a colour here</button>
-          <button class="chip" type="button" id="selOnly" hidden aria-pressed="true" data-tip="On: everything you change happens inside the selection, and the rest prints as opened. Off: only skin tones, pale colours, smoothing and sharpen stay inside.">Leave the rest untouched</button>
+          <button class="chip" type="button" id="selShadows" hidden data-tip="Remove shadows here: shadows drop out inside the selection only, and stay that way after you clear it. Adjust how far under Fine-tune, Parts.">Shadows here</button>
+          <button class="chip" type="button" id="selKnock" hidden data-tip="Knock out a colour here: then click a colour inside the selection. It is removed there and nowhere else, and stays that way after you clear the selection.">Knock out here</button>
+          <button class="chip" type="button" id="selOnly" hidden aria-pressed="true" data-tip="Leave the rest untouched. On: everything you change happens inside the selection, and the rest prints as opened. Off: only skin tones, pale colours, smoothing and sharpen stay inside.">Rest untouched</button>
           <span class="sel-note" id="selNote" hidden></span>
         </div>
         <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
