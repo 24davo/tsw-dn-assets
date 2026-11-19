@@ -598,6 +598,16 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .i-white{background:radial-gradient(circle,#e0168a 0 30%,transparent 32%),#3d3d40}
 /* v93: the step trail as three large boxes that stay at the top of the panel */
 .panel-bar{min-height:42px}
+.panel-tab{position:absolute;z-index:6;top:50%;right:380px;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;width:26px;padding:12px 0;border:1.5px solid var(--line-strong);border-right:0;border-radius:var(--r) 0 0 var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.panel-tab:hover{background:var(--soft)}
+.panel-tab svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.panel-tab span{writing-mode:vertical-rl}
+@media (min-width:1280px){.panel-tab{right:440px}}
+.work.panel-off{grid-template-columns:minmax(0,1fr)}
+.work.panel-off .panel{display:none}
+.work.panel-off .panel-tab{right:0;border-color:var(--accent)}
+.work.panel-off .panel-tab svg{transform:scaleX(-1)}
+@media (max-width:880px){.panel-tab{display:none}.work.panel-off .panel{display:block}}
 .trail{position:sticky;top:42px;z-index:3;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px max(20px,env(safe-area-inset-right,0px)) 12px max(20px,env(safe-area-inset-left,0px));background:var(--panel)}
 .trail button{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 10px;align-items:center;justify-items:start;padding:10px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--soft)}
 .trail button:hover{border-color:var(--ink)}
@@ -715,7 +725,8 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="chip" type="button" id="selClear" hidden data-tip="Back to changing the whole design.">Clear</button>
           <button class="chip" type="button" id="selShadows" hidden data-tip="Shadows drop out inside the selection only. Adjust how far under Fine-tune, Parts.">Remove shadows here</button>
           <button class="chip" type="button" id="selKnock" hidden data-tip="Then click a colour inside the selection: it is removed there, and nowhere else.">Knock out a colour here</button>
-          <span class="sel-note" id="selNote" hidden>Skin tones, pale colours, smoothing and sharpen change only inside the selection.</span>
+          <button class="chip" type="button" id="selOnly" hidden aria-pressed="true" data-tip="On: everything you change happens inside the selection, and the rest prints as opened. Off: only skin tones, pale colours, smoothing and sharpen stay inside.">Leave the rest untouched</button>
+          <span class="sel-note" id="selNote" hidden></span>
         </div>
         <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
@@ -768,6 +779,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     </section>
     </div>
 
+    <button class="panel-tab" type="button" id="panelTab" aria-expanded="true" aria-label="Hide the tools panel" data-tip="Fold the tools away for more room for the art. Click again to bring them back."><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg><span>Tools</span></button>
     <aside class="panel" aria-label="Halftone settings">
       <div class="panel-bar"><span class="kicker">Tools</span><span class="g-actions"><button class="link" type="button" id="revertBtn">Revert</button><button class="link" type="button" id="resetAll">Reset to defaults</button><button class="link" type="button" id="foldAll">Expand all</button></span></div>
       <nav class="trail" id="trail" aria-label="The three steps"></nav>
@@ -1713,10 +1725,12 @@ function engine(){
     const recol = rules.map((R, k) => R.action === 'recolour' ? k : -1).filter(k => k >= 0);
     const nc = rules.filter(R => R.action === 'remove' || R.action === 'fade' || R.action === 'solid').length; // nc: ranges that change the ink
     // A part's painted area: its selection only counts inside it. A part whose area was never sent selects nothing.
-    { const used = new Set(rules.map(R => R.mask)); for (const id of [...masks.keys()]) if (!used.has(id)) masks.delete(id); }
+    { const used = new Set(rules.map(R => R.mask)); if (p.guard != null) used.add(p.guard); for (const id of [...masks.keys()]) if (!used.has(id)) masks.delete(id); }
+    const GM = p.guard != null && masks.get(p.guard) || null; let gout = false; // the selection: outside it (gout) nothing whole-design is knocked out or changed
     const hasM = rules.map(R => R.mask != null), RM = rules.map(R => R.mask != null && masks.get(R.mask) || null);
     const W0 = w, H0 = h;
     const sw = (k, r, g, b, L, x, y) => {
+      if (gout && !hasM[k]) return 0; // a whole-design part stays inside the selection
       let s = selectWeight(rules[k], r, g, b, L);
       if (s <= 0 || !hasM[k]) return s;
       const M = RM[k]; if (!M) return 0;
@@ -1774,6 +1788,7 @@ function engine(){
         const a = d[i+3];
         if (a === 0) continue;
         let c = a/255;
+        if (GM){ let u = ((x + 0.5)*GM.w/W0) | 0, v = ((y + 0.5)*GM.h/H0) | 0; if (u > GM.w - 1) u = GM.w - 1; if (v > GM.h - 1) v = GM.h - 1; gout = GM.d[v*GM.w + u] < 128; }
         if (bgm){ const v = bgm[i >> 2]; if (v === 255){ cls[i >> 2] = 1; continue; } if (v) c *= v/255; }
         if (hard){ if (c < hard){ cls[i >> 2] = 1; continue; } c = 1; }
         let r = d[i], g = d[i+1], b = d[i+2];
@@ -1812,9 +1827,9 @@ function engine(){
           else { m = r > kr ? r - kr : kr - r; const dg = g > kg ? g - kg : kg - g; if (dg > m) m = dg; const db = b > kb ? b - kb : kb - b; if (db > m) m = db; }
           const dn = m/far;
           if (cut || nd){ // clean cut (or a No dots part): a hard knock-out of the knock-out colour only, so nearby colours keep full ink
-            if (tone && dn <= ktol){ if (!nc){ cls[i >> 2] = 1; continue; } c = 0; }
+            if (tone && !gout && dn <= ktol){ if (!nc){ cls[i >> 2] = 1; continue; } c = 0; }
           } else {
-            let q = tone ? (dn - k0)/ks : 1;
+            let q = tone && !gout ? (dn - k0)/ks : 1;
             if (rampr.length){ // Own dots: the selected part's ink follows the range's own fade; a soft edge of the selection blends the two
               const L1 = (0.299*r + 0.587*g + 0.114*b)/255;
               q = q < 0 ? 0 : q > 1 ? 1 : q;
@@ -2595,7 +2610,7 @@ function params(){
           k0: st.k0/100, k1: st.k1/100, ktol: st.ktol/100, knock: hexRgb(st.knock || st.shirt),
           gamma: st.finish === 'cut' ? 1 : Math.pow(2, -st.mid/50), contrast: st.finish === 'cut' ? 1 : Math.pow(2, st.con/50), // Ink density is a halftone step
           drop: st.finish === 'cut' ? 0 : st.drop/100, solid: st.finish === 'cut' ? 1 : st.solid/100, one: st.ink === 'one', ink: hexRgb(st.inkHex),
-          cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(partParams), selOut: rules.length ? activeRule : -1,
+          cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(partParams), guard: selGuardOn() ? areaMask(art.selA).id : null, selOut: rules.length ? activeRule : -1,
           hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
           rich: st.rich && st.finish !== 'cut', crisp: st.crisp && st.finish !== 'cut' ? 3 : 0, speck: !!st.speck, speckT: st.finish === 'cut' ? Math.max(3, Math.round((st.speckMm/25.4*DPI)**2)) : 0,
           flat: isFlat() ? {n: st.flatN, snap: !!st.flatSnap, tidy: Math.round(st.flatTidy/25.4*DPI), smooth: (st.flatSmooth == null ? 4 : +st.flatSmooth)*0.16, up: art ? toMm(st.widthCm)/25.4*DPI/art.w : 1, drop: st.flatDrop ? st.flatDrop.split(',').map(hexRgb) : []} : null,
@@ -2639,6 +2654,7 @@ function sendMasks(){
     const m = areaMask(R.area); if (now.has(m.id)) continue; now.add(m.id);
     if (!have.has(m.id)){ const b = m.a.slice().buffer; bus.post({type: 'mask', id: m.id, w: m.w, h: m.h, buf: b}, [b]); }
   }
+  if (selGuardOn()){ const m = areaMask(art.selA); if (!now.has(m.id)){ now.add(m.id); if (!have.has(m.id)){ const b = m.a.slice().buffer; bus.post({type: 'mask', id: m.id, w: m.w, h: m.h, buf: b}, [b]); } } }
   bus.have = now;
 }
 function schedule(){
@@ -2853,7 +2869,9 @@ function selMask(W, H){ // 255 inside the selection, 0 outside, at the print's p
 function syncSel(){
   const on = !!(art && art.sel); if (!$('selBox')) return;
   $('selBox').setAttribute('aria-pressed', String(selTool === 'box')); $('selLoop').setAttribute('aria-pressed', String(selTool === 'loop'));
-  if ($('selClear').hidden === on){ $('selClear').hidden = !on; $('selShadows').hidden = !on; $('selKnock').hidden = !on; renderRules(); } if ($('selNote').hidden === on) $('selNote').hidden = !on;
+  if ($('selClear').hidden === on){ $('selClear').hidden = !on; $('selShadows').hidden = !on; $('selKnock').hidden = !on; $('selOnly').hidden = !on; renderRules(); } if ($('selNote').hidden === on) $('selNote').hidden = !on;
+  if (on){ const g = selGuardOn(); $('selOnly').setAttribute('aria-pressed', String(g));
+    const t = g ? 'Changes now happen inside the selection only. The rest prints as opened.' : 'Only skin tones, pale colours, smoothing and sharpen stay inside the selection.'; if ($('selNote').textContent !== t) $('selNote').textContent = t; }
   stage.classList.toggle('selecting', !!selTool);
 }
 function selStart(kind){
@@ -2873,7 +2891,8 @@ function selPart(type){ // a new part that removes shadows, or a clicked colour,
   if (type === 'sample'){ startPick(activeRule); toast('Now click the colour to knock out, inside the selection.'); }
   else toast(`Shadows removed inside the selection (Part ${rules.length}). Adjust how far under Fine-tune, Parts.`);
 }
-function selSet(sel){ art.sel = sel; art.selV = (art.selV || 0) + 1; syncSel(); drawBrush(); updateChecks(); if (selWorks()) buildSrc(); }
+const selGuardOn = () => !!(art && art.sel && art.selA && art.selOnly !== false); // the selection holds everything outside it as opened
+function selSet(sel){ art.sel = sel; art.selA = sel ? [selArea()] : null; art.selV = (art.selV || 0) + 1; syncSel(); drawBrush(); updateChecks(); if (selWorks()) buildSrc(); else schedule(); }
 function selDown(e){ const p = toFile(e); if (!p) return; selDraw = {kind: selTool, pts: [p.x, p.y, p.x, p.y]}; view.setPointerCapture(e.pointerId); drawBrush(); }
 function selMove(e){ const p = toFile(e); if (!p || !selDraw) return; const q = selDraw.pts;
   if (selDraw.kind === 'box'){ q[2] = p.x; q[3] = p.y; } else if (Math.hypot(p.x - q[q.length - 2], p.y - q[q.length - 1]) > art.crop.w/400) q.push(p.x, p.y);
@@ -2885,7 +2904,7 @@ function selUp(){
   const tiny = k.w/100;
   if (x1 - x0 < tiny || y1 - y0 < tiny || (d.kind === 'loop' && q.length < 8)){ drawBrush(); toast('That was too small. Drag a bigger area.'); return; }
   selTool = null; noteChange('Select area'); selSet({kind: d.kind, pts: q.map(v => Math.round(v*10)/10)});
-  toast(selWorks() ? 'Selected. Skin tones, pale colours, smoothing and sharpen now change only inside it.' : 'Selected. Now set Calm skin tones, Deepen pale colours, Smooth out noise or Sharpen: only the inside changes.');
+  toast('Selected. Changes now happen inside it only. The rest prints as opened.');
 }
 function buildSrcSoon(){ clearTimeout(srcTimer); srcTimer = setTimeout(buildSrc, 250); }
 function buildSrc(){
@@ -3642,6 +3661,7 @@ async function stripMake(x, y){
 }
 document.addEventListener('click', e => { const b = e.target.closest ? e.target.closest('[data-strip]') : null; if (b) stripStart(b.dataset.strip); });
 
+$('selOnly').addEventListener('click', () => { if (!art || !art.sel) return; art.selOnly = art.selOnly === false; noteChange(art.selOnly ? 'Selection: leave the rest untouched' : 'Selection: whole design again'); syncSel(); updateChecks(); schedule(); });
 $('selShadows').addEventListener('click', () => selPart('shadows')); $('selKnock').addEventListener('click', () => selPart('sample'));
 $('selBox').addEventListener('click', () => selStart('box')); $('selLoop').addEventListener('click', () => selStart('loop'));
 $('selClear').addEventListener('click', () => { if (!art || !art.sel) return; selTool = null; selDraw = null; noteChange('Clear selection'); selSet(null); toast('Selection cleared. Changes apply to the whole design again.'); });
@@ -3654,6 +3674,15 @@ $('quickReset').addEventListener('click', () => { // the sliders showing in Quic
     if (+el.value === +def) continue; el.value = def; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); n++; }
   syncQuick(); toast(n ? 'Quick adjust is back to its defaults.' : 'Quick adjust is already at its defaults.');
 });
+
+function setPanel(open, keep){
+  const w = document.querySelector('.work'), t = $('panelTab'); if (!w || !t) return;
+  w.classList.toggle('panel-off', !open); t.setAttribute('aria-expanded', String(open)); t.setAttribute('aria-label', open ? 'Hide the tools panel' : 'Show the tools panel');
+  if (keep) try { localStorage.setItem('tsw-ge-panel', open ? '1' : '0'); } catch(e){}
+  if (typeof render === 'function') requestAnimationFrame(() => { try { render(); } catch(e){} });
+}
+$('panelTab').addEventListener('click', () => setPanel(document.querySelector('.work').classList.contains('panel-off'), true));
+try { if (localStorage.getItem('tsw-ge-panel') === '0') setPanel(false, false); } catch(e){}
 
 /* ---------- knock-out colour picker ---------- */
 function startPick(target){ // target: 'knock', or the number of the colour range being sampled
@@ -4400,7 +4429,7 @@ function updateChecks(){
   const q = qualityInfo();
   rows.push([q.c, q.c === 'good' ? '✓' : '!', q.t, q.d]);
   if (st.bgOn && Array.isArray(bgFound)) rows.push(['info', '✂', `Background removed (${(st.bgHex || rgbHex(bgFound[0], bgFound[1], bgFound[2])).toUpperCase()})`, `Cleared where it joins the outside edge, within ${st.bgTol}%. The same colour inside the design stays.`]);
-  if (art && art.sel) rows.push(['info', '◐', 'A selected area is on', selWorks() ? 'Skin tones, pale colours, smoothing and sharpen change only inside the selection. Clear it (above the art) to change the whole design.' : 'Nothing is using it yet: it limits Calm skin tones, Deepen pale colours, Smooth out noise and Sharpen.']);
+  if (art && art.sel) rows.push(['info', '◐', 'A selected area is on', selGuardOn() ? 'The knock-out, shadow removal and other changes happen inside the selection only. The rest prints as opened, with nothing removed. Clear it (above the art) to change the whole design.' : selWorks() ? 'Skin tones, pale colours, smoothing and sharpen change only inside the selection. Clear it (above the art) to change the whole design.' : 'Nothing is using it yet: it limits Calm skin tones, Deepen pale colours, Smooth out noise and Sharpen.']);
   if (st.skin) rows.push(['info', '◐', `Skin tones calmed: ${['', 'a little', 'more'][st.skin]}`, 'Skin-like colours are eased back so faces don’t print too orange or red. Print a test strip to check.']);
   if (st.pale) rows.push(['info', '◐', `Pale colours deepened: ${['', 'a little', 'more'][st.pale]}`, 'Creams and other light tints are a little darker and stronger so they don’t print as white. White itself is unchanged.']);
   if (st.noise) rows.push(['info', '≈', `Noise smoothed: ${['', 'Light', 'Medium', 'Strong'][st.noise]}`, 'Speckle and patchy colour evened out on the art at print size, before the dots.']);
