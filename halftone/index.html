@@ -392,6 +392,27 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .label-chip{display:inline-block;padding:2px 8px;border-radius:4px;background:#1a1a1a;font-weight:700;word-break:break-word}
 .label-chip.red{color:#ff3b30}.label-chip.yellow{color:#ffe600}
 .batch-label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.gang-set{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;font-weight:600}
+.gang-set label{display:inline-flex;align-items:center;gap:8px}
+.gang-set input[type=number]{width:88px;height:36px;padding:0 8px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--bg);color:var(--ink);font:inherit;font-weight:700}
+.gang-sum{flex:1;min-width:220px;text-align:right;font-weight:700}
+.gang-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr)}
+.gang-list{overflow:auto;padding:16px;display:grid;gap:10px;align-content:start;border-right:1px solid var(--line)}
+.gang-sheets{overflow:auto;padding:16px;display:flex;flex-wrap:wrap;gap:24px;align-content:flex-start;align-items:flex-start}
+.gang-item{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel)}
+.gang-item.over{border-color:#e0a030}
+.gang-item canvas{width:64px;height:64px;object-fit:contain;background:var(--soft);border-radius:2px}
+.gang-name{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gang-meta{font-size:12px;color:var(--muted)}
+.gang-qty{display:flex;align-items:center;gap:4px}
+.gang-qty button{width:34px;height:36px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--panel);color:var(--ink);font-size:18px;font-weight:700;cursor:pointer}
+.gang-qty input{width:52px;height:36px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--bg);color:var(--ink);font:inherit;font-weight:800;text-align:center}
+.gang-qty .x{border-color:var(--line);font-size:14px}
+.gang-empty{padding:28px 16px;font-size:15px;color:var(--muted);line-height:1.5;max-width:520px}
+.gang-sheet{display:grid;gap:8px}
+.gang-sheet canvas{display:block;border:1px solid var(--line-strong);border-radius:2px}
+.gang-cap{font-size:13px;font-weight:700}
+@media (max-width:880px){.gang-body{grid-template-columns:1fr}.gang-list{border-right:0;border-bottom:1px solid var(--line);max-height:40vh}}
 .bo-head{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;padding:8px 0 0}
 .bo-head h3{margin:0;font-size:18px;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--ink)}
 .bg-tick{width:22px;height:22px;margin:0;cursor:pointer;accent-color:var(--accent)}
@@ -692,6 +713,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
       <button class="btn" id="installBtn" type="button" hidden data-tip="Puts this in its own window, like a program: no browser tabs or address bar, its own icon on the taskbar, and the taskbar stays in view.">Install app</button>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
       <button class="btn" type="button" id="batchBtn" data-tip="Many files at once: one set-up for a group, every file at the same scale, saved together as full-size PNGs.">Batch</button>
+      <button class="btn" type="button" id="gangBtn" data-tip="Gang sheet: finished prints packed onto one sheet of film, with a quantity for each.">Sheet</button>
       <button class="btn" type="button" id="openBtn">Open art</button>
       <input type="file" id="fileIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
       <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
@@ -1363,12 +1385,34 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <div class="cal-actions"><button class="btn" type="button" id="calCancel">Cancel</button><button class="btn primary" type="button" id="calSave">Save and show life size</button></div>
   </div>
 </div>
+<div class="batch" id="gang" role="dialog" aria-modal="true" aria-labelledby="gangTitle" hidden>
+  <div class="batch-bar">
+    <h2 id="gangTitle">Gang sheet</h2>
+    <span class="batch-sub">Finished prints packed onto a sheet of film. Set how many of each and the sheet arranges itself.</span>
+    <button class="btn primary" type="button" id="gangSave" disabled>Save sheet</button>
+    <button class="btn" type="button" id="gangAddOpen" data-tip="Adds the design in the editor, as it would save now.">Add the open design</button>
+    <button class="btn" type="button" id="gangToBatch" data-tip="Go to Batch to send whole groups here.">Batch</button>
+    <button class="btn" type="button" id="gangClear" disabled>Clear</button>
+    <button class="btn" type="button" id="gangClose">Back to the editor</button>
+  </div>
+  <div class="gang-set">
+    <label>Film width <input type="number" id="gangW" min="100" max="1600" step="1"> mm</label>
+    <label>Gap between prints <input type="number" id="gangGap" min="0" max="30" step="1"> mm</label>
+    <label>Longest sheet <input type="number" id="gangMax" min="200" max="1500" step="10"> mm</label>
+    <label><input type="checkbox" id="gangTurn"> Turn prints to save film</label>
+    <label><input type="checkbox" id="gangByOrder"> Keep each order together</label>
+    <span class="gang-sum" id="gangSum" aria-live="polite"></span>
+  </div>
+  <div class="gang-body"><div class="gang-list" id="gangList"></div><div class="gang-sheets" id="gangSheets"></div></div>
+  <div class="batch-busy" id="gangBusy" hidden><div><span id="gangBusyTxt">Working…</span></div></div>
+</div>
 <div class="batch" id="batch" role="dialog" aria-modal="true" aria-labelledby="batchTitle" hidden>
   <div class="batch-bar">
     <h2 id="batchTitle">Batch</h2>
     <span class="batch-sub">Many files, one set-up for each group. Pick a preset on each group (or set it up on a file), tick the groups, then process them all into one zip. Lock a group when it is right.</span>
     <label class="batch-label">Production label <select id="batchLabelMode"><option value="off">Off</option><option value="simple">Simple</option><option value="full">Full info</option></select></label>
     <button class="btn primary" type="button" id="batchRun" disabled data-tip="Works out every ticked group that is set up, and saves one zip with a folder for each group.">Process ticked groups</button>
+    <button class="btn" type="button" id="batchToGang" disabled data-tip="Works out every ticked group that is set up and puts the prints on a gang sheet, where you set how many of each.">Send ticked to a sheet</button>
     <button class="btn" type="button" id="batchJoin" disabled data-tip="Puts the files of every ticked group into one group, like names that each arrived as a group of their own. Untick the groups to leave out first.">Join ticked groups</button>
     <button class="btn" type="button" id="batchUndo" disabled>Undo</button>
     <button class="btn" type="button" id="batchNew">New group</button>
@@ -6415,7 +6459,7 @@ function batchShow(){ hideWelcome(); $('batch').hidden = false; renderBatch(); }
 function renderBatch(){
   syncBatchTools();
   const run = batchGroups.filter(g => g.on && batchReady(g)).length;
-  $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
+  $('batchToGang').disabled = !run; $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
   if ($('batch').hidden) return;
   if (!batchGroups.length){
     $('batchBody').innerHTML = '<div class="batch-empty"><b>No groups yet</b><p>A group is a set of files that share one set-up, like the back names of an order. An order sent from the Workboard arrives here already in its groups. For anything else, start a group and add its files, or drop files or a zip here.</p><button class="btn primary" type="button" data-act="first">Start a group and add files</button></div>';
@@ -6552,6 +6596,7 @@ $('batchIn').addEventListener('change', async e => {
 });
 $('batchBtn').addEventListener('click', batchShow);
 $('batchRun').addEventListener('click', () => batchSave(batchGroups.filter(g => g.on), true));
+$('batchToGang').addEventListener('click', () => batchSave(batchGroups.filter(g => g.on), true, true));
 $('batchUndo').addEventListener('click', batchUndoGo);
 $('batchJoin').addEventListener('click', () => {
   if (batchBusy) return;
@@ -6665,7 +6710,7 @@ async function makeZip(files){
 /* Save: each ticked file is put through the editor in turn (off the tabs, so nothing there changes), worked out at its
    group's settings and scale. One group saves a zip named after the group. Process ticked groups (whole) saves every
    ticked group in one zip, a folder for each group, named after the order when they share one. */
-async function batchSave(groups, whole){
+async function batchSave(groups, whole, toSheet){ // toSheet: the finished prints go to the gang sheet, not a zip
   if (batchBusy || saving) return;
   const notSet = groups.filter(g => g.items.some(it => it.on) && !(g.snap && batchSized(g))).length;
   groups = groups.filter(g => g.snap && batchSized(g));
@@ -6693,6 +6738,7 @@ async function batchSave(groups, whole){
         await new Promise(r => setTimeout(r, 30));
         for (let n = 0; n < 400; n++){ await idle(); if (outReady) break; await new Promise(r => setTimeout(r, 25)); }
         if (!outReady) throw new Error('not ready');
+        if (toSheet){ if (!await gangAdd(labelled(traceCanvas() || outCanvas), {name: fileName().replace(/\.png$/i, ''), order: g.order || '', orders: it.orders || null, artKey: 'b:' + it.key})) throw new Error('empty'); files.push({name: fileName(), blob: null, it, g}); URL.revokeObjectURL(url); continue; }
         const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('no png')), 'image/png'));
         const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
         if (!names.has(g.id)) names.set(g.id, new Set());
@@ -6709,7 +6755,7 @@ async function batchSave(groups, whole){
     restoringDocs = wasKeeping;
   }
   let ok = false; const done = new Set(files.map(f => f.g.id)).size;
-  if (!batchStopped && files.length){
+  if (!batchStopped && files.length && !toSheet){
     $('batchBusyTxt').textContent = 'Packing the zip…';
     try {
       const clean = t => String(t).replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-');
@@ -6731,10 +6777,126 @@ async function batchSave(groups, whole){
   if (ok) for (const f of files){ f.it.saved = true; if (f.it.orders && f.it.orders.length) artSaved(f.it.orders, 'b:' + f.it.key); }
   batchBusy = false; saving = false; $('saveBtn').disabled = !outReady; $('batchBusyTxt').textContent = 'Working…'; $('batchBusy').hidden = true;
   batchKeepSoon(); renderBatch();
+  if (toSheet && !batchStopped){ if (files.length){ $('batch').hidden = true; $('batchBar').hidden = true; gangShow(); toast(`${files.length} print${files.length === 1 ? '' : 's'} added to the sheet.` + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: too big at this scale.` : '')); } else toast('Those files couldn’t be worked out.'); return; }
   if (batchStopped) toast('Stopped. Nothing was saved.');
   else if (ok && (failed || left || notSet || whole)) toast(`Saved ${files.length} PNG${files.length === 1 ? '' : 's'}` + (whole ? ` from ${done} group${done === 1 ? '' : 's'}` : '') + ' in one zip.' + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: over 400 × 500 mm at this scale.` : '') + (notSet ? ` ${notSet} ticked group${notSet === 1 ? ' isn’t' : 's aren’t'} set up yet.` : ''));
   else if (!files.length) toast('Those files couldn’t be worked out.');
 }
+
+/* ---------- gang sheet: finished prints, a quantity each, packed onto film ---------- */
+let gangItems = [], gangSeq = 0, gangBusy = false;
+const gangSet = Object.assign({w: 580, gap: 5, max: 1000, turn: true, byOrder: true}, (() => { try { return JSON.parse(localStorage.getItem('tsw-ge-gang')) || {}; } catch(e){ return {}; } })());
+const gangPx = mm => Math.round(mm/25.4*DPI), gangMm = px => Math.round(px/DPI*25.4);
+async function gangAdd(src, info){ // src: a finished print's canvas. Trimmed to its ink, so no film is spent on empty edges
+  const w = src.width, h = src.height, d = src.getContext('2d', {willReadFrequently: true}).getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0, o = 3; y < h; y++) for (let x = 0; x < w; x++, o += 4) if (d[o]){ if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return false;
+  const c = document.createElement('canvas'); c.width = x1 - x0 + 1; c.height = y1 - y0 + 1; c.getContext('2d').drawImage(src, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
+  const blob = await new Promise(res => c.toBlob(res, 'image/png')); if (!blob) return false;
+  const k = Math.min(1, 360/Math.max(c.width, c.height)), t = document.createElement('canvas'); t.width = Math.max(1, Math.round(c.width*k)); t.height = Math.max(1, Math.round(c.height*k)); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height);
+  gangItems.push({id: ++gangSeq, name: info.name || 'print', order: info.order || '', orders: info.orders || null, artKey: info.artKey || '', w: c.width, h: c.height, blob, thumb: t, qty: 1});
+  return true;
+}
+function gangPack(){ // a skyline packer: each print goes where it ends lowest on the sheet; a new sheet starts when the longest sheet is reached
+  const gap = gangPx(gangSet.gap), W = gangPx(gangSet.w) + gap, maxL = gangPx(gangSet.max), list = [], over = new Set(), sheets = [];
+  for (const it of gangItems) for (let n = 0; n < it.qty; n++) list.push(it);
+  const big = it => Math.max(it.w, it.h);
+  list.sort((a, b) => (gangSet.byOrder ? String(a.order).localeCompare(String(b.order)) : 0) || big(b) - big(a) || a.id - b.id);
+  let sky = null, cur = null; // every sheet keeps its own skyline, so a later small print can still fill a gap on an earlier sheet
+  const open = () => { cur = {places: [], len: 0, sky: [{x: 0, y: 0, w: W}]}; sheets.push(cur); sky = cur.sky; };
+  const find = (w, h) => { let best = null;
+    for (let i = 0; i < sky.length; i++){ const x = sky[i].x; if (x + w > W) break; let y = 0, rem = w; for (let j = i; j < sky.length && rem > 0; j++){ if (sky[j].y > y) y = sky[j].y; rem -= sky[j].w; }
+      if (!best || y + h < best.y + best.h || (y + h === best.y + best.h && x < best.x)) best = {x, y, w, h}; }
+    return best; };
+  const put = r => { const nx = r.x + r.w, out = [];
+    for (const s of sky){ const e = s.x + s.w; if (e <= r.x || s.x >= nx){ out.push(s); continue; } if (s.x < r.x) out.push({x: s.x, y: s.y, w: r.x - s.x}); if (e > nx) out.push({x: nx, y: s.y, w: e - nx}); }
+    out.push({x: r.x, y: r.y + r.h, w: r.w}); out.sort((a, b) => a.x - b.x);
+    sky = []; for (const s of out){ const l = sky[sky.length - 1]; if (l && l.y === s.y && l.x + l.w === s.x) l.w += s.w; else sky.push(s); } cur.sky = sky; };
+  for (const it of list){
+    const opts = [[it.w, it.h, false]]; if (gangSet.turn && it.w !== it.h) opts.push([it.h, it.w, true]);
+    const fits = opts.filter(([w, h]) => w + gap <= W && h <= maxL); if (!fits.length){ over.add(it.id); continue; }
+    const tryAll = () => { let b = null; for (const [w, h, rot] of fits){ const r = find(w + gap, h + gap); if (r && r.y + h <= maxL && (!b || r.y + r.h < b.y + b.h)) b = Object.assign(r, {rot, pw: w, ph: h}); } return b; };
+    let r = null; for (let k = 0; k < sheets.length; k++){ cur = sheets[k]; sky = cur.sky; r = tryAll(); if (r && (k === sheets.length - 1 || r.y + r.ph <= cur.len)) break; r = null; } // an earlier sheet only where it gets no longer
+    if (!r){ open(); r = tryAll(); } if (!r){ over.add(it.id); continue; }
+    put(r); cur.places.push({it, x: r.x, y: r.y, w: r.pw, h: r.ph, rot: r.rot}); if (r.y + r.ph > cur.len) cur.len = r.y + r.ph;
+  }
+  const live = sheets.filter(sh => sh.places.length), film = live.reduce((t, sh) => t + sh.len, 0), ink = live.reduce((t, sh) => t + sh.places.reduce((a, q) => a + q.w*q.h, 0), 0);
+  return {sheets: live, over, W: W - gap, film, waste: film ? 1 - ink/((W - gap)*film) : 0, count: live.reduce((t, sh) => t + sh.places.length, 0)};
+}
+function gangDraw(ctx, q, k, img){ // one print at its place; k: sheet pixels to canvas pixels
+  ctx.save(); if (q.rot){ ctx.translate((q.x + q.w)*k, q.y*k); ctx.rotate(Math.PI/2); ctx.drawImage(img, 0, 0, q.h*k, q.w*k); } else ctx.drawImage(img, q.x*k, q.y*k, q.w*k, q.h*k); ctx.restore();
+}
+function gangRender(){
+  const list = $('gangList'), box = $('gangSheets'); list.textContent = ''; box.textContent = '';
+  $('gangW').value = gangSet.w; $('gangGap').value = gangSet.gap; $('gangMax').value = gangSet.max; $('gangTurn').checked = !!gangSet.turn; $('gangByOrder').checked = !!gangSet.byOrder;
+  $('gangBtn').textContent = gangItems.length ? `Sheet (${gangItems.reduce((t, it) => t + it.qty, 0)})` : 'Sheet';
+  if (!gangItems.length){
+    list.innerHTML = '<div class="gang-empty"><b>No prints yet.</b><br>Add the design in the editor with “Add the open design”, or go to Batch, tick the groups and choose “Send ticked to a sheet”.</div>';
+    $('gangSum').textContent = ''; $('gangSave').disabled = true; $('gangClear').disabled = true; return;
+  }
+  const lay = gangPack();
+  for (const it of gangItems){
+    const row = document.createElement('div'); row.className = 'gang-item' + (lay.over.has(it.id) ? ' over' : ''); row.dataset.id = it.id;
+    const t = document.createElement('canvas'); t.width = it.thumb.width; t.height = it.thumb.height; t.getContext('2d').drawImage(it.thumb, 0, 0); row.appendChild(t);
+    const mid = document.createElement('div'); mid.innerHTML = `<div class="gang-name" title="${esc(it.name)}">${esc(it.name)}</div><div class="gang-meta">${gangMm(it.w)} × ${gangMm(it.h)} mm${it.order ? ' · ' + esc(it.order) : ''}${lay.over.has(it.id) ? ' · <b>too big for this film</b>' : ''}</div>`; row.appendChild(mid);
+    const q = document.createElement('div'); q.className = 'gang-qty'; q.innerHTML = `<button type="button" data-q="-1" aria-label="One fewer">−</button><input type="number" min="1" max="500" value="${it.qty}" aria-label="How many of ${esc(it.name)}"><button type="button" data-q="1" aria-label="One more">+</button><button type="button" class="x" data-q="x" aria-label="Remove ${esc(it.name)}">✕</button>`; row.appendChild(q);
+    list.appendChild(row);
+  }
+  const n = lay.sheets.length;
+  lay.sheets.forEach((sh, i) => {
+    const wrap = document.createElement('div'); wrap.className = 'gang-sheet';
+    const vw = Math.min(520, Math.max(260, box.clientWidth - 40 || 520)), k = vw/lay.W, c = document.createElement('canvas'); c.width = Math.round(vw); c.height = Math.max(1, Math.round(sh.len*k));
+    const x = c.getContext('2d'); x.fillStyle = '#2b2b2e'; x.fillRect(0, 0, c.width, c.height);
+    for (const q of sh.places){ gangDraw(x, q, k, q.it.thumb); x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = 1; x.strokeRect(Math.round(q.x*k) + .5, Math.round(q.y*k) + .5, Math.round(q.w*k) - 1, Math.round(q.h*k) - 1); }
+    const cap = document.createElement('div'); cap.className = 'gang-cap'; cap.textContent = `${n > 1 ? `Sheet ${i + 1} of ${n} · ` : ''}${gangSet.w} × ${gangMm(sh.len)} mm · ${sh.places.length} print${sh.places.length === 1 ? '' : 's'}`;
+    wrap.appendChild(cap); wrap.appendChild(c); box.appendChild(wrap);
+  });
+  const left = lay.over.size;
+  $('gangSum').textContent = lay.count ? `${lay.count} print${lay.count === 1 ? '' : 's'} on ${n} sheet${n === 1 ? '' : 's'} · ${gangMm(lay.film)} mm of film · ${Math.round(lay.waste*100)}% unused` + (left ? ` · ${left} too big` : '') : 'Nothing fits this film width.';
+  $('gangSave').disabled = !lay.count || gangBusy; $('gangSave').textContent = n > 1 ? `Save ${n} sheets` : 'Save sheet'; $('gangClear').disabled = false;
+}
+function gangShow(){ hideWelcome(); $('gang').hidden = false; gangRender(); }
+async function gangSave(){
+  if (gangBusy || saving) return; const lay = gangPack(); if (!lay.count) return;
+  gangBusy = true; $('gangBusy').hidden = false; let ok = false;
+  try {
+    const clean = t => String(t).replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-'), orders = [...new Set(gangItems.map(it => it.order).filter(Boolean))], base = (orders.length === 1 && clean(orders[0])) || 'gang-sheet', files = [], n = lay.sheets.length;
+    for (let i = 0; i < n; i++){
+      $('gangBusyTxt').textContent = n > 1 ? `Making sheet ${i + 1} of ${n}…` : 'Making the sheet…'; await new Promise(r => setTimeout(r, 30));
+      const sh = lay.sheets[i], c = document.createElement('canvas'); c.width = lay.W; c.height = sh.len; const x = c.getContext('2d'); if (!x) throw new Error('This sheet is too big for the browser. Try a shorter “Longest sheet”.');
+      const bmps = new Map();
+      for (const q of sh.places){ let b = bmps.get(q.it.id); if (!b){ b = await createImageBitmap(q.it.blob); bmps.set(q.it.id, b); } gangDraw(x, q, 1, b); }
+      for (const b of bmps.values()) if (b.close) b.close();
+      const raw = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('This sheet is too big for the browser. Try a shorter “Longest sheet”.')), 'image/png'));
+      const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', `Gang sheet ${i + 1} of ${n}: ${sh.places.length} prints, ${gangSet.w} x ${gangMm(sh.len)} mm, gap ${gangSet.gap} mm`]]);
+      files.push({name: `${base}_sheet${n > 1 ? `-${i + 1}-of-${n}` : ''}_${gangSet.w}x${gangMm(sh.len)}mm.png`, blob: png});
+    }
+    $('gangBusyTxt').textContent = 'Saving…';
+    ok = n === 1 ? await saveFile(files[0].blob, files[0].name) : await saveFile(await makeZip(files), `${base}_${n}-sheets.zip`);
+    if (ok) for (const it of gangItems) if (it.orders && it.orders.length && !lay.over.has(it.id)) artSaved(it.orders, it.artKey || 'g:' + it.id);
+  } catch(err){ toast(err && err.message ? err.message : 'The sheet couldn’t be made.'); }
+  gangBusy = false; $('gangBusy').hidden = true; $('gangBusyTxt').textContent = 'Working…'; gangRender();
+}
+$('gangBtn').addEventListener('click', gangShow);
+$('gangClose').addEventListener('click', () => { if (!gangBusy) $('gang').hidden = true; });
+$('gangToBatch').addEventListener('click', () => { if (gangBusy) return; $('gang').hidden = true; batchShow(); });
+$('gangSave').addEventListener('click', gangSave);
+$('gangClear').addEventListener('click', () => { if (gangBusy) return; gangItems = []; gangRender(); });
+$('gangAddOpen').addEventListener('click', async () => {
+  if (gangBusy) return; if (!art || art.isSample && false){ toast('Open a design in the editor first.'); return; }
+  gangBusy = true; $('gangBusy').hidden = false; $('gangBusyTxt').textContent = 'Adding the design…';
+  try { await idle(); if (!outReady) throw new Error('The design isn’t ready yet. Try again in a moment.');
+    if (!await gangAdd(labelled(traceCanvas() || outCanvas), {name: fileName().replace(/\.png$/i, ''), order: art.orders && art.orders[0] || '', orders: art.orders || null, artKey: art.artKey || ''})) throw new Error('That design has nothing to print.');
+  } catch(err){ toast(err && err.message ? err.message : 'The design couldn’t be added.'); }
+  gangBusy = false; $('gangBusy').hidden = true; $('gangBusyTxt').textContent = 'Working…'; gangRender();
+});
+for (const [id, key, lo, hi] of [['gangW', 'w', 100, 1600], ['gangGap', 'gap', 0, 30], ['gangMax', 'max', 200, 1500]]) $(id).addEventListener('change', e => { const v = Math.round(+e.target.value); gangSet[key] = isFinite(v) ? Math.max(lo, Math.min(hi, v)) : gangSet[key]; try { localStorage.setItem('tsw-ge-gang', JSON.stringify(gangSet)); } catch(err){} gangRender(); });
+for (const [id, key] of [['gangTurn', 'turn'], ['gangByOrder', 'byOrder']]) $(id).addEventListener('change', e => { gangSet[key] = e.target.checked; try { localStorage.setItem('tsw-ge-gang', JSON.stringify(gangSet)); } catch(err){} gangRender(); });
+$('gangList').addEventListener('click', e => { const b = e.target.closest('[data-q]'), row = e.target.closest('.gang-item'); if (!b || !row || gangBusy) return; const it = gangItems.find(x => x.id === +row.dataset.id); if (!it) return;
+  if (b.dataset.q === 'x') gangItems = gangItems.filter(x => x !== it); else it.qty = Math.max(1, Math.min(500, it.qty + +b.dataset.q)); gangRender(); });
+$('gangList').addEventListener('change', e => { const row = e.target.closest('.gang-item'); if (!row || e.target.type !== 'number') return; const it = gangItems.find(x => x.id === +row.dataset.id); if (!it) return; const v = Math.round(+e.target.value); it.qty = isFinite(v) ? Math.max(1, Math.min(500, v)) : it.qty; gangRender(); });
+new ResizeObserver(() => { if (!$('gang').hidden && !gangBusy) gangRender(); }).observe($('gangSheets'));
 
 /* Groups are kept in this browser's storage beside the open designs (files under b:key, the list under meta 'batch'),
    so a refresh brings a batch back. Nothing leaves the computer. */
