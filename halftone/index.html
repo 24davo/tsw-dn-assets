@@ -158,7 +158,7 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .crop-bar{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100% - 24px);padding:6px 6px 6px 12px;font-size:13px;font-weight:600}
 .stage.cropping #view{cursor:crosshair}
 .stage.selecting #view{cursor:crosshair}
-.sel-note{font-size:12px;color:var(--muted);max-width:330px;line-height:1.35}
+.sel-note{font-size:12px;color:var(--muted);max-width:330px;line-height:1.35;flex-basis:100%;max-width:none}
 .quick-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .stage.cropping .pane-pick,.stage.cropping #legend{display:none!important}
 .g-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -713,6 +713,8 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="chip" type="button" id="selBox" aria-pressed="false" data-tip="Drag a box on the art. Skin tones, pale colours, smoothing and sharpen then change only inside it.">Box</button>
           <button class="chip" type="button" id="selLoop" aria-pressed="false" data-tip="Draw around a part freehand, such as a face.">Loop</button>
           <button class="chip" type="button" id="selClear" hidden data-tip="Back to changing the whole design.">Clear</button>
+          <button class="chip" type="button" id="selShadows" hidden data-tip="Shadows drop out inside the selection only. Adjust how far under Fine-tune, Parts.">Remove shadows here</button>
+          <button class="chip" type="button" id="selKnock" hidden data-tip="Then click a colour inside the selection: it is removed there, and nowhere else.">Knock out a colour here</button>
           <span class="sel-note" id="selNote" hidden>Skin tones, pale colours, smoothing and sharpen change only inside the selection.</span>
         </div>
         <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
@@ -2613,6 +2615,7 @@ function areaMask(area){
   const X = v => (v - c.x)*sx, Y = v => (v - c.y)*sy;
   for (const a of area){
     const q = a.pts;
+    if (a.m === 'loop'){ x.globalCompositeOperation = 'source-over'; x.beginPath(); x.moveTo(X(q[0]), Y(q[1])); for (let i = 2; i < q.length; i += 2) x.lineTo(X(q[i]), Y(q[i + 1])); x.closePath(); x.fill(); continue; } // a selection's loop
     if (a.m === 'box'){ x.globalCompositeOperation = 'source-over'; x.fillRect(X(Math.min(q[0], q[2])), Y(Math.min(q[1], q[3])), Math.abs(q[2] - q[0])*sx, Math.abs(q[3] - q[1])*sy); continue; }
     x.globalCompositeOperation = a.m === 'sub' ? 'destination-out' : 'source-over'; x.lineWidth = Math.max(1, a.r*2*sx);
     x.beginPath(); x.moveTo(X(q[0]), Y(q[1])); if (q.length === 2) x.lineTo(X(q[0]) + 0.01, Y(q[1]));
@@ -2850,7 +2853,7 @@ function selMask(W, H){ // 255 inside the selection, 0 outside, at the print's p
 function syncSel(){
   const on = !!(art && art.sel); if (!$('selBox')) return;
   $('selBox').setAttribute('aria-pressed', String(selTool === 'box')); $('selLoop').setAttribute('aria-pressed', String(selTool === 'loop'));
-  if ($('selClear').hidden === on) $('selClear').hidden = !on; if ($('selNote').hidden === on) $('selNote').hidden = !on;
+  if ($('selClear').hidden === on){ $('selClear').hidden = !on; $('selShadows').hidden = !on; $('selKnock').hidden = !on; renderRules(); } if ($('selNote').hidden === on) $('selNote').hidden = !on;
   stage.classList.toggle('selecting', !!selTool);
 }
 function selStart(kind){
@@ -2858,6 +2861,17 @@ function selStart(kind){
   if (selTool === kind){ selTool = null; selDraw = null; syncSel(); drawBrush(); return; }
   if (cropping) endCrop(false); if (picking) endPick(); if (areaTool) setArea(areaTool.i, null); if (brushTool) setBrush(null);
   selTool = kind; selDraw = null; syncSel(); toast(kind === 'box' ? 'Drag a box over the part to change.' : 'Draw around the part to change.');
+}
+const selArea = () => ({m: art.sel.kind === 'box' ? 'box' : 'loop', pts: [...art.sel.pts], r: 0}); // the selection as a part's area
+function selPart(type){ // a new part that removes shadows, or a clicked colour, inside the selection only
+  if (!art || !art.sel) return;
+  if (rules.length >= MAX_RULES){ toast(`A design can have ${MAX_RULES} parts. Delete one under Fine-tune, Parts, first.`); return; }
+  if (cropping) endCrop(false); if (picking) endPick(); selTool = null; selDraw = null;
+  rules.push(Object.assign(newRule(type, 'remove'), {fuzz: type === 'shadows' ? 0 : 20, area: [selArea()]}));
+  activeRule = rules.length - 1; noteChange(type === 'shadows' ? 'Remove shadows in the selection' : 'Knock out a colour in the selection');
+  syncRules(); syncSel(); drawBrush(); schedule();
+  if (type === 'sample'){ startPick(activeRule); toast('Now click the colour to knock out, inside the selection.'); }
+  else toast(`Shadows removed inside the selection (Part ${rules.length}). Adjust how far under Fine-tune, Parts.`);
 }
 function selSet(sel){ art.sel = sel; art.selV = (art.selV || 0) + 1; syncSel(); drawBrush(); updateChecks(); if (selWorks()) buildSrc(); }
 function selDown(e){ const p = toFile(e); if (!p) return; selDraw = {kind: selTool, pts: [p.x, p.y, p.x, p.y]}; view.setPointerCapture(e.pointerId); drawBrush(); }
@@ -3628,6 +3642,7 @@ async function stripMake(x, y){
 }
 document.addEventListener('click', e => { const b = e.target.closest ? e.target.closest('[data-strip]') : null; if (b) stripStart(b.dataset.strip); });
 
+$('selShadows').addEventListener('click', () => selPart('shadows')); $('selKnock').addEventListener('click', () => selPart('sample'));
 $('selBox').addEventListener('click', () => selStart('box')); $('selLoop').addEventListener('click', () => selStart('loop'));
 $('selClear').addEventListener('click', () => { if (!art || !art.sel) return; selTool = null; selDraw = null; noteChange('Clear selection'); selSet(null); toast('Selection cleared. Changes apply to the whole design again.'); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && selTool){ selTool = null; selDraw = null; syncSel(); drawBrush(); } });
@@ -4079,7 +4094,7 @@ function briSlider(i, v){
 function areaRow(R, i){
   const on = areaTool && areaTool.i === i ? areaTool.mode : '', chip = (v, t, tip) => `<button class="chip" type="button" data-act="area" data-v="${v}" aria-pressed="${on === v}" data-tip="${tip}">${t}</button>`;
   return `<div class="field"><div class="f-head"><span>Area</span><output>${hasArea(R) ? 'Marked area only' : R.type === 'all' ? 'Not marked yet' : 'Whole design'}</output></div>` +
-    `<div class="chips" role="group" aria-label="Area of part ${i + 1}">${chip('add', 'Paint', 'Paint over the area this part covers. It shows in pink.')}${hasArea(R) ? chip('sub', 'Erase', 'Take area away from this part.') : ''}${chip('box', 'Box', 'Drag a box over the area this part covers.')}` +
+    `<div class="chips" role="group" aria-label="Area of part ${i + 1}">${chip('add', 'Paint', 'Paint over the area this part covers. It shows in pink.')}${hasArea(R) ? chip('sub', 'Erase', 'Take area away from this part.') : ''}${chip('box', 'Box', 'Drag a box over the area this part covers.')}${art && art.sel ? `<button class="chip" type="button" data-act="area" data-v="sel" aria-pressed="false" data-tip="This part then works only inside the box or loop drawn with Select, above the art.">Use the selection</button>` : ''}` +
     `${hasArea(R) ? `<button class="chip" type="button" data-act="area" data-v="clear" aria-pressed="false" data-tip="Forget the marked area.">Clear</button>` : ''}</div>` +
     (on && on !== 'box' ? `<div class="f-head"><label for="r${i}areaV">Brush size</label><output id="r${i}areaVOut" for="r${i}areaV">${mmTxt(areaMm())}</output></div><input type="range" id="r${i}areaV" data-k="areaV" min="0" max="100" step="1" value="${st.areaV}">` : '') + `</div>`;
 }
@@ -4164,6 +4179,7 @@ rulesBox.addEventListener('click', e => {
   if (act === 'off'){ R.off = !R.off; activeRule = i; renderRules(); syncLegend(); schedule(); return; }
   if (act === 'area'){
     const v = b.dataset.v;
+    if (v === 'sel'){ if (!art || !art.sel) return; R.area = [selArea()]; activeRule = i; if (areaTool) setArea(0, null); else renderRules(); drawBrush(); noteChange('Part area from the selection'); schedule(); toast(`Part ${i + 1} now works only inside the selection.`); return; }
     if (v === 'clear'){ R.area = null; if (areaTool && areaTool.i === i) setArea(0, null); else renderRules(); drawBrush(); noteChange('Part area cleared'); schedule(); return; }
     if (activeRule !== i){ activeRule = i; schedule(); }
     setArea(i, v); return;
