@@ -7,9 +7,8 @@
 <title>Graphic Engine</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 529.96 529.96%22%3E%3Cpath fill=%22%23ea0a8c%22 d=%22M495.87,67.07h-32.98V1.1h-164.92v65.97h-65.97v164.92H67.07v65.97H1.1v164.92h65.97v65.97h461.79V67.07h-32.98ZM441.53,418.26h0l-23.43,23.43h0l-23.74,23.74-.16-.15-23.43-23.43-.16-.16-23.27-23.27-.16-.16-23.27-23.27-.16-.16-23.11-23.11-22.87,22.87h0l-23.43,23.43h0l-23.74,23.74-.16-.15-23.43-23.43-.16-.16-23.27-23.27-.16-.16-23.43-23.43,23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43h0l23.43-23.43.16-.16,23.27-23.27h0l23.43-23.43h0l23.74-23.74.16.15,23.43,23.43.16.16,23.43,23.43,23.42,23.43-.16.16-23.27,23.27-.16.16-23.27,23.27h0l-23.43,23.43h0l-.12.12,23.27,23.27h0s23.43,23.43,23.43,23.43l.16.16,23.27,23.27.16.16,23.43,23.43-23.55,23.55Z%22/%3E%3C/svg%3E">
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap">
+<!-- Inter: the board's own copy first (23 Nov), Google's as the fallback when opened elsewhere -->
+<style>@font-face{font-family:"Inter";font-style:normal;font-weight:400 800;font-display:swap;src:url("/fonts/inter-latin.woff2") format("woff2"),url("https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0I5nvwU.woff2") format("woff2")}</style>
 <style>
 /* Layout: an app frame. Header bar, the print shown on the shirt colour (left, as big as possible), settings rail (right); stacks on phones. */
 :root{ /* dark by default, like Photoshop: neutral greys so colours are judged without a tint around them */
@@ -621,6 +620,34 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .i-white{background:radial-gradient(circle,#e0168a 0 30%,transparent 32%),#3d3d40}
 /* v93: the step trail as three large boxes that stay at the top of the panel */
 .panel-bar{min-height:42px}
+.bar{padding-block:8px;gap:8px 16px}
+.bar .kicker{display:none}
+.bar h1{font-size:19px}
+.bar .logo-mark{width:28px;height:28px}
+.bar .btn{height:36px;padding:0 14px}
+.tdrop{position:relative;display:inline-flex}
+.tdrop-btn{display:inline-flex;align-items:center;gap:8px}
+.tdrop-btn svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tdrop-btn .car{width:6px;height:6px;margin:0 2px 3px 2px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg)}
+.tdrop-btn[aria-expanded="true"]{border-color:var(--ink)}
+.tdrop-btn.has{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tdrop-val{font-weight:800}
+.tdrop-val:empty{display:none}
+.tdrop-sw{width:16px;height:16px;border-radius:2px;border:1px solid rgba(128,128,128,.7)}
+.tdrop-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:9;min-width:210px;padding:8px;background:var(--panel);border:1.5px solid var(--line-strong);border-radius:var(--r)}
+.tdrop.right .tdrop-pop{left:auto;right:0}
+.tdrop-pop .tgroup{display:grid;gap:6px;border:0;padding:0;background:none}
+.tdrop-pop .tgroup > .tg-label{display:none}
+.tdrop-pop .tgroup .chip{width:100%;text-align:left}
+.tdrop-pop #shirtTray{display:flex;flex-wrap:wrap;gap:8px;width:318px;padding:0}
+.tdrop-pop #shirtTray .shirt-name{flex-basis:100%;min-width:0}
+.tdrop-pop.menu{display:grid;padding:0;min-width:200px}
+.tdrop-pop.menu .btn{justify-content:flex-start;width:100%;height:44px;border:0;border-radius:0;background:none}
+.tdrop-pop.menu .btn:hover{background:var(--soft)}
+.tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
+.mv-menu{min-width:190px}
+.stage-bar > #viewTray{border:0;padding:0;background:none}
+.mv-menu .on-colour{flex-wrap:wrap;gap:6px}
 .panel-tab{position:absolute;z-index:6;top:50%;right:380px;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;width:26px;padding:12px 0;border:1.5px solid var(--line-strong);border-right:0;border-radius:var(--r) 0 0 var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
 .panel-tab:hover{background:var(--soft)}
 .panel-tab svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -708,12 +735,14 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <div class="actions">
       <button class="btn" id="undoBtn" type="button" disabled>Undo</button>
       <button class="btn" id="redoBtn" type="button" disabled>Redo</button>
+      <button class="btn" type="button" id="batchBtn" data-tip="Many files at once: one set-up for a group, every file at the same scale, saved together as full-size PNGs.">Batch</button>
+      <button class="btn" type="button" id="gangBtn" data-tip="Gang sheet: finished prints packed onto one sheet of film, with a quantity for each.">Sheet</button>
+      <div class="tdrop right" id="moreDrop"><button class="btn tdrop-btn" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false">More<i class="car" aria-hidden="true"></i></button><div class="tdrop-pop menu" hidden>
       <a class="btn" id="helpBtn" href="https://24davo.github.io/tsw-dn-assets/halftone/guide/" target="_blank" rel="noopener" style="text-decoration:none">Guide</a>
       <button class="btn" id="fullBtn" type="button" aria-pressed="false" hidden data-tip="Fills the whole screen with Graphic Engine. The browser’s bars and the taskbar hide until you leave it. Esc leaves.">Full screen</button>
       <button class="btn" id="installBtn" type="button" hidden data-tip="Puts this in its own window, like a program: no browser tabs or address bar, its own icon on the taskbar, and the taskbar stays in view.">Install app</button>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
-      <button class="btn" type="button" id="batchBtn" data-tip="Many files at once: one set-up for a group, every file at the same scale, saved together as full-size PNGs.">Batch</button>
-      <button class="btn" type="button" id="gangBtn" data-tip="Gang sheet: finished prints packed onto one sheet of film, with a quantity for each.">Sheet</button>
+      </div></div>
       <button class="btn" type="button" id="openBtn">Open art</button>
       <input type="file" id="fileIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
       <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
@@ -738,11 +767,13 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         <div class="tabs-actions" id="tabsActions" hidden><button class="link" type="button" id="allApplyBtn">Copy settings to all</button><button class="link" type="button" id="allSaveBtn">Save all</button></div>
       </div>
       <div class="stage-bar">
+        <div class="tdrop" data-tdrop="crop"><button class="chip tdrop-btn" type="button" id="cropDropBtn" aria-haspopup="true" aria-expanded="false" data-tip="Trim to the art, draw a crop, or go back to the whole file."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1v11h11M1 4h11v11"/></svg><span>Crop</span><b class="tdrop-val" id="cropDropVal"></b><i class="car" aria-hidden="true"></i></button><div class="tdrop-pop" hidden>
         <div class="tgroup" role="group" aria-label="Crop" id="cropTray"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1v11h11M1 4h11v11"/></svg>Crop</span>
           <button class="chip" type="button" id="cropTrim" data-tip="Cuts the empty space off around the art, so the print size measures the art itself.">Trim to the art</button>
           <button class="chip" type="button" id="cropDraw" aria-pressed="false" data-tip="Drag a box on the art to keep just that part, for example to cut off unwanted marks at the edge.">Draw a crop</button>
           <button class="chip" type="button" id="cropReset" hidden data-tip="Back to the whole file.">Reset crop</button>
-        </div>
+        </div></div></div>
+        <div class="tdrop" data-tdrop="sel"><button class="chip tdrop-btn" type="button" id="selDropBtn" aria-haspopup="true" aria-expanded="false" data-tip="Draw a box or a loop, then your changes happen inside it only."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h12v12H2z" stroke-dasharray="2.5 2"/></svg><span>Select</span><b class="tdrop-val" id="selDropVal"></b><i class="car" aria-hidden="true"></i></button><div class="tdrop-pop" hidden>
         <div class="tgroup" role="group" aria-label="Select area" id="selTray"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h12v12H2z" stroke-dasharray="2.5 2"/></svg>Select</span>
           <button class="chip" type="button" id="selBox" aria-pressed="false" data-tip="Drag a box on the art. Skin tones, pale colours, smoothing and sharpen then change only inside it.">Box</button>
           <button class="chip" type="button" id="selLoop" aria-pressed="false" data-tip="Draw around a part freehand, such as a face.">Loop</button>
@@ -751,20 +782,21 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="chip" type="button" id="selKnock" hidden data-tip="Knock out a colour here: then click a colour inside the selection. It is removed there and nowhere else, and stays that way after you clear the selection.">Knock out here</button>
           <button class="chip" type="button" id="selOnly" hidden aria-pressed="true" data-tip="Leave the rest untouched. On: everything you change happens inside the selection, and the rest prints as opened. Off: only skin tones, pale colours, smoothing and sharpen stay inside.">Rest untouched</button>
           <span class="sel-note" id="selNote" hidden></span>
-        </div>
+        </div></div></div>
         <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
-          <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
-          <span class="on-colour"><button class="chip" type="button" data-view="white" aria-pressed="false" data-tip="The print exactly as it is now, over a colour you choose. It only changes what you look at: the print is not worked out again.">On a colour</button><span class="colorbox" data-tip="The colour behind the print in this view."><input type="color" id="checkPick" value="#3d3d40" aria-label="Colour behind the print in the On a colour view"></span><span class="check-sw" id="checkSw" role="group" aria-label="Quick colours" hidden><button class="sw" type="button" data-check="#3d3d40" aria-pressed="false" aria-label="Charcoal" data-tip="Charcoal" style="background:#3d3d40"></button><button class="sw" type="button" data-check="#111111" aria-pressed="false" aria-label="Black" data-tip="Black" style="background:#111111"></button><button class="sw" type="button" data-check="#ffffff" aria-pressed="false" aria-label="White" data-tip="White" style="background:#ffffff"></button><button class="sw" type="button" data-check="#1d2742" aria-pressed="false" aria-label="Navy" data-tip="Navy" style="background:#1d2742"></button><button class="sw" type="button" data-check="#a8a8a8" aria-pressed="false" aria-label="Grey marle" data-tip="Grey marle" style="background:#a8a8a8"></button><button class="sw" type="button" data-check="#c21a26" aria-pressed="false" aria-label="Red" data-tip="Red" style="background:#c21a26"></button></span></span>
           <button class="chip" type="button" data-view="split" aria-pressed="false">Split</button>
-          <span class="more-views"><button class="chip" type="button" id="moreViewsBtn" aria-haspopup="true" aria-expanded="false" aria-pressed="false" data-tip="Other views: White base, Ink map.">More</button>
+          <span class="more-views"><button class="chip" type="button" id="moreViewsBtn" aria-haspopup="true" aria-expanded="false" aria-pressed="false" data-tip="Other views: Transparent, On a colour, White base, Ink map.">More</button>
             <span class="mv-menu" id="moreViews" hidden>
+              <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
+              <span class="on-colour"><button class="chip" type="button" data-view="white" aria-pressed="false" data-tip="The print exactly as it is now, over a colour you choose. It only changes what you look at: the print is not worked out again.">On a colour</button><span class="colorbox" data-tip="The colour behind the print in this view."><input type="color" id="checkPick" value="#3d3d40" aria-label="Colour behind the print in the On a colour view"></span><span class="check-sw" id="checkSw" role="group" aria-label="Quick colours" hidden><button class="sw" type="button" data-check="#3d3d40" aria-pressed="false" aria-label="Charcoal" data-tip="Charcoal" style="background:#3d3d40"></button><button class="sw" type="button" data-check="#111111" aria-pressed="false" aria-label="Black" data-tip="Black" style="background:#111111"></button><button class="sw" type="button" data-check="#ffffff" aria-pressed="false" aria-label="White" data-tip="White" style="background:#ffffff"></button><button class="sw" type="button" data-check="#1d2742" aria-pressed="false" aria-label="Navy" data-tip="Navy" style="background:#1d2742"></button><button class="sw" type="button" data-check="#a8a8a8" aria-pressed="false" aria-label="Grey marle" data-tip="Grey marle" style="background:#a8a8a8"></button><button class="sw" type="button" data-check="#c21a26" aria-pressed="false" aria-label="Red" data-tip="Red" style="background:#c21a26"></button></span></span>
               <button class="chip" type="button" data-view="base" aria-pressed="false">White base</button>
               <button class="chip" type="button" data-view="map" aria-pressed="false">Ink map</button>
               <button class="chip" type="button" data-view="sel" aria-pressed="false" hidden>Selection</button>
             </span></span>
         </div>
-        <div class="tgroup" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tg-label tray-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2L1.5 4.5l1.5 3 1.5-.8V14h7V6.700l1.500.800 1.500-3L10.500 2a2.500 2.500 0 01-5 0z"/></svg>Shirt</span></div>
+        <div class="tdrop" data-tdrop="shirt" data-stay><button class="chip tdrop-btn" type="button" id="shirtDropBtn" aria-haspopup="true" aria-expanded="false" data-tip="The shirt colour the print is shown on. The list stays open while you try colours."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2L1.5 4.5l1.5 3 1.5-.8V14h7V6.700l1.500.800 1.500-3L10.500 2a2.500 2.500 0 01-5 0z"/></svg><span>Shirt</span><i class="tdrop-sw" id="shirtDropSw" aria-hidden="true"></i><b class="tdrop-val" id="shirtDropVal"></b><i class="car" aria-hidden="true"></i></button><div class="tdrop-pop" hidden>
+        <div class="tgroup" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tg-label tray-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2L1.5 4.5l1.5 3 1.5-.8V14h7V6.700l1.500.800 1.500-3L10.500 2a2.500 2.500 0 01-5 0z"/></svg>Shirt</span></div></div></div>
       </div>
     <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
       <canvas id="view"></canvas>
@@ -2919,6 +2951,7 @@ function syncSel(){
   if (on){ const g = selGuardOn(); $('selOnly').setAttribute('aria-pressed', String(g));
     const t = g ? 'Changes now happen inside the selection only. The rest prints as opened.' : 'Only skin tones, pale colours, smoothing and sharpen stay inside the selection.'; if ($('selNote').textContent !== t) $('selNote').textContent = t; }
   stage.classList.toggle('selecting', !!selTool);
+  syncDrops();
 }
 function selStart(kind){
   if (!art) return;
@@ -3267,10 +3300,10 @@ $('checkPick').addEventListener('input', e => setCheck(e.target.value));
 $('checkSw').addEventListener('click', e => { const b = e.target.closest('[data-check]'); if (b) setCheck(b.dataset.check); });
 new MutationObserver(syncCheckSw).observe($('viewTray').querySelector('[data-view="white"]'), {attributes: true, attributeFilter: ['aria-pressed']});
 syncCheckSw();
-$('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b){ setView(b.dataset.view); moreViews(false); } });
+$('viewTray').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b){ setView(b.dataset.view); if (b.dataset.view !== 'white') moreViews(false); } }); // On a colour keeps the menu open: its colours are in it
 function moreViews(open){ $('moreViews').hidden = !open; $('moreViewsBtn').setAttribute('aria-expanded', String(open)); }
 function syncMoreViews(){
-  const b = $('moreViews').querySelector('[aria-pressed="true"]');
+  const b = $('moreViews').querySelector('[data-view][aria-pressed="true"]');
   $('moreViewsBtn').textContent = b ? b.textContent : 'More'; $('moreViewsBtn').setAttribute('aria-pressed', String(!!b));
 }
 $('moreViewsBtn').addEventListener('click', e => { e.stopPropagation(); moreViews($('moreViews').hidden); });
@@ -3730,6 +3763,22 @@ function setPanel(open, keep){
 $('panelTab').addEventListener('click', () => setPanel(document.querySelector('.work').classList.contains('panel-off'), true));
 try { if (localStorage.getItem('tsw-ge-panel') === '0') setPanel(false, false); } catch(e){}
 
+/* ---------- drop-downs across the top (as on the Workshop Board): one open at a time; a choice closes it ---------- */
+function dropClose(keep){ for (const d of document.querySelectorAll('.tdrop')){ if (d === keep) continue; const pop = d.querySelector('.tdrop-pop'); if (pop && !pop.hidden){ pop.hidden = true; d.querySelector('.tdrop-btn').setAttribute('aria-expanded', 'false'); } } }
+document.addEventListener('click', e => {
+  const t = e.target.closest ? e.target : null; if (!t) return;
+  const btn = t.closest('.tdrop-btn'), d = t.closest('.tdrop');
+  if (btn){ const pop = d.querySelector('.tdrop-pop'), open = pop.hidden; dropClose(d); pop.hidden = !open; btn.setAttribute('aria-expanded', String(open)); return; }
+  if (!d){ dropClose(); return; }
+  if (!d.hasAttribute('data-stay') && t.closest('button, a')) dropClose(); // the Shirt list stays open, to try colours one after another
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape') dropClose(); });
+function syncDrops(){ // the buttons say what is on, so nothing is hidden by being folded away
+  const crop = !$('cropReset').hidden || !!cropping, sel = !!(art && art.sel) || !!selTool;
+  $('cropDropBtn').classList.toggle('has', crop); const cv = cropping ? 'drawing' : crop ? 'on' : ''; if ($('cropDropVal').textContent !== cv) $('cropDropVal').textContent = cv;
+  $('selDropBtn').classList.toggle('has', sel); const sv = selTool ? 'drawing' : sel ? 'on' : ''; if ($('selDropVal').textContent !== sv) $('selDropVal').textContent = sv;
+}
+
 /* ---------- knock-out colour picker ---------- */
 function startPick(target){ // target: 'knock', or the number of the colour range being sampled
   endBrush();
@@ -3818,6 +3867,7 @@ function syncShirt(){
   for (const b of shirtTray.querySelectorAll('button.sw')){ const on = b.dataset.hex.toLowerCase() === st.shirt.toLowerCase(); matched = matched || on; b.setAttribute('aria-pressed', String(on)); }
   custom.setAttribute('aria-pressed', String(!matched));
   $('shirtDot').style.background = matched ? '' : st.shirt;
+  $('shirtDropSw').style.background = st.shirt; $('shirtDropVal').textContent = (SHIRTS.find(([, hex]) => hex.toLowerCase() === st.shirt.toLowerCase()) || ['Custom'])[0];
   $('shirtName').textContent = (SHIRTS.find(([, hex]) => hex.toLowerCase() === st.shirt.toLowerCase()) || ['Custom'])[0];
   if (document.activeElement !== $('shirtHex')) $('shirtHex').value = st.shirt.toUpperCase();
   $('shirtPick').value = st.shirt;
