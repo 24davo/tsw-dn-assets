@@ -646,6 +646,13 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .tdrop-pop.menu .btn:hover{background:var(--soft)}
 .tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
 .mv-menu{min-width:190px}
+.tdrop-pop #inkQuick{display:grid;grid-template-columns:1fr;gap:8px;min-width:320px;align-items:stretch}
+.tdrop-pop #inkQuick > #blkQuick{grid-column:auto;grid-row:auto;width:100%;min-height:40px;padding:6px 12px}
+.tdrop-pop #inkQuick > #inkChips,.tdrop-pop #inkQuick > #inkRow{grid-column:auto}
+.panel .dtg-hint{margin-top:6px;padding:6px 8px;gap:6px 8px;font-size:12px;line-height:1.35}
+.panel .dtg-hint button{padding:5px 9px;font-size:12px;border-width:1.5px}
+.panel .dtg-hint .x{padding:4px 8px;border-color:var(--line-strong);font-weight:700;align-self:flex-start}
+.panel .dtg-hint span{flex:1 1 150px}
 #inkQuick{grid-template-columns:1fr auto;align-items:center}
 #inkQuick > .lv-sub{grid-column:1;grid-row:1}
 #inkQuick > #blkQuick{grid-column:2;grid-row:1;width:auto;min-height:32px;padding:3px 10px}
@@ -892,9 +899,19 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         </div>
         <div class="tdrop" data-tdrop="shirt" data-stay><button class="chip tdrop-btn" type="button" id="shirtDropBtn" aria-haspopup="true" aria-expanded="false" data-tip="The shirt colour the print is shown on. The list stays open while you try colours."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2L1.5 4.5l1.5 3 1.5-.8V14h7V6.700l1.500.800 1.500-3L10.500 2a2.500 2.500 0 01-5 0z"/></svg><span>Shirt</span><i class="tdrop-sw" id="shirtDropSw" aria-hidden="true"></i><b class="tdrop-val" id="shirtDropVal"></b><i class="car" aria-hidden="true"></i></button><div class="tdrop-pop" hidden>
         <div class="tgroup" role="group" aria-label="Shirt colour" id="shirtTray"><span class="tg-label tray-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2L1.5 4.5l1.5 3 1.5-.8V14h7V6.700l1.500.800 1.500-3L10.500 2a2.500 2.500 0 01-5 0z"/></svg>Shirt</span></div></div></div>
-        <div class="tdrop" data-tdrop="ink" data-stay><button class="chip tdrop-btn" type="button" id="inkDropBtn" aria-haspopup="true" aria-expanded="false" data-tip="Print the art’s own colours, or everything in one flat ink colour (Mono), like a solid colour fill in Photoshop."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.500s4.500 4.800 4.500 8a4.500 4.500 0 01-9 0c0-3.200 4.500-8 4.500-8z"/></svg><span>Ink</span><i class="tdrop-sw" id="inkDropSw" aria-hidden="true" hidden></i><b class="tdrop-val" id="inkDropVal"></b><i class="car" aria-hidden="true"></i></button><div class="tdrop-pop" hidden>
-          <div class="ink-top"><div class="chips"><button class="chip" type="button" data-inkset="art" aria-pressed="true" data-tip="Print the art in its own colours.">Original colours</button><button class="chip" type="button" data-inkset="one" aria-pressed="false" data-tip="Flatten the whole design to one solid colour you pick, like a solid colour fill layer in Photoshop.">One solid colour</button></div>
-            <div class="inkrow" id="inkTopRow" hidden><span class="colorbox"><input type="color" id="inkPickTop" value="#ffffff" aria-label="Ink colour"></span><button class="sw" type="button" data-inkhex="#ffffff" aria-label="White ink" title="White" style="background:#ffffff"></button><button class="sw" type="button" data-inkhex="#000000" aria-label="Black ink" title="Black" style="background:#000000"></button><span>Everything prints in this one colour.</span></div></div>
+        <div class="tdrop" data-tdrop="ink" data-stay><button class="chip tdrop-btn" type="button" id="inkDropBtn" aria-haspopup="true" aria-expanded="false" data-tip="Ink colour: the art’s own colours or one solid colour, and whether DTF black ink is allowed for."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.500s4.500 4.800 4.500 8a4.500 4.500 0 01-9 0c0-3.200 4.500-8 4.500-8z"/></svg><span>Ink</span><i class="tdrop-sw" id="inkDropSw" aria-hidden="true" hidden></i><b class="tdrop-val" id="inkDropVal"></b><i class="car" aria-hidden="true"></i></button><div class="tdrop-pop" hidden>
+          <div class="ink-top" id="inkQuick">
+        <div class="chips" id="inkChips">
+          <button class="pick" type="button" data-ink="art"><i class="dot" aria-hidden="true"></i><span class="pk-t">Original colours</span><span class="pk-d">The art’s own colours.</span></button>
+          <button class="pick" type="button" data-ink="one"><i class="dot" aria-hidden="true"></i><span class="pk-t">One solid colour</span><span class="pk-d">Flatten it all to a colour you pick.</span></button>
+        </div>
+        <div class="inkrow" id="inkRow" hidden>
+          <span class="colorbox"><input type="color" id="inkPick" value="#ffffff" aria-label="Ink colour"></span>
+          <button class="sw" type="button" data-inkhex="#ffffff" aria-label="White ink" title="White" style="background:#ffffff"></button><button class="sw" type="button" data-inkhex="#000000" aria-label="Black ink" title="Black" style="background:#000000"></button>
+          <span id="inkTxt">Everything prints in this one colour.</span>
+        </div>
+        <button class="pick tick" type="button" id="blkQuick" aria-pressed="false" data-tip="DTF black prints as a dark matt grey, not a true black. On: the views show ink as it really prints, and on tees darker than that grey, the darkest colours are thinned (or removed in Clean cut) so the tee’s own black does the job. Off: blacks print as they are. How grey is set in Fine-tune, Ink colour."><i class="dot" aria-hidden="true"></i><span class="pk-t">Allow for DTF black ink</span><span class="pk-s" id="blkQuickS">Off</span></button>
+          </div>
         </div></div>
       </div>
     <section class="stage" id="stage" aria-label="Print preview on the shirt colour">
@@ -978,20 +995,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="choice wide" type="button" data-finish="dtg"><span class="choice-t">DTG</span><span class="choice-d">Solid background behind the art. Nothing removed, no dots.</span></button>
         </div>
         <p class="style-desc" id="finishNowD" aria-live="polite"></p>
-        <div class="dtg-hint" id="dtgHint" hidden><button type="button" id="dtgHintBtn">Better as DTG?</button><span id="dtgHintWhy"></span></div>
-        <div class="field" id="inkQuick">
-          <div class="lv-sub" data-tip="How the ink prints: the art’s own colours or one solid colour, and whether DTF black ink is allowed for.">Ink colour</div>
-        <div class="chips" id="inkChips">
-          <button class="pick" type="button" data-ink="art"><i class="dot" aria-hidden="true"></i><span class="pk-t">Original colours</span><span class="pk-d">The art’s own colours.</span></button>
-          <button class="pick" type="button" data-ink="one"><i class="dot" aria-hidden="true"></i><span class="pk-t">One solid colour</span><span class="pk-d">Flatten it all to a colour you pick.</span></button>
-        </div>
-        <div class="inkrow" id="inkRow" hidden>
-          <span class="colorbox"><input type="color" id="inkPick" value="#ffffff" aria-label="Ink colour"></span>
-          <button class="sw" type="button" data-inkhex="#ffffff" aria-label="White ink" title="White" style="background:#ffffff"></button><button class="sw" type="button" data-inkhex="#000000" aria-label="Black ink" title="Black" style="background:#000000"></button>
-          <span id="inkTxt">Everything prints in this one colour.</span>
-        </div>
-        <button class="pick tick" type="button" id="blkQuick" aria-pressed="false" data-tip="DTF black prints as a dark matt grey, not a true black. On: the views show ink as it really prints, and on tees darker than that grey, the darkest colours are thinned (or removed in Clean cut) so the tee’s own black does the job. Off: blacks print as they are. How grey is set in Fine-tune, Ink colour."><i class="dot" aria-hidden="true"></i><span class="pk-t">DTF black ink</span><span class="pk-s" id="blkQuickS">Off</span></button>
-        </div>
+        <div class="dtg-hint" id="dtgHint" hidden><button type="button" id="dtgHintBtn">Better as DTG?</button><span id="dtgHintWhy"></span><button type="button" class="x" id="dtgHintX" aria-label="Close this suggestion" data-tip="Close. It stays closed for this design.">✕</button></div>
         <div class="field" id="lookQuickBox">
           <div class="lv-sub" data-tip="A Quick start sets the main recipe for this print style in one click. Then balance it with the Quick adjust sliders below, or go deeper in Fine-tune.">Quick start</div>
           <p class="f-note step-hint">Pick the closest. Then balance it with the sliders below.</p>
@@ -4060,7 +4064,7 @@ function syncBg(){
   $('bgTxt').textContent = st.bgHex ? `Picked: ${st.bgHex.toUpperCase()}` : bgFound === 'none' ? 'The edge is clear already: nothing to remove.' : found ? `Found on the edge: ${found.toUpperCase()}` : 'Looking at the edge…';
   $('bgAuto').hidden = !st.bgHex;
 }
-$('bgOn').addEventListener('change', e => { st.bgOn = e.target.checked; syncBg(); noteChange(st.bgOn ? 'Background removed' : 'Background kept'); schedule(); });
+$('bgOn').addEventListener('change', e => { st.bgOn = e.target.checked; syncBg(); noteChange(st.bgOn ? 'Background removed' : 'Background kept'); schedule(); syncLookQuick(); syncQuick(); });
 $('bgPick').addEventListener('click', () => picking ? endPick() : startPick('bg'));
 $('bgAuto').addEventListener('click', () => { st.bgHex = null; syncBg(); noteChange('Background colour found on the edge'); schedule(); });
 let hardWas = 50; // the hard edge threshold to go back to when it's ticked again
@@ -4070,6 +4074,7 @@ const SLIDERS = [['fade', v => v ? `${v} mm` : 'Off'], ['back', pxMm], ['bgTol',
 const QUICK = {
   dotsKnock: [['k1', 'Shirt showing through', 'Less', 'More'], ['mid', 'Ink amount', 'Less ink', 'More ink']],
   dots: [['mid', 'Ink amount', 'Less ink', 'More ink'], ['lpi', 'Dot size', 'Bigger dots', 'Finer dots']],
+  cutBg: [['bgTol', 'Background removed up to', 'Only that colour', 'Colours near it too'], ['cut', 'Soft edges', 'Keep more', 'Remove more'], ['speckMm', 'Specks cleared up to', 'Tiny only', 'Bigger ones too']],
   cut: [['cut', 'Soft edges', 'Keep more', 'Remove more'], ['bri', 'Brightness', 'Darker', 'Brighter'], ['speckMm', 'Specks cleared up to', 'Tiny only', 'Bigger ones too']],
   cutShadows: [[() => { const i = rules.findIndex(R => R.type === 'shadows' && R.action === 'remove' && !R.invert && !R.off); return i < 0 ? '' : `r${i}range`; }, 'Shadows removed up to', 'Only the darkest', 'Lighter shades too'], ['cut', 'Soft edges', 'Keep more', 'Remove more'], ['speckMm', 'Specks cleared up to', 'Tiny only', 'Bigger ones too']],
   cutKnock: [['ktol', 'Colour cleared near the shirt', 'Only the shirt colour', 'Colours near it too'], ['cut', 'Soft edges', 'Keep more', 'Remove more'], ['speckMm', 'Specks cleared up to', 'Tiny only', 'Bigger ones too']],
@@ -4079,7 +4084,7 @@ const QUICK = {
 let quickKey = '';
 function quickMode(){
   const b = $('finishChips').querySelector('[aria-pressed="true"]'), f = b ? b.dataset.finish : st.finish;
-  return f === 'prep' || f === 'dtg' ? 'prep' : f === 'flat' ? 'flat' : f === 'cut' ? (st.look === 'shadows' ? 'cutShadows' : st.look === 'knock' ? 'cutKnock' : 'cut') : st.look === 'deep' || st.look === 'knock' ? 'dotsKnock' : 'dots';
+  return f === 'prep' || f === 'dtg' ? 'prep' : f === 'flat' ? 'flat' : f === 'cut' ? (st.look === 'shadows' ? 'cutShadows' : st.look === 'knock' ? 'cutKnock' : st.bgOn ? 'cutBg' : 'cut') : st.look === 'deep' || st.look === 'knock' ? 'dotsKnock' : 'dots';
 }
 function quickTip(id, lo, hi){ // what the slider does, from its own note in Fine-tune
   const f = $(id) && $(id).closest('.field'), n = f && f.querySelector('.f-note'), t = n ? n.textContent.replace(/\s*More\s*$/, '').replace(/\s+/g, ' ').trim() : '';
@@ -4139,20 +4144,27 @@ $('shapeChips').addEventListener('click', e => { const b = e.target.closest('[da
 function setInk(mode, hex){ if (mode) st.ink = mode; if (hex){ st.inkHex = hex.toLowerCase(); st.ink = 'one'; } noteChange(st.ink === 'one' ? `One solid colour ${st.inkHex.toUpperCase()}` : 'Original colours'); syncInk(); syncSums(); remember(); schedule(); }
 $('inkChips').addEventListener('click', e => { const b = e.target.closest('[data-ink]'); if (b) setInk(b.dataset.ink); });
 $('inkPick').addEventListener('input', e => setInk(null, e.target.value));
-$('inkPickTop').addEventListener('input', e => setInk(null, e.target.value));
 document.addEventListener('click', e => { const t = e.target.closest ? e.target : null; if (!t) return; const h = t.closest('[data-inkhex]'), m = t.closest('[data-inkset]'); if (h) setInk(null, h.dataset.inkhex); else if (m) setInk(m.dataset.inkset); });
-$('lookQuick').addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (!b) return; const r = document.querySelector(`input[name="look"][value="${b.dataset.look}"]`); if (r) r.closest('label').click(); });
+$('lookQuick').addEventListener('click', e => { const b = e.target.closest('[data-look]'); if (!b) return;
+  const v = b.dataset.look, look = v === 'bg' ? 'edges' : v, r = document.querySelector(`input[name="look"][value="${look}"]`);
+  if (r && st.look !== look) r.closest('label').click();
+  const bgEl = $('bgOn'), want = v === 'bg' ? true : v === 'edges' ? false : null; // the two prep-only recipes differ only in the background
+  if (want !== null && bgEl.checked !== want){ bgEl.checked = want; bgEl.dispatchEvent(new Event('change', {bubbles: true})); }
+  syncLookQuick(); syncQuick(); });
 function syncInk(){ syncChips('inkChips', 'ink', st.ink); $('inkRow').hidden = st.ink !== 'one'; $('inkPick').value = st.inkHex; syncBlk();
-  const one = st.ink === 'one'; $('inkPickTop').value = st.inkHex; $('inkDropSw').hidden = !one; $('inkDropSw').style.background = st.inkHex; $('inkDropVal').textContent = one ? 'Solid' : 'Original'; $('inkDropBtn').classList.toggle('has', one); $('inkTopRow').hidden = !one;
-  for (const b of document.querySelectorAll('[data-inkset]')) b.setAttribute('aria-pressed', String(b.dataset.inkset === st.ink));
+  const one = st.ink === 'one'; $('inkDropSw').hidden = !one; $('inkDropSw').style.background = st.inkHex; inkLabel();
   for (const b of document.querySelectorAll('[data-inkhex]')) b.setAttribute('aria-pressed', String(one && b.dataset.inkhex === st.inkHex.toLowerCase())); }
+function inkLabel(){ // the Ink menu's button says what is on, so nothing hides inside it
+  const one = st.ink === 'one', t = (one ? 'Solid' : 'Original') + (st.blkOn ? ' · black ink on' : '');
+  if ($('inkDropVal').textContent !== t) $('inkDropVal').textContent = t; $('inkDropBtn').classList.toggle('has', one || !!st.blkOn);
+}
 function syncBlk(){
   $('blkOn').checked = st.blkOn; $('blkField').hidden = !st.blkOn;
-  if ($('blkQuick')){ $('blkQuick').setAttribute('aria-pressed', String(!!st.blkOn)); $('blkQuickS').textContent = st.blkOn ? 'On' : 'Off'; }
+  if ($('blkQuick')){ $('blkQuick').setAttribute('aria-pressed', String(!!st.blkOn)); $('blkQuickS').textContent = st.blkOn ? 'On' : 'Off'; inkLabel(); }
   $('blk').value = st.blk; $('blkOut').textContent = `${st.blk}% grey`; $('blkTxt').textContent = blkHex().toUpperCase(); $('blkSwatch').style.background = blkHex();
 }
 $('blkOn').addEventListener('change', e => { st.blkOn = e.target.checked; noteChange(st.blkOn ? 'DTF black ink allowed for' : 'DTF black ink not allowed for'); syncBlk(); syncSums(); remember(); schedule(); updateChecks(); });
-$('blkQuick').addEventListener('click', () => $('blkOn').click());
+$('blkQuick').addEventListener('click', () => { const el = $('blkOn'); el.checked = !el.checked; el.dispatchEvent(new Event('change', {bubbles: true})); }); // not el.click(): that click would count as one outside the Ink menu and close it
 $('blk').addEventListener('input', e => { st.blk = +e.target.value; syncBlk(); remember(); schedule(); });
 $('looks').addEventListener('change', e => {
   if (e.target.name !== 'look') return;
@@ -4165,12 +4177,15 @@ $('looks').addEventListener('change', e => {
   if (st.look === 'shadows') ensureShadowRule();
   syncLook(); syncFinish(); syncSliders(); updateNotes(); remember(); schedule();
 });
+const QS_BG = ['Remove the background', 'The plain backdrop goes. The rest prints solid.', 'For art on a plain backdrop, such as a JPG logo on white. The background colour is found from the edges and removed; everything else prints solid. Balance how much with Quick adjust.'];
+const lookQuickNow = () => routeOf(st.finish) === 'cut' && st.look === 'edges' && st.bgOn ? 'bg' : st.look; // Remove the background = the prep-only recipe with the background out
 function syncLookQuick(){ // the Quick starts this print style offers, as buttons
-  const r = routeOf(st.finish), list = ROUTE_LOOKS[r], box = $('lookQuick'); if (!box) return;
-  const html = list.map(v => `<button class="pick" type="button" data-look="${v}" aria-pressed="${st.look === v && !st.flat}" data-tip="${LOOK_TEXT[r][v][2]}"><i class="dot" aria-hidden="true"></i><span class="pk-t">${LOOK_TEXT[r][v][0]}</span><span class="pk-d">${LOOK_TEXT[r][v][1]}</span></button>`).join('');
+  const r = routeOf(st.finish), list = r === 'cut' ? ['shadows', 'knock', 'bg', 'edges'] : ROUTE_LOOKS[r], box = $('lookQuick'); if (!box) return;
+  const T = v => v === 'bg' ? QS_BG : LOOK_TEXT[r][v], cur = lookQuickNow();
+  const html = list.map(v => `<button class="pick" type="button" data-look="${v}" aria-pressed="${cur === v && !st.flat}" data-tip="${T(v)[2]}"><i class="dot" aria-hidden="true"></i><span class="pk-t">${T(v)[0]}</span><span class="pk-d">${T(v)[1]}</span></button>`).join('');
   if (box.dataset.h !== html){ box.dataset.h = html; box.innerHTML = html; }
-  $('lookNowD').textContent = list.includes(st.look) && !st.flat ? LOOK_TEXT[r][st.look][1] : '';
-  $('inkQuick').hidden = isDtg() || isFlat();
+  $('lookNowD').textContent = list.includes(cur) && !st.flat ? T(cur)[1] : '';
+  $('inkDropBtn').closest('.tdrop').hidden = isDtg() || isFlat();
 }
 function syncLook(){ syncLookQuick(); syncLookPics(); syncQuick(); for (const r of document.querySelectorAll('input[name="look"]')) r.checked = r.value === st.look; $('knockGroup').hidden = !knockLook(st.look); syncFinChips(); syncStepButtons(); syncRouteSum(); }
 function syncRouteSum(){ syncSums(); }
@@ -4219,7 +4234,7 @@ function dtgMeasure(bgRgb){
 function dtgHintSoon(bg, on){ clearTimeout(dtgHintTimer); dtgHintTimer = setTimeout(() => dtgHintCheck(bg, on), 60); }
 function dtgHintCheck(bg, on){
   const box = $('dtgHint'); if (!box) return;
-  if (!art || !srcCanvas.width || isDtg() || isFlat()){ box.hidden = true; dtgHintKey = ''; return; }
+  if (!art || !srcCanvas.width || isDtg() || isFlat() || art.dtgHintOff){ box.hidden = true; dtgHintKey = ''; return; }
   const bgRgb = st.bgOn && Array.isArray(bg) ? bg : null, key = [srcV, st.shirt, st.widthCm, bgRgb ? bgRgb.join('.') + '/' + st.bgTol : ''].join('|');
   if (key !== dtgHintKey){ dtgHintKey = key; try { dtgHintGlow = dtgMeasure(bgRgb).glow; } catch(e){ dtgHintGlow = 0; } }
   // the ink area is what is left to print after the knock-out and shadow removal (owner: a design with lots of
@@ -4231,6 +4246,7 @@ function dtgHintCheck(bg, on){
   box.dataset.glow = m.glow.toFixed(1); box.dataset.ink = Math.round(m.inkCm2);
   $('dtgHintWhy').textContent = why.join(' '); box.hidden = !why.length;
 }
+$('dtgHintX').addEventListener('click', () => { if (art) art.dtgHintOff = true; $('dtgHint').hidden = true; });
 $('dtgHintBtn').addEventListener('click', () => { const b = $('finishChips').querySelector('[data-finish="dtg"]'); if (b) b.click(); $('dtgHint').hidden = true; });
 function syncDtg(){ // the background colour row, and the Quick start row it replaces
   const on = isDtg(); if (!$('dtgField')) return;
