@@ -5455,7 +5455,7 @@ async function savePng(){ // answers true once the PNG is saved
     $('busyTxt').textContent = 'Preparing the PNG…'; $('busy').hidden = false;
     await new Promise(r => setTimeout(r, 30));
     const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
-    const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
+    const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()], ['TSW-Recipe', recipeText()]]);
     $('busy').hidden = true;
     ok = await saveFile(png, fileName());
   } catch(err){
@@ -5605,6 +5605,9 @@ function starterPreset(b){ // a starter as a full preset: today's settings, with
   const L = {...lv}; if (starterLv && L.bri === starterLv.bri && L.bc === starterLv.bc){ L.bri = 0; L.bc = 0; }
   if (b.lv) Object.assign(L, b.lv); starterLv = b.lv ? {bri: L.bri, bc: L.bc} : null;
   return {name: b.name, desc: b.desc, v: 1, s, levels: L, rules: own.concat(mine).slice(0, MAX_RULES)};
+}
+function recipeText(){ // plain letters only, so it is safe inside a PNG's text line
+  try { return JSON.stringify(capturePreset('Saved recipe', true)).replace(/[^\x20-\x7e]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')); } catch(e){ return '{}'; }
 }
 function capturePreset(name, withSize){
   const s = {}; for (const k of PRESET_KEYS) s[k] = st[k];
@@ -6990,7 +6993,7 @@ async function batchSave(groups, whole, toSheet){ // toSheet: the finished print
         if (!outReady) throw new Error('not ready');
         if (toSheet){ if (!await gangAdd(labelled(traceCanvas() || outCanvas), {name: fileName().replace(/\.png$/i, ''), order: g.order || '', orders: it.orders || null, artKey: 'b:' + it.key})) throw new Error('empty'); files.push({name: fileName(), blob: null, it, g}); URL.revokeObjectURL(url); continue; }
         const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('no png')), 'image/png'));
-        const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
+        const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()], ['TSW-Recipe', recipeText()]]);
         if (!names.has(g.id)) names.set(g.id, new Set());
         const used = names.get(g.id);
         let name = fileName(); for (let n = 2; used.has(name.toLowerCase()); n++) name = fileName().replace(/\.png$/, `-${n}.png`);
@@ -7199,7 +7202,7 @@ const geTabs = () => docs.map((d, i) => { const a = d === cur ? art : d.art; ret
 function geStatus(){
   if (!art) return {ready: true, design: null, tabs: geTabs()};
   return {ready: outReady && !running && !pending, design: {name: art.name, sample: !!art.isSample, filePx: [art.w, art.h], widthMm: +(st.widthCm*10).toFixed(1), heightMm: +(st.widthCm*10*art.h/art.w).toFixed(1),
-    style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: lookName(), shirt: st.shirt, saveAs: fileName(), orders: art.orders || null}, tabs: geTabs()};
+    style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: lookQuickNow() === 'bg' ? QS_BG[0] : lookName(), shirt: st.shirt, saveAs: fileName(), orders: art.orders || null}, tabs: geTabs()};
 }
 async function geFile(src, name){
   if (src instanceof File) return src;
@@ -7226,7 +7229,7 @@ function geCheck(changes){ // only real settings, of the right kind
     else if (GE_WORDS[k]){ if (!GE_WORDS[k].includes(v)) geFail(`“${k}” takes one of: ${GE_WORDS[k].join(', ')}.`); out[k] = v; }
     else if (kind === 'text' || kind === 'string'){ if (typeof v !== 'string') geFail(`“${k}” takes text.`); out[k] = cleanStr(v).slice(0, 200); }
     else if (kind === 'number'){ if (typeof v !== 'number' || !isFinite(v)) geFail(`“${k}” takes a number.`);
-      const el = $(k), lo = el && el.type === 'range' ? +el.min : -Infinity, hi = el && el.type === 'range' ? +el.max : Infinity; // kept inside what its slider allows
+      const el = $(k), lo = el && el.type === 'range' ? Math.min(+el.min, ST0[k]) : -Infinity, hi = el && el.type === 'range' ? Math.max(+el.max, ST0[k]) : Infinity; // kept inside what its slider allows
       out[k] = Math.max(lo, Math.min(hi, v)); }
     else if (kind === 'boolean'){ if (typeof v !== 'boolean') geFail(`“${k}” takes true or false.`); out[k] = v; }
     else geFail(`“${k}” can’t be set this way.`);
@@ -7246,7 +7249,12 @@ function gePicture(which, maxPx){
 }
 async function gePng(){
   const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
-  return withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
+  return withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()], ['TSW-Recipe', recipeText()]]);
+}
+function geLook(look){
+  if (st.look === look) return;
+  const r = document.querySelector(`input[name="look"][value="${look}"]`); if (!r) geFail('That Quick start is not on this page.');
+  r.checked = true; r.dispatchEvent(new Event('change', {bubbles: true}));
 }
 const geLists = () => [['starter', STARTERS], ['recipe', RECIPES], ['shared', shared], ['computer', presets]];
 const GE_HELP = {
@@ -7256,6 +7264,7 @@ const GE_HELP = {
   show: 'show(tab): brings a tab to the front (tab numbers come from status()).',
   close: 'close(): closes the tab on screen without asking, even if it was not saved.',
   style: 'style(name): the print style, as the five buttons do it. name is "clean cut", "halftone", "dtg" or "trace prep".',
+  quickStart: 'quickStart(name): presses a Quick start button. name is "knock", "shadows", "edges" (clean up only) or "bg" (remove the background); halftone has "deep", "knock", "full" and "edges".',
   settings: 'All the settings as they are now, the list of setting names, and the words the worded ones take.',
   set: 'set({name: value, …}): changes settings. Also takes widthMm, and levels: {bri, bc}. Parts and marked areas stay as they are.',
   size: 'size(widthMm): the print width in mm (the height follows).',
@@ -7286,6 +7295,11 @@ const ge = {
     geNeedArt(); const key = {'clean cut': 'cut', halftone: 'dots', dtg: 'dtg', 'trace prep': 'flat'}[String(name).toLowerCase()] || geFail('style() takes "clean cut", "halftone", "dtg" or "trace prep".');
     const b = $('finishChips').querySelector(`[data-finish="${key}"]`); if (!b) geFail('That style is not on this page.'); b.click(); await geSettle(); return geStatus();
   },
+  async quickStart(name){
+    geNeedArt(); const v = String(name).toLowerCase(), b = /^[a-z]+$/.test(v) && $('lookQuick').querySelector(`[data-look="${v}"]`);
+    if (b && b.offsetParent) b.click(); else if (GE_WORDS.look.includes(v)) geLook(v); else geFail('quickStart() takes one of: ' + [...new Set(GE_WORDS.look.concat('bg'))].join(', ') + '.');
+    await geSettle(); return geStatus();
+  },
   settings(){ const now = {}; for (const k of PRESET_KEYS) now[k] = st[k]; now.knock = st.knock; return {now, levels: {...lv}, widthMm: +(st.widthCm*10).toFixed(1), names: [...PRESET_KEYS, 'knock'], words: JSON.parse(JSON.stringify(GE_WORDS))}; },
   async set(changes){
     geNeedArt();
@@ -7293,6 +7307,7 @@ const ge = {
     const ok = geCheck(c);
     if (L != null){ if (typeof L !== 'object') geFail('levels takes {bri, bc, …}.'); for (const k of Object.keys(L)){ if (!(k in LV0)) geFail(`“${k}” is not a level.`); if (typeof L[k] !== typeof LV0[k]) geFail(`Level “${k}” is the wrong kind of value.`); } }
     if (wMm != null && !(typeof wMm === 'number' && wMm > 0)) geFail('widthMm takes a number of millimetres.');
+    if ('look' in ok){ geLook(ok.look); delete ok.look; }
     Object.assign(st, ok); if ('knock' in ok) knockFrom = ok.knock ? 'hand' : 'shirt';
     if (L) Object.assign(lv, L);
     syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
@@ -7340,7 +7355,7 @@ const ge = {
 };
 // one command at a time, in the order they were asked for
 let geLine = Promise.resolve();
-const api = {version: ge.version};
+const api = {version: 2};
 for (const k of Object.keys(ge)) if (typeof ge[k] === 'function') api[k] = (...a) => { const run = geLine.then(() => ge[k](...a)); geLine = run.catch(() => 0); return run; };
 Object.defineProperty(window, 'tswGE', {value: Object.freeze(api), writable: false, configurable: false});
 }
