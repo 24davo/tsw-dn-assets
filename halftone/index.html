@@ -7184,6 +7184,166 @@ async function batchRestore(){
 }
 window.addEventListener('pagehide', () => { if (batchKeepTimer) batchKeepNow(); });
 batchRestore().catch(() => 0);
+/* ---------- the command list: Graphic Engine run by a script instead of by hand (window.tswGE) ---------- */
+{
+const geWait = ms => new Promise(r => setTimeout(r, ms));
+const geFail = m => { throw new Error(m); };
+const geNeedArt = () => { if (!art) geFail('No design is open.'); };
+async function geSettle(){ // until the result on screen matches the settings
+  await geWait(330); // a rebuild of the art's copy waits a quarter second before it starts
+  for (let n = 0; n < 1200; n++){ await idle(); if (outReady && !running && !pending) break; await geWait(25); }
+  if (!outReady) geFail('The result did not finish working out.');
+  await geWait(90);
+}
+const geTabs = () => docs.map((d, i) => { const a = d === cur ? art : d.art; return {tab: i, name: a ? a.name : '', showing: d === cur, sample: !!(a && a.isSample)}; });
+function geStatus(){
+  if (!art) return {ready: true, design: null, tabs: geTabs()};
+  return {ready: outReady && !running && !pending, design: {name: art.name, sample: !!art.isSample, filePx: [art.w, art.h], widthMm: +(st.widthCm*10).toFixed(1), heightMm: +(st.widthCm*10*art.h/art.w).toFixed(1),
+    style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: lookName(), shirt: st.shirt, saveAs: fileName(), orders: art.orders || null}, tabs: geTabs()};
+}
+async function geFile(src, name){
+  if (src instanceof File) return src;
+  if (src instanceof Blob) return new File([src], name || 'art.png', {type: src.type || 'image/png'});
+  if (typeof src !== 'string' || !/^(data:image\/|blob:|https?:\/\/|\.{0,2}\/)/i.test(src)) geFail('open() takes a File, a Blob, a data: picture or a web address.');
+  let r; try { r = await fetch(src); } catch(e){ geFail('That address could not be read from this page.'); }
+  if (!r.ok) geFail(`That address answered ${r.status}.`);
+  const b = await r.blob(), n = name || (/^data:|^blob:/i.test(src) ? 'art.png' : decodeURIComponent(src.split(/[?#]/)[0].split('/').pop() || 'art.png'));
+  return new File([b], n, {type: b.type || 'image/png'});
+}
+const GE_TYPES = {knock: 'hex?', backHex: 'hex?', bgHex: 'hex?', shirt: 'hex', inkHex: 'hex', thruHex: 'hex', flatBgHex: 'hex', dtgHex: 'shirtOrHex', flatDrop: 'text'};
+const GE_WORDS = {finish: ['cut', 'dots'], ink: ['art', 'one'], shape: ['round', 'ellipse', 'line', 'square'], emode: ['any', 'near'], fadeDir: ['in', 'out', 'spread'], flatBg: ['auto', 'black', 'white', 'own', 'off'],
+  look: [...new Set(Object.keys(LOOK_TEXT.dots).concat(Object.keys(LOOK_TEXT.cut)))]};
+function geCheck(changes){ // only real settings, of the right kind
+  const out = {};
+  for (const k of Object.keys(changes || {})){
+    const v = changes[k];
+    if (k !== 'knock' && !PRESET_KEYS.includes(k)) geFail(`“${k}” is not a setting. settings() lists them.`);
+    const kind = GE_TYPES[k] || typeof ST0[k];
+    const hex = typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+    if (kind === 'hex?'){ if (v !== null && !hex) geFail(`“${k}” takes a colour like #1a2b3c, or null.`); out[k] = v === null ? null : v.toLowerCase(); }
+    else if (kind === 'hex'){ if (!hex) geFail(`“${k}” takes a colour like #1a2b3c.`); out[k] = v.toLowerCase(); }
+    else if (kind === 'shirtOrHex'){ if (v !== 'shirt' && !hex) geFail(`“${k}” takes "shirt" or a colour like #1a2b3c.`); out[k] = v.toLowerCase(); }
+    else if (GE_WORDS[k]){ if (!GE_WORDS[k].includes(v)) geFail(`“${k}” takes one of: ${GE_WORDS[k].join(', ')}.`); out[k] = v; }
+    else if (kind === 'text' || kind === 'string'){ if (typeof v !== 'string') geFail(`“${k}” takes text.`); out[k] = cleanStr(v).slice(0, 200); }
+    else if (kind === 'number'){ if (typeof v !== 'number' || !isFinite(v)) geFail(`“${k}” takes a number.`);
+      const el = $(k), lo = el && el.type === 'range' ? +el.min : -Infinity, hi = el && el.type === 'range' ? +el.max : Infinity; // kept inside what its slider allows
+      out[k] = Math.max(lo, Math.min(hi, v)); }
+    else if (kind === 'boolean'){ if (typeof v !== 'boolean') geFail(`“${k}” takes true or false.`); out[k] = v; }
+    else geFail(`“${k}” can’t be set this way.`);
+  }
+  return out;
+}
+function gePicture(which, maxPx){
+  const size = Math.max(120, Math.min(1600, maxPx || 900)), bg = st.shirt;
+  const one = src => { const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height, k = Math.min(1, size/Math.max(sw, sh)), c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(sw*k)); c.height = Math.max(1, Math.round(sh*k)); const x = c.getContext('2d'); x.fillStyle = bg; x.fillRect(0, 0, c.width, c.height);
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); return c; };
+  if (which === 'before') return one(srcCanvas).toDataURL('image/jpeg', 0.86);
+  if (which !== 'both') return one(outCanvas).toDataURL('image/jpeg', 0.86);
+  const a = one(srcCanvas), b = one(outCanvas), c = document.createElement('canvas'), gap = 12; c.width = a.width + gap + b.width; c.height = Math.max(a.height, b.height);
+  const x = c.getContext('2d'); x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height); x.drawImage(a, 0, 0); x.drawImage(b, a.width + gap, 0);
+  return c.toDataURL('image/jpeg', 0.86);
+}
+async function gePng(){
+  const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
+  return withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()]]);
+}
+const geLists = () => [['starter', STARTERS], ['recipe', RECIPES], ['shared', shared], ['computer', presets]];
+const GE_HELP = {
+  help: 'This list.',
+  status: 'What is open: the design on screen, its print size, style and file name, and the tabs.',
+  open: 'open(file, name): opens art in a new tab. file is a File, a Blob, a data: picture or a web address this page can read.',
+  show: 'show(tab): brings a tab to the front (tab numbers come from status()).',
+  close: 'close(): closes the tab on screen without asking, even if it was not saved.',
+  style: 'style(name): the print style, as the five buttons do it. name is "clean cut", "halftone", "dtg" or "trace prep".',
+  settings: 'All the settings as they are now, the list of setting names, and the words the worded ones take.',
+  set: 'set({name: value, …}): changes settings. Also takes widthMm, and levels: {bri, bc}. Parts and marked areas stay as they are.',
+  size: 'size(widthMm): the print width in mm (the height follows).',
+  recipe: 'The whole set-up as one block of data (settings, levels, parts, print size), to use on other designs with apply().',
+  apply: 'apply(recipe, {size: false}): puts a recipe on the design on screen. With size: false the print size is left alone.',
+  presets: 'The saved presets, starters and recipes by name.',
+  usePreset: 'usePreset(name): applies a saved preset, starter or recipe by its name.',
+  measure: 'Facts about the result: print size, ink left to print, soft glow, the Better as DTG? note, specks cleared, the settings in words.',
+  picture: 'picture(which, maxPx): a small JPG to look at. which is "after" (on the shirt colour), "before" or "both".',
+  png: 'The finished print file as a Blob (300 dpi, with its label), without saving it.',
+  save: 'Saves the PNG the same way the Save button does. Answers the file name.',
+  toSheet: 'Adds the finished print to the gang sheet.',
+  sheet: 'What is on the gang sheet.'
+};
+const ge = {
+  version: 1,
+  help: () => ({...GE_HELP}),
+  status: () => geStatus(),
+  async open(src, name){
+    const f = await geFile(src, name), was = art;
+    const ok = await openFile(f);
+    if (!ok || art === was) geFail($('toast').hidden ? 'That file wouldn’t open.' : $('toast').textContent);
+    hideWelcome(); await geSettle(); return geStatus();
+  },
+  async show(i){ const d = docs[i]; if (!d) geFail('There is no tab ' + i + '.'); switchTo(d); await geSettle(); return geStatus(); },
+  async close(){ geNeedArt(); if (art.isSample && docs.length < 2) return geStatus(); commitStep(); unsaved = false; const d = cur; closeDoc(d); await geWait(120); if (art) await geSettle(); return geStatus(); },
+  async style(name){
+    geNeedArt(); const key = {'clean cut': 'cut', halftone: 'dots', dtg: 'dtg', 'trace prep': 'flat'}[String(name).toLowerCase()] || geFail('style() takes "clean cut", "halftone", "dtg" or "trace prep".');
+    const b = $('finishChips').querySelector(`[data-finish="${key}"]`); if (!b) geFail('That style is not on this page.'); b.click(); await geSettle(); return geStatus();
+  },
+  settings(){ const now = {}; for (const k of PRESET_KEYS) now[k] = st[k]; now.knock = st.knock; return {now, levels: {...lv}, widthMm: +(st.widthCm*10).toFixed(1), names: [...PRESET_KEYS, 'knock'], words: JSON.parse(JSON.stringify(GE_WORDS))}; },
+  async set(changes){
+    geNeedArt();
+    const c = {...(changes || {})}, wMm = c.widthMm, L = c.levels; delete c.widthMm; delete c.levels;
+    const ok = geCheck(c);
+    if (L != null){ if (typeof L !== 'object') geFail('levels takes {bri, bc, …}.'); for (const k of Object.keys(L)){ if (!(k in LV0)) geFail(`“${k}” is not a level.`); if (typeof L[k] !== typeof LV0[k]) geFail(`Level “${k}” is the wrong kind of value.`); } }
+    if (wMm != null && !(typeof wMm === 'number' && wMm > 0)) geFail('widthMm takes a number of millimetres.');
+    Object.assign(st, ok); if ('knock' in ok) knockFrom = ok.knock ? 'hand' : 'shirt';
+    if (L) Object.assign(lv, L);
+    syncShirt(); syncLook(); syncFinish(); syncSliders(); syncChips('angleChips', 'angle', st.angle); syncChips('shapeChips', 'shape', st.shape);
+    syncInk(); syncLevels(); updateNotes(); syncRules(); syncKnock();
+    if (wMm != null){ art.sizeFrom = 'user'; setWidth(wMm/10, true); buildSrcSoon(); }
+    remember(); noteChange('Script: ' + (Object.keys(changes || {}).slice(0, 4).join(', ') || 'no change')); schedule(); updateChecks();
+    await geSettle(); return geStatus();
+  },
+  async size(widthMm){ return ge.set({widthMm}); },
+  recipe(){ geNeedArt(); return JSON.parse(JSON.stringify(capturePreset('Script recipe', true))); },
+  async apply(recipe, opts){
+    geNeedArt();
+    let p; try { p = JSON.parse(JSON.stringify(recipe)); } catch(e){ geFail('That recipe is not plain data.'); }
+    if (!isPreset(p)) geFail('That is not a recipe. recipe() makes one.');
+    const s = p.s; p.s = {}; const kf = s.knockFrom; delete s.knockFrom;
+    Object.assign(p.s, geCheck(s)); if ('knock' in p.s) p.s.knockFrom = /^(shirt|art|hand)$/.test(kf) ? kf : 'hand';
+    if (opts && opts.size === false) delete p.size;
+    if (p.size && !(p.size.w > 0 && p.size.h > 0)) delete p.size;
+    p.name = cleanStr(String(p.name)).slice(0, 80) || 'Script recipe'; delete p.desc;
+    applyPreset(p); await geSettle(); return geStatus();
+  },
+  presets(){ const out = []; for (const [where, list] of geLists()) for (const q of list) out.push({name: q.name, where, style: q.s && q.s.finish === 'cut' ? 'clean cut' : 'halftone', about: q.desc || ''}); return out; },
+  async usePreset(name){
+    geNeedArt();
+    for (const [where, list] of geLists().reverse()){ const q = list.find(x => sameName(x.name, String(name))); if (!q) continue;
+      applyPreset(where === 'starter' || where === 'recipe' ? starterPreset(q) : q); await geSettle(); return geStatus(); }
+    geFail(`No preset is called “${name}”. presets() lists them.`);
+  },
+  async measure(){
+    geNeedArt(); await geSettle();
+    const box = $('dtgHint'), wMm = st.widthCm*10, hMm = wMm*art.h/art.w, ink = (lastOn || 0)/((DPI/2.54)**2);
+    return {name: art.name, widthMm: +wMm.toFixed(1), heightMm: +hMm.toFixed(1), inkCm2: Math.round(ink), inkShareOfBox: +(ink/(wMm*hMm/100)*100).toFixed(1),
+      softGlow: box && box.dataset.glow ? +box.dataset.glow : null, betterAsDtg: box && !box.hidden ? $('dtgHintWhy').textContent : '',
+      specksCleared: lastSpeck ? lastSpeck[0] : 0, settings: settingsText(), saveAs: fileName()};
+  },
+  async picture(which, maxPx){ geNeedArt(); await geSettle(); return gePicture(which || 'after', maxPx); },
+  async png(){ geNeedArt(); await geSettle(); return gePng(); },
+  async save(){ geNeedArt(); await geSettle(); const name = fileName(); if (!await savePng()) geFail($('toast').hidden ? 'Not saved.' : $('toast').textContent); return {saved: name}; },
+  async toSheet(){
+    geNeedArt(); await geSettle();
+    if (!await gangAdd(labelled(traceCanvas() || outCanvas), {name: fileName().replace(/\.png$/i, ''), order: art.orders && art.orders[0] || '', orders: art.orders || null, artKey: art.artKey || ''})) geFail('That design has nothing to print.');
+    return ge.sheet();
+  },
+  sheet(){ return {prints: gangItems.length, names: gangItems.map(i => i.name || '')}; }
+};
+// one command at a time, in the order they were asked for
+let geLine = Promise.resolve();
+const api = {version: ge.version};
+for (const k of Object.keys(ge)) if (typeof ge[k] === 'function') api[k] = (...a) => { const run = geLine.then(() => ge[k](...a)); geLine = run.catch(() => 0); return run; };
+Object.defineProperty(window, 'tswGE', {value: Object.freeze(api), writable: false, configurable: false});
+}
 restoreDocs().catch(() => 0).then(n => { handoverUp = true; handoverReady(window.opener); if (!n) sampleArt().then(c => { if (!art) setArt(c, c.width, c.height, 'Sample art', true, DPI); }); if (!n && !window.opener && !welcomeSkipped() && $('batch').hidden) showWelcome(); });
 })();
 </script>
