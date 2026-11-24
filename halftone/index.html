@@ -646,6 +646,23 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .tdrop-pop.menu .btn:hover{background:var(--soft)}
 .tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
 .mv-menu{min-width:190px}
+.batch.chk{z-index:16}
+#chkBody{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
+.chk-head{grid-column:1/-1;margin:8px 0 0;font-size:16px;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--ink)}
+.chk-card{display:grid;gap:10px;align-content:start;padding:16px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+.chk-card.flag{border:2px solid var(--ink)}
+.chk-card img{display:block;width:100%;height:auto;border-radius:var(--r);background:var(--soft)}
+.chk-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chk-name{flex:1 1 160px;min-width:0;font-size:15px;font-weight:700;overflow-wrap:anywhere}
+.chk-tag{flex:none;padding:4px 10px;border:1.5px solid var(--ink);border-radius:var(--r);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.chk-tag.is-problem{background:var(--ink);color:var(--panel)}
+.chk-tag.is-fine,.chk-tag.is-wait{border-color:var(--line);color:var(--muted)}
+.chk-why{margin:0;font-size:15px;line-height:1.45}
+.chk-tip{margin:0;font-size:14px;line-height:1.45;color:var(--muted)}
+.chk-tip b{color:var(--ink)}
+.chk-facts{margin:0;font-size:13px;color:var(--muted)}
+.chk-card .btn{justify-self:start}
+@media (max-width:480px){#chkBody{grid-template-columns:1fr}}
 .cal-box.bh-box{width:min(640px,100%);gap:16px}
 .bh-lead{margin:0;font-size:15px;line-height:1.5;color:var(--ink)}
 .bh-steps{margin:0;padding:0;list-style:none;counter-reset:bh;display:grid;gap:12px}
@@ -1600,6 +1617,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <label class="batch-label">Production label <select id="batchLabelMode"><option value="off">Off</option><option value="simple">Simple</option><option value="full">Full info</option></select></label>
     <button class="btn primary" type="button" id="batchRun" disabled data-tip="Works out every ticked group that is set up, and saves one zip with a folder for each group.">Process ticked groups</button>
     <button class="btn" type="button" id="batchToGang" disabled data-tip="Works out every ticked group that is set up and puts the prints on a gang sheet, where you set how many of each.">Send ticked to a sheet</button>
+    <button class="btn" type="button" id="batchCheck" disabled hidden data-tip="Works out every ticked group that is set up, then asks Claude to look at each result and flag the ones that need a hand. Nothing is saved or changed.">Check with Claude</button>
     <button class="btn" type="button" id="batchJoin" disabled data-tip="Puts the files of every ticked group into one group, like names that each arrived as a group of their own. Untick the groups to leave out first.">Join ticked groups</button>
     <button class="btn" type="button" id="batchUndo" disabled>Undo</button>
     <button class="btn" type="button" id="batchNew">New group</button>
@@ -1609,6 +1627,15 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
   <input type="file" id="batchIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,application/zip,.png,.jpg,.jpeg,.webp,.gif,.svg,.zip" hidden>
   <div class="batch-bar2" id="batchBar" role="status" hidden><span id="batchBarTxt"></span><button type="button" id="batchBarUndo">Undo</button></div>
   <div class="batch-busy" id="batchBusy" hidden><div><span id="batchBusyTxt">Working…</span><button class="btn" type="button" id="batchStop">Stop</button></div></div>
+</div>
+<div class="batch chk" id="chk" role="dialog" aria-modal="true" aria-labelledby="chkTitle" hidden>
+  <div class="batch-bar">
+    <h2 id="chkTitle">Check with Claude</h2>
+    <span class="batch-sub" id="chkSum" role="status" aria-live="polite"></span>
+    <button class="btn" type="button" id="chkStop" hidden>Stop</button>
+    <button class="btn primary" type="button" id="chkClose">Back to the batch</button>
+  </div>
+  <div class="batch-body" id="chkBody"></div>
 </div>
 <div class="cal" id="allDlg" role="dialog" aria-modal="true" aria-labelledby="allTitle" hidden>
   <div class="cal-box ask-box">
@@ -6744,11 +6771,11 @@ function batchSplit(g){ // the ticked files leave for a group of their own, righ
   for (const x of g.items) x.on = true;
   return ng;
 }
-function batchShow(){ hideWelcome(); $('batch').hidden = false; renderBatch(); }
+function batchShow(){ hideWelcome(); $('batch').hidden = false; renderBatch(); chkStatus(); }
 function renderBatch(){
   syncBatchTools();
   const run = batchGroups.filter(g => g.on && batchReady(g)).length;
-  $('batchToGang').disabled = !run; $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
+  $('batchCheck').disabled = !run; $('batchToGang').disabled = !run; $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
   if ($('batch').hidden) return;
   if (!batchGroups.length){
     $('batchBody').innerHTML = '<div class="batch-empty"><b>No groups yet</b><p>A group is a set of files that share one set-up, like the back names of an order. An order sent from the Workboard arrives here already in its groups. For anything else, start a group and add its files, or drop files or a zip here.</p><button class="btn primary" type="button" data-act="first">Start a group and add files</button></div>';
@@ -6886,6 +6913,7 @@ $('batchIn').addEventListener('change', async e => {
 $('batchBtn').addEventListener('click', batchShow);
 $('batchRun').addEventListener('click', () => batchSave(batchGroups.filter(g => g.on), true));
 $('batchToGang').addEventListener('click', () => batchSave(batchGroups.filter(g => g.on), true, true));
+$('batchCheck').addEventListener('click', () => batchSave(batchGroups.filter(g => g.on), true, 'check'));
 $('batchUndo').addEventListener('click', batchUndoGo);
 $('batchJoin').addEventListener('click', () => {
   if (batchBusy) return;
@@ -7027,6 +7055,7 @@ async function batchSave(groups, whole, toSheet){ // toSheet: the finished print
         await new Promise(r => setTimeout(r, 30));
         for (let n = 0; n < 400; n++){ await idle(); if (outReady) break; await new Promise(r => setTimeout(r, 25)); }
         if (!outReady) throw new Error('not ready');
+        if (toSheet === 'check'){ await new Promise(r => setTimeout(r, 90)); files.push({name: fileName(), blob: null, it, g, check: chkCapture()}); URL.revokeObjectURL(url); continue; }
         if (toSheet){ if (!await gangAdd(labelled(traceCanvas() || outCanvas), {name: fileName().replace(/\.png$/i, ''), order: g.order || '', orders: it.orders || null, artKey: 'b:' + it.key})) throw new Error('empty'); files.push({name: fileName(), blob: null, it, g}); URL.revokeObjectURL(url); continue; }
         const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('no png')), 'image/png'));
         const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()], ['TSW-Recipe', recipeText()]]);
@@ -7066,6 +7095,7 @@ async function batchSave(groups, whole, toSheet){ // toSheet: the finished print
   if (ok) for (const f of files){ f.it.saved = true; if (f.it.orders && f.it.orders.length) artSaved(f.it.orders, 'b:' + f.it.key); }
   batchBusy = false; saving = false; $('saveBtn').disabled = !outReady; $('batchBusyTxt').textContent = 'Working…'; $('batchBusy').hidden = true;
   batchKeepSoon(); renderBatch();
+  if (toSheet === 'check'){ if (batchStopped) toast('Stopped. Nothing was checked.'); else if (files.length) chkRun(files, failed, left); else toast('Those files couldn’t be worked out.'); return; }
   if (toSheet && !batchStopped){ if (files.length){ $('batch').hidden = true; $('batchBar').hidden = true; gangShow(); toast(`${files.length} print${files.length === 1 ? '' : 's'} added to the sheet.` + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: too big at this scale.` : '')); } else toast('Those files couldn’t be worked out.'); return; }
   if (batchStopped) toast('Stopped. Nothing was saved.');
   else if (ok && (failed || left || notSet || whole)) toast(`Saved ${files.length} PNG${files.length === 1 ? '' : 's'}` + (whole ? ` from ${done} group${done === 1 ? '' : 's'}` : '') + ' in one zip.' + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: over 400 × 500 mm at this scale.` : '') + (notSet ? ` ${notSet} ticked group${notSet === 1 ? ' isn’t' : 's aren’t'} set up yet.` : ''));
@@ -7223,6 +7253,75 @@ async function batchRestore(){
 }
 window.addEventListener('pagehide', () => { if (batchKeepTimer) batchKeepNow(); });
 batchRestore().catch(() => 0);
+/* ---------- Check with Claude: the board asks Claude to look over a batch's results (board only) ---------- */
+const CHK_URL = '/api/ge/check', CHK_AT_ONCE = 3;
+const CHK_TIPS = {none: '', remove_more_shadow: 'Remove more of the shadow: raise the Remove shadows amount.', remove_less_shadow: 'Too much has gone: lower the Remove shadows amount.',
+  clear_bigger_specks: 'Stray specks are left: raise “Specks cleared up to”.', background_not_removed: 'A background is still there: try the Remove the background Quick start.',
+  better_as_dtg: 'Soft glows or a lot of ink: this one may suit DTG better.', low_detail: 'The file is low on detail at this size: print smaller, or ask for better artwork.'};
+const CHK_WORD = {fine: 'Fine', look: 'Worth a look', problem: 'Problem', wait: 'Waiting', off: 'Not checked'};
+let chkOn = false, chkLeft = null, chkAsked = false, chkItems = [], chkStopped = false, chkBusy = false;
+async function chkStatus(){ // is the feature there, and switched on? Asked once per visit, and only where a board could answer
+  if (chkAsked || !/^https?:$/.test(location.protocol) || !location.pathname.startsWith('/engine/')) return;
+  chkAsked = true;
+  try { const r = await fetch(CHK_URL, {credentials: 'same-origin', headers: {Accept: 'application/json'}}); if (!r.ok) return; const j = await r.json(); chkOn = j && j.enabled === true; chkLeft = j && typeof j.leftToday === 'number' ? j.leftToday : null; } catch(e){ chkOn = false; }
+  $('batchCheck').hidden = !chkOn;
+}
+function chkCapture(){ // the design on screen: a small before | after picture on the shirt colour, and its measurements. No names
+  const size = 778 /* two panes and the gap come to 1568 px at most, the largest Claude reads without shrinking */, one = src => { const k = Math.min(1, size/Math.max(src.width, src.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(src.width*k)); c.height = Math.max(1, Math.round(src.height*k));
+    const x = c.getContext('2d'); x.fillStyle = st.shirt; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); return c; };
+  const a = one(srcCanvas), b = one(outCanvas), c = document.createElement('canvas'), gap = 12; c.width = a.width + gap + b.width; c.height = Math.max(a.height, b.height);
+  const x = c.getContext('2d'); x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height); x.drawImage(a, 0, 0); x.drawImage(b, a.width + gap, 0);
+  const box = $('dtgHint'), wMm = st.widthCm*10, hMm = wMm*art.h/art.w, ink = (lastOn || 0)/((DPI/2.54)**2);
+  let pic = c.toDataURL('image/jpeg', 0.84); for (const q of [0.7, 0.55, 0.4]){ if (pic.length <= 560000) break; pic = c.toDataURL('image/jpeg', q); } /* the board takes up to 560,000 characters */
+  return {pic, facts: {widthMm: +wMm.toFixed(1), heightMm: +hMm.toFixed(1), inkCm2: Math.round(ink), inkShare: +(ink/(wMm*hMm/100)*100).toFixed(1),
+    softGlow: box && box.dataset.glow && !isDtg() ? +box.dataset.glow : null, specks: lastSpeck ? lastSpeck[0] : 0, dpi: Math.round(art.w/(wMm/25.4)),
+    style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: (lookQuickNow() === 'bg' ? QS_BG[0] : lookName()).slice(0, 60), shirt: st.shirt, settings: settingsText().slice(0, 600)}};
+}
+function chkRender(){
+  const done = chkItems.filter(c => c.verdict !== 'wait').length, flagged = chkItems.filter(c => c.verdict === 'problem' || c.verdict === 'look'), off = chkItems.filter(c => c.verdict === 'off').length;
+  $('chkSum').textContent = chkBusy ? `Claude is looking: ${done} of ${chkItems.length} done.` :
+    `${chkItems.length - off} of ${chkItems.length} design${chkItems.length === 1 ? '' : 's'} checked. ` + (flagged.length ? `${flagged.length} to look at.` : 'None flagged.') + (off ? ` ${off} not checked.` : '') + (chkLeft != null ? ` ${chkLeft} check${chkLeft === 1 ? '' : 's'} left today.` : '') + ' Nothing was saved or changed.';
+  $('chkStop').hidden = !chkBusy;
+  const rank = {problem: 0, look: 1, off: 2, wait: 3, fine: 4};
+  const card = c => `<article class="chk-card${c.verdict === 'problem' || c.verdict === 'look' ? ' flag' : ''}" data-ref="${c.ref}"><div class="chk-top"><span class="chk-name">${esc(c.name)}</span><span class="chk-tag is-${c.verdict}">${CHK_WORD[c.verdict]}</span></div>` +
+    `<img alt="Before on the left, after on the right" src="${c.pic}">` + (c.reason ? `<p class="chk-why">${esc(c.reason)}</p>` : '') + (CHK_TIPS[c.suggestion] ? `<p class="chk-tip"><b>Try:</b> ${esc(CHK_TIPS[c.suggestion])}</p>` : '') +
+    `<p class="chk-facts">${c.facts.widthMm} × ${c.facts.heightMm} mm · ${c.facts.inkCm2} cm² of ink · about ${c.facts.dpi} dpi · ${esc(c.group)}</p><button class="btn" type="button" data-chk-open>Open in editor</button></article>`;
+  const first = chkItems.filter(c => rank[c.verdict] < 4).sort((a, b) => rank[a.verdict] - rank[b.verdict]), rest = chkItems.filter(c => c.verdict === 'fine');
+  $('chkBody').innerHTML = (first.length ? `<h3 class="chk-head">${chkBusy ? 'In progress and flagged' : 'Look at these first'} (${first.length})</h3>` + first.map(card).join('') : '') + (rest.length ? `<h3 class="chk-head">Fine (${rest.length})</h3>` + rest.map(card).join('') : '');
+}
+async function chkAsk(c, batch, again){
+  try {
+    const r = await fetch(CHK_URL, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', Accept: 'application/json'},
+      body: JSON.stringify({v: 1, design: {ref: c.ref, picture: c.pic.split(',')[1], facts: c.facts}, batch})});
+    let j = null; try { j = await r.json(); } catch(e){}
+    if (r.status === 503 && j && j.error === 'busy' && !again && !chkStopped){ await new Promise(z => setTimeout(z, 2500)); return chkAsk(c, batch, true); } /* Claude was busy: one more try */
+    if (!r.ok){ c.verdict = 'off'; c.reason = r.status === 429 ? 'Today’s limit of checks is used up.' : r.status === 401 ? 'Sign in to the Workshop Board again, then check again.' : r.status === 503 && !(j && j.error === 'busy') ? 'Check with Claude isn’t set up on the board yet.' : r.status === 503 ? 'Claude is busy right now. Try again in a minute.' : 'Claude couldn’t check this one. Try again in a moment.'; return r.status === 429 || r.status === 401 || (r.status === 503 && !(j && j.error === 'busy')) ? 'halt' : ''; }
+    if (!j || j.ref !== c.ref || !(j.verdict in {fine: 1, look: 1, problem: 1})){ c.verdict = 'off'; c.reason = 'The answer for this one couldn’t be read.'; return ''; }
+    c.verdict = j.verdict; c.reason = String(j.reason || '').slice(0, 240); c.suggestion = j.suggestion in CHK_TIPS ? j.suggestion : 'none'; if (typeof j.leftToday === 'number') chkLeft = j.leftToday;
+  } catch(e){ c.verdict = 'off'; c.reason = 'The board couldn’t be reached. Check the connection and try again.'; }
+  return '';
+}
+async function chkRun(files, failed, left){
+  const share = files.map(f => f.check.facts.inkShare).sort((a, b) => a - b), mid = share.length % 2 ? share[(share.length - 1)/2] : (share[share.length/2 - 1] + share[share.length/2])/2;
+  chkItems = files.map((f, i) => ({ref: 'c' + (i + 1) + Math.random().toString(36).slice(2, 10), name: f.it.name, group: f.g.name, g: f.g.id, key: f.it.key, pic: f.check.pic, facts: f.check.facts, verdict: 'wait', reason: '', suggestion: 'none'}));
+  chkStopped = false; chkBusy = true; $('toast').hidden = true; $('chk').hidden = false; chkRender(); $('chkClose').focus();
+  if (failed || left) toast((failed ? `${failed} couldn’t be worked out. ` : '') + (left ? `${left} left out: too big at this scale.` : ''));
+  const batch = {count: chkItems.length, medianInkShare: +mid.toFixed(1)}, queue = [...chkItems]; let halt = false;
+  const worker = async () => { while (queue.length && !chkStopped && !halt){ const c = queue.shift(); if (await chkAsk(c, batch) === 'halt') halt = true; if (!$('chk').hidden) chkRender(); } };
+  await Promise.all(Array.from({length: Math.min(CHK_AT_ONCE, chkItems.length)}, worker));
+  const why = chkItems.find(c => c.verdict === 'off' && c.reason);
+  for (const c of chkItems) if (c.verdict === 'wait'){ c.verdict = 'off'; c.reason = chkStopped ? 'Stopped before this one was checked.' : (why ? why.reason : 'Not checked.'); }
+  chkBusy = false; chkRender();
+}
+$('chkStop').addEventListener('click', () => { chkStopped = true; });
+$('chkClose').addEventListener('click', () => { chkStopped = true; $('chk').hidden = true; if (!$('batch').hidden) $('batchCheck').focus(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('chk').hidden) $('chkClose').click(); });
+$('chkBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-chk-open]'); if (!b || chkBusy) return;
+  const c = chkItems.find(x => x.ref === b.closest('.chk-card').dataset.ref), g = c && batchGroups.find(G => G.id === c.g), it = g && g.items.find(x => x.key === c.key);
+  if (!it){ toast('That file is no longer in the batch.'); return; }
+  $('chk').hidden = true; batchSetup(g, it);
+});
 /* ---------- Batch with Claude: the mini guide in the More menu ---------- */
 {
 const box = $('claudeHelp'), shut = () => { if (box.hidden) return; box.hidden = true; $('moreBtn').focus(); };
