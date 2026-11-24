@@ -646,6 +646,13 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .tdrop-pop.menu .btn:hover{background:var(--soft)}
 .tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
 .mv-menu{min-width:190px}
+.tab-ok{flex:none;color:var(--good);font-size:13px;font-weight:800;line-height:1}
+.tabs-t span b.tabs-ok{display:inline;font-size:13px;font-weight:700;color:var(--good);text-decoration:none}
+.tabs-pop-save{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-bottom:1px solid var(--line);font-size:14px}
+.tabs-all{display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}
+.tabs-ck{flex:none;display:flex;align-items:center;justify-content:center;width:44px;cursor:pointer}
+.tabs-ck input,.tabs-all input{width:20px;height:20px;margin:0;accent-color:var(--accent);cursor:pointer}
+.tabs-row .tabs-go{padding-left:0}
 .ink-box{display:grid;gap:6px}
 .ink-box .f-note{margin:0}
 .ink-set{display:grid;gap:6px}
@@ -5199,8 +5206,8 @@ function renderTabs(){
   $('tabsActions').hidden = docs.filter(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample).length < 2;
   $('tabsList').innerHTML = docs.map(d => {
     const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
-    return `<div class="tab${d === cur ? ' on' : ''}"><button class="tab-name" type="button" role="tab" aria-selected="${d === cur}" data-doc="${d.id}" title="${esc(name)}${dirty ? ' · not saved' : ''}">` +
-      `${artThumb(a) ? `<img class="tab-pic" src="${artThumb(a)}" alt="">` : ''}${dirty ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}<span class="tab-t">${esc(name)}</span></button>` +
+    return `<div class="tab${d === cur ? ' on' : ''}"><button class="tab-name" type="button" role="tab" aria-selected="${d === cur}" data-doc="${d.id}" title="${esc(name)}${dirty ? ' · not saved' : d.saved ? ' · saved' : ''}">` +
+      `${artThumb(a) ? `<img class="tab-pic" src="${artThumb(a)}" alt="">` : ''}${dirty ? '<span class="tab-dot" aria-hidden="true"></span>' : d.saved && a && !a.isSample ? '<span class="tab-ok" aria-hidden="true">✓</span>' : ''}<span class="tab-t">${esc(name)}</span></button>` +
       (docs.length > 1 || (a && !a.isSample) ? `<button class="tab-x" type="button" data-close="${d.id}" aria-label="Close ${esc(name)}" data-tip="Close this design">×</button>` : '') + '</div>';
   }).join('') + '<button class="tab-add" type="button" id="tabAdd" aria-label="Open art in a new tab" data-tip="Open art in a new tab. Dropping or pasting art opens a new tab too.">+</button>';
   syncTabsAll();
@@ -5208,23 +5215,76 @@ function renderTabs(){
   if (on && L.scrollWidth > L.clientWidth){ const a = on.offsetLeft - L.offsetLeft, b = a + on.offsetWidth; if (a < L.scrollLeft) L.scrollLeft = a - 8; else if (b > L.scrollLeft + L.clientWidth) L.scrollLeft = b - L.clientWidth + 8; }
 }
 /* All tabs: every open design in one list */
-const TABS_ALL_FROM = 4;
+const TABS_ALL_FROM = 2;
+const tabsPick = new Set(); let tabsSaving = ''; /* the ticked designs (tab ids), and the progress line while they save */
+const tabsPickable = d => { const a = d === cur ? art : d.art; return !!(a && !a.isSample); };
+const tabsWait = ms => new Promise(r => setTimeout(r, ms));
+async function tabsSettle(){ /* until the result on screen matches the design just shown */
+  await tabsWait(330); for (let n = 0; n < 1200; n++){ await idle(); if (outReady && !running && !pending) break; await tabsWait(25); }
+  if (!outReady) throw new Error('A design did not finish working out. Nothing was saved.'); await tabsWait(90);
+}
+async function tabsPng(){ /* the same file Save PNG makes */
+  const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('The browser could not make the PNG.')), 'image/png'));
+  return withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()], ['TSW-Recipe', recipeText()]]);
+}
+async function tabsSaveTicked(){
+  const list = docs.filter(d => tabsPick.has(d.id) && tabsPickable(d)); if (!list.length || tabsSaving || saving) return;
+  const back = cur, files = [], taken = new Set(); let ok = false, why = '';
+  saving = true; $('saveBtn').disabled = true;
+  try {
+    for (let i = 0; i < list.length; i++){
+      const d = list[i]; tabsSaving = `Saving ${i + 1} of ${list.length}…`; syncTabsAll();
+      if (!docs.includes(d)){ why = 'A ticked design was closed while saving. Nothing was saved.'; break; }
+      switchTo(d); await tabsSettle();
+      if (cur !== d){ why = 'The design on screen changed while saving. Nothing was saved: try again.'; break; }
+      let name = fileName(); const dot = name.lastIndexOf('.'), stem = dot > 0 ? name.slice(0, dot) : name, ext = dot > 0 ? name.slice(dot) : '';
+      for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${stem}-${n}${ext}`; /* two designs with one name both stay */
+      taken.add(name.toLowerCase()); files.push({d, name, blob: await tabsPng()});
+    }
+    if (!why && files.length === list.length){
+      tabsSaving = 'Saving the file…'; syncTabsAll();
+      ok = files.length === 1 ? await saveFile(files[0].blob, files[0].name) : await saveFile(await makeZip(files.map(f => ({name: f.name, blob: f.blob}))), `Designs_twedit_${files.length}-files.zip`);
+    }
+  } catch(err){ why = err && err.message ? err.message : 'Saving didn’t work.'; }
+  saving = false; tabsSaving = '';
+  if (docs.includes(back) && cur !== back){ switchTo(back); }
+  if (ok){
+    for (const f of files){ const a = f.d === cur ? art : f.d.art; if (f.d === cur){ commitStep(); unsaved = false; } else f.d.unsaved = false; f.d.saved = true; if (a && a.orders) artSaved(a.orders, a.artKey); }
+    tabsPick.clear(); if (files.length > 1) toast(`${files.length} designs saved in one zip. Look in your Downloads folder.`);
+  } else if (why) toast(why);
+  $('saveBtn').disabled = !outReady; renderTabs();
+}
 function syncTabsAll(){
   const real = docs.filter(d => { const a = d === cur ? art : d.art; return a && !a.isSample; }), show = docs.length >= TABS_ALL_FROM;
   $('tabsAll').hidden = !show; if (!show){ $('tabsAllPop').hidden = true; $('tabsAllBtn').setAttribute('aria-expanded', 'false'); return; }
   $('tabsAllTxt').textContent = `All tabs (${docs.length})`;
   const saved = real.filter(d => d !== cur && !d.unsaved);
-  $('tabsAllPop').innerHTML = `<div class="tabs-pop-head"><b>${docs.length} of ${MAX_DOCS} designs open</b><button class="btn small" type="button" data-tabs-clear${saved.length ? '' : ' disabled'} data-tip="Closes every design with nothing unsaved. The one on screen stays open.">Close the saved ones${saved.length ? ` (${saved.length})` : ''}</button></div><div class="tabs-pop-list" role="list">` +
+  for (const id of [...tabsPick]) if (!docs.some(d => d.id === id && tabsPickable(d))) tabsPick.delete(id);
+  const canPick = docs.filter(tabsPickable), pickN = tabsPick.size;
+  $('tabsAllPop').innerHTML = `<div class="tabs-pop-save"><label class="tabs-all"><input type="checkbox" data-pick-all${tabsSaving ? ' disabled' : ''}${pickN && pickN === canPick.length ? ' checked' : ''}> Tick all</label><button class="btn small primary" type="button" data-tabs-save${pickN && !tabsSaving ? '' : ' disabled'} data-tip="Saves every ticked design’s print PNG in one go. Two or more come down together as one zip.">${tabsSaving ? esc(tabsSaving) : pickN ? `Save ticked (${pickN})` : 'Save ticked'}</button></div><div class="tabs-pop-head"><b>${docs.length} of ${MAX_DOCS} designs open</b><button class="btn small" type="button" data-tabs-clear${saved.length ? '' : ' disabled'} data-tip="Closes every design with nothing unsaved. The one on screen stays open.">Close the saved ones${saved.length ? ` (${saved.length})` : ''}</button></div><div class="tabs-pop-list" role="list">` +
     docs.map(d => { const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample, cm = d === cur ? st.widthCm : d.snap && d.snap.w;
-      return `<div class="tabs-row${d === cur ? ' on' : ''}" role="listitem"><button class="tabs-go" type="button" data-go="${d.id}"${d === cur ? ' aria-current="true"' : ''}>${artThumb(a) ? `<img src="${artThumb(a)}" alt="">` : '<span class="tabs-nopic"></span>'}<span class="tabs-t"><b>${esc(name)}</b><span>${a && cm ? `${toMm(cm)} × ${toMm(cm*a.h/a.w)} mm` : ''}${d === cur ? ' · on screen' : ''}${dirty ? ' · not saved' : ''}${d.batch ? ' · from Batch' : ''}</span></span></button>` +
+      return `<div class="tabs-row${d === cur ? ' on' : ''}" role="listitem"><label class="tabs-ck">${tabsPickable(d) ? `<input type="checkbox" data-pick="${d.id}"${tabsPick.has(d.id) ? ' checked' : ''}${tabsSaving ? ' disabled' : ''} aria-label="Tick ${esc(name)} to save">` : ''}</label><button class="tabs-go" type="button" data-go="${d.id}"${d === cur ? ' aria-current="true"' : ''}>${artThumb(a) ? `<img src="${artThumb(a)}" alt="">` : '<span class="tabs-nopic"></span>'}<span class="tabs-t"><b>${esc(name)}</b><span>${a && cm ? `${toMm(cm)} × ${toMm(cm*a.h/a.w)} mm` : ''}${d === cur ? ' · on screen' : ''}${dirty ? ' · not saved' : d.saved && a && !a.isSample ? ' · <b class="tabs-ok">✓ saved</b>' : ''}${d.batch ? ' · from Batch' : ''}</span></span></button>` +
         (docs.length > 1 || (a && !a.isSample) ? `<button class="tabs-x" type="button" data-shut="${d.id}" aria-label="Close ${esc(name)}">×</button>` : '') + '</div>'; }).join('') + '</div>';
 }
 $('tabsAllBtn').addEventListener('click', () => setTimeout(() => { const L = $('tabsAllPop').querySelector('.tabs-pop-list'), on = L && L.querySelector('.tabs-row.on'); if (on && !$('tabsAllPop').hidden) L.scrollTop = Math.max(0, on.offsetTop - L.offsetTop - L.clientHeight/2 + on.offsetHeight/2); }, 0)); // the design on screen is in view when the list opens
+$('tabsAllPop').addEventListener('change', e => {
+  const t = e.target; if (!t.dataset || tabsSaving) return;
+  if (t.dataset.pick){ if (t.checked) tabsPick.add(+t.dataset.pick); else tabsPick.delete(+t.dataset.pick); }
+  else if ('pickAll' in t.dataset){ tabsPick.clear(); if (t.checked) for (const d of docs) if (tabsPickable(d)) tabsPick.add(d.id); }
+  else return;
+  const L = $('tabsAllPop').querySelector('.tabs-pop-list'), top = L ? L.scrollTop : 0; syncTabsAll();
+  const L2 = $('tabsAllPop').querySelector('.tabs-pop-list'); if (L2) L2.scrollTop = top;
+});
 $('tabsAllPop').addEventListener('click', e => {
   e.stopPropagation(); // the list redraws itself, so it decides for itself when to close
   const go = e.target.closest('[data-go]'), shut = e.target.closest('[data-shut]');
+  if (tabsSaving && !e.target.closest('.tabs-ck, .tabs-all')) return;
   if (go){ const d = docs.find(d => d.id === +go.dataset.go); dropClose(); if (d) switchTo(d); return; }
   if (shut){ const d = docs.find(d => d.id === +shut.dataset.shut); if (d){ if (d === cur || d.unsaved) dropClose(); closeDoc(d); } return; }
+  if (e.target.closest('.tabs-ck, .tabs-all')){ /* a tick: the change handler below does the work, and the list keeps its place */
+    return; }
+  if (e.target.closest('[data-tabs-save]')){ tabsSaveTicked(); return; }
+  if (tabsSaving) return;
   if (e.target.closest('[data-tabs-clear]')){
     const gone = docs.filter(d => d !== cur && d.art && !d.art.isSample && !d.unsaved); if (!gone.length) return;
     for (const d of gone) closeDoc(d);
@@ -5691,7 +5751,7 @@ async function savePng(){ // answers true once the PNG is saved
   } finally {
     $('busyTxt').textContent = 'Updating…'; saving = false; $('saveBtn').disabled = !outReady;
   }
-  if (ok){ commitStep(); unsaved = false; renderTabs(); savedMoment(fileName()); if (art && art.orders) artSaved(art.orders, art.artKey); }
+  if (ok){ commitStep(); unsaved = false; if (cur) cur.saved = true; renderTabs(); savedMoment(fileName()); if (art && art.orders) artSaved(art.orders, art.artKey); }
   return ok;
 }
 let savedTimer = 0;
