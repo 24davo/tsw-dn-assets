@@ -5169,7 +5169,8 @@ function newDoc(){ // a new tab for the art being opened; the sample's tab is re
   cur = {id: ++docSeq, key: newKey()}; docs.push(cur);
 }
 const newKey = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-const docFull = () => docs.length >= MAX_DOCS && !(art && art.isSample);
+let docSpare = 0; // v127: places past the limit while a design from the check list opens, so a full row of tabs can't stop it
+const docFull = () => docs.length >= MAX_DOCS + docSpare && !(art && art.isSample);
 function closeDoc(d){
   const last = docs.length < 2;
   if (last && (!d.art && d !== cur || (d === cur ? art : d.art) && (d === cur ? art : d.art).isSample)) return; // the sample stays: there is nothing to close
@@ -5261,7 +5262,7 @@ function syncTabsAll(){
   const saved = real.filter(d => d !== cur && !d.unsaved);
   for (const id of [...tabsPick]) if (!docs.some(d => d.id === id && tabsPickable(d))) tabsPick.delete(id);
   const canPick = docs.filter(tabsPickable), pickN = tabsPick.size;
-  $('tabsAllPop').innerHTML = `<div class="tabs-pop-save"><label class="tabs-all"><input type="checkbox" data-pick-all${tabsSaving ? ' disabled' : ''}${pickN && pickN === canPick.length ? ' checked' : ''}> Tick all</label><button class="btn small primary" type="button" data-tabs-save${pickN && !tabsSaving ? '' : ' disabled'} data-tip="Saves every ticked design’s print PNG in one go. Two or more come down together as one zip.">${tabsSaving ? esc(tabsSaving) : pickN ? `Save ticked (${pickN})` : 'Save ticked'}</button></div><div class="tabs-pop-head"><b>${docs.length} of ${MAX_DOCS} designs open</b><button class="btn small" type="button" data-tabs-clear${saved.length ? '' : ' disabled'} data-tip="Closes every design with nothing unsaved. The one on screen stays open.">Close the saved ones${saved.length ? ` (${saved.length})` : ''}</button></div><div class="tabs-pop-list" role="list">` +
+  $('tabsAllPop').innerHTML = `<div class="tabs-pop-save"><label class="tabs-all"><input type="checkbox" data-pick-all${tabsSaving ? ' disabled' : ''}${pickN && pickN === canPick.length ? ' checked' : ''}> Tick all</label><button class="btn small primary" type="button" data-tabs-save${pickN && !tabsSaving ? '' : ' disabled'} data-tip="Saves every ticked design’s print PNG in one go. Two or more come down together as one zip.">${tabsSaving ? esc(tabsSaving) : pickN ? `Save ticked (${pickN})` : 'Save ticked'}</button></div><div class="tabs-pop-head"><b>${docs.length > MAX_DOCS ? `${docs.length} designs open (${MAX_DOCS}, plus one from the check)` : `${docs.length} of ${MAX_DOCS} designs open`}</b><button class="btn small" type="button" data-tabs-clear${saved.length ? '' : ' disabled'} data-tip="Closes every design with nothing unsaved. The one on screen stays open.">Close the saved ones${saved.length ? ` (${saved.length})` : ''}</button></div><div class="tabs-pop-list" role="list">` +
     docs.map(d => { const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample, cm = d === cur ? st.widthCm : d.snap && d.snap.w;
       return `<div class="tabs-row${d === cur ? ' on' : ''}" role="listitem"><label class="tabs-ck">${tabsPickable(d) ? `<input type="checkbox" data-pick="${d.id}"${tabsPick.has(d.id) ? ' checked' : ''}${tabsSaving ? ' disabled' : ''} aria-label="Tick ${esc(name)} to save">` : ''}</label><button class="tabs-go" type="button" data-go="${d.id}"${d === cur ? ' aria-current="true"' : ''}>${artThumb(a) ? `<img src="${artThumb(a)}" alt="">` : '<span class="tabs-nopic"></span>'}<span class="tabs-t"><b>${esc(name)}</b><span>${a && cm ? `${toMm(cm)} × ${toMm(cm*a.h/a.w)} mm` : ''}${d === cur ? ' · on screen' : ''}${dirty ? ' · not saved' : d.saved && a && !a.isSample ? ' · <b class="tabs-ok">✓ saved</b>' : ''}${d.batch ? ' · from Batch' : ''}</span></span></button>` +
         (docs.length > 1 || (a && !a.isSample) ? `<button class="tabs-x" type="button" data-shut="${d.id}" aria-label="Close ${esc(name)}">×</button>` : '') + '</div>'; }).join('') + '</div>';
@@ -7673,14 +7674,20 @@ $('chkBody').addEventListener('click', e => {
 });
 /* Open in editor lands in the editor on that design, every time (owner, 24 Nov: "so I work on the correct design").
    One design from the check is open at a time: earlier ones close, so the tabs can't fill up and stop the next one
-   opening. A design that is already open is shown, not opened twice. If it can't open, the sheet comes back and says why. */
+   opening. A design that is already open is shown, not opened twice. If it can't open, the sheet comes back and says why.
+   v127 (owner, 25 Nov: "it says i have 16 tabs open so it cant"): with the row of tabs full it still opens, in one
+   spare place past the limit. Only ever one, since the earlier check design closes first. */
 async function chkToEditor(g, it){
   const has = d => !!(d.batch && d.batch.key === it.key && (d === cur ? art : d.art)), same = docs.find(has);
   for (const d of [...docs]) if (d !== cur && d !== same && d.batch && d.batch.fromChk){ docs.splice(docs.indexOf(d), 1); forgetDoc(d); d.art = null; d.steps = null; }
   if (same){ $('batch').hidden = true; if (same !== cur) switchTo(same); same.batch.g = g.id; same.batch.fromChk = true; renderTabs(); syncBatchNote(); return; }
   $('toast').hidden = true;
-  try { await batchSetup(g, it); } catch(e){}
-  if (cur && cur.batch && cur.batch.key === it.key && $('batch').hidden){ cur.batch.fromChk = true; syncBatchNote(); return; }
+  const old = cur && cur.batch && cur.batch.fromChk ? cur : null; // the check design on screen: it closes once the new one is open
+  docSpare = old ? 2 : 1;
+  try { await batchSetup(g, it); } catch(e){} finally { docSpare = 0; }
+  if (cur && cur.batch && cur.batch.key === it.key && $('batch').hidden){
+    if (old && old !== cur && docs.includes(old)){ docs.splice(docs.indexOf(old), 1); forgetDoc(old); old.art = null; old.steps = null; renderTabs(); }
+    cur.batch.fromChk = true; syncBatchNote(); return; }
   const why = $('toast').hidden ? '' : $('toast').textContent; chkOpen(); toast(why || 'That design couldn’t be opened in the editor. Try again in a moment.');
 }
 /* ---------- Batch with Claude: the mini guide in the More menu ---------- */
