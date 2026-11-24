@@ -646,6 +646,20 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .tdrop-pop.menu .btn:hover{background:var(--soft)}
 .tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
 .mv-menu{min-width:190px}
+.ink-box{display:grid;gap:6px}
+.ink-box .f-note{margin:0}
+.ink-set{display:grid;gap:6px}
+.ink-set:empty{display:none}
+.ink-c{display:flex;align-items:center;gap:10px;min-height:40px;font-size:13px}
+.ink-c > i{flex:none;width:26px;height:26px;border-radius:3px;border:1px solid rgba(128,128,128,.45)}
+.ink-c .ink-h{display:grid;min-width:92px;line-height:1.25;font-weight:600;font-variant-numeric:tabular-nums}
+.ink-c .ink-h small{font-size:11px;font-weight:500;color:var(--muted)}
+.ink-c .ink-as{color:var(--muted)}
+.ink-c .link{margin-left:auto;font-size:12px}
+.quick-flat{display:grid;gap:6px}
+label.chip.sel-ink{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+label.chip.sel-ink .colorbox{width:22px;height:22px}
+#inkChips .pick.na{opacity:.55}
 #tabsAll{flex:none;align-self:center;margin-bottom:2px}
 #tabsAllBtn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .tdrop-pop.tabs-pop{width:min(420px,calc(100vw - 24px));padding:0;z-index:12}
@@ -965,6 +979,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           <button class="chip" type="button" id="selClear" hidden data-tip="Back to changing the whole design.">Clear</button>
           <button class="chip" type="button" id="selShadows" hidden data-tip="Remove shadows here: shadows drop out inside the selection only, and stay that way after you clear it. Adjust how far under Fine-tune, Parts.">Shadows here</button>
           <button class="chip" type="button" id="selKnock" hidden data-tip="Knock out a colour here: then click a colour inside the selection. It is removed there and nowhere else, and stays that way after you clear the selection.">Knock out here</button>
+          <label class="chip sel-ink" id="selInk" hidden data-tip="Colour here: what prints inside the selection prints in the colour you pick, and stays that way after you clear the selection. Select another area to give it its own colour.">Colour here<span class="colorbox"><input type="color" id="selInkPick" value="#ffffff" aria-label="Colour for the selection"></span></label>
           <button class="chip" type="button" id="selOnly" hidden aria-pressed="true" data-tip="Leave the rest untouched. On: everything you change happens inside the selection, and the rest prints as opened. Off: only skin tones, pale colours, smoothing and sharpen stay inside.">Rest untouched</button>
           <span class="sel-note" id="selNote" hidden></span>
         </div></div></div>
@@ -988,12 +1003,16 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         <div class="chips" id="inkChips">
           <button class="pick" type="button" data-ink="art"><i class="dot" aria-hidden="true"></i><span class="pk-t">Original colours</span><span class="pk-d">The art’s own colours.</span></button>
           <button class="pick" type="button" data-ink="one"><i class="dot" aria-hidden="true"></i><span class="pk-t">One solid colour</span><span class="pk-d">Flatten it all to a colour you pick.</span></button>
+          <button class="pick" type="button" data-ink="two" data-tip="The art’s two main colours, each one flat. Change what either prints as. Clean cut only."><i class="dot" aria-hidden="true"></i><span class="pk-t">Two solid colours</span><span class="pk-d">The art’s two main colours.</span></button>
+          <button class="pick" type="button" data-ink="three" data-tip="The art’s three main colours, each one flat. Change what any of them prints as. Clean cut only."><i class="dot" aria-hidden="true"></i><span class="pk-t">Three solid colours</span><span class="pk-d">The art’s three main colours.</span></button>
         </div>
         <div class="inkrow" id="inkRow" hidden>
           <span class="colorbox"><input type="color" id="inkPick" value="#ffffff" aria-label="Ink colour"></span>
           <button class="sw" type="button" data-inkhex="#ffffff" aria-label="White ink" title="White" style="background:#ffffff"></button><button class="sw" type="button" data-inkhex="#000000" aria-label="Black ink" title="Black" style="background:#000000"></button>
           <span id="inkTxt">Everything prints in this one colour.</span>
         </div>
+        <div class="ink-box" id="inkSet" hidden><p class="f-note" id="inkSetNote"></p><div class="ink-set" id="inkSetRows"></div></div>
+        <div class="ink-box" id="inkParts" hidden><div class="lv-sub">Coloured selections</div><div class="ink-set" id="inkPartRows"></div></div>
         <button class="pick tick" type="button" id="blkQuick" aria-pressed="false" data-tip="DTF black prints as a dark matt grey, not a true black. On: the views show ink as it really prints, and on tees darker than that grey, the darkest colours are thinned (or removed in Clean cut) so the tee’s own black does the job. Off: blacks print as they are. How grey is set in Fine-tune, Ink colour."><i class="dot" aria-hidden="true"></i><span class="pk-t">Allow for DTF black ink</span><span class="pk-s" id="blkQuickS">Off</span></button>
           </div>
         </div></div>
@@ -1101,7 +1120,13 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
         </div>
         <div class="quick" id="quickAdj" hidden>
           <div class="quick-head"><div class="lv-sub" data-tip="Drag to balance the look. These are the same settings as in Fine-tune, where there are more. Hover a slider to see what it does.">Quick adjust</div><button class="link" type="button" id="quickReset">Reset to defaults</button></div>
-          <div class="quick-rows" id="quickRows"></div>
+          <div class="quick-flat" id="quickFlat" hidden>
+          <div class="lv-sub">How many colours</div>
+          <div class="chips" id="quickFlatChips" role="group" aria-label="How many colours"><button class="chip" type="button" data-flatn="0">Auto</button><button class="chip" type="button" data-flatn="1">1</button><button class="chip" type="button" data-flatn="2">2</button><button class="chip" type="button" data-flatn="3">3</button><button class="chip" type="button" data-flatn="4">4</button><button class="chip" type="button" data-flatn="5">5</button><button class="chip" type="button" data-flatn="6">6</button><button class="chip" type="button" data-flatn="8">8</button></div>
+          <div class="lv-sub">Colours, and what each prints as</div>
+          <div class="ink-set" id="quickFlatTo"></div>
+        </div>
+        <div class="quick-rows" id="quickRows"></div>
           <p class="f-note">Drag to balance the look. These are the same settings as in Fine-tune, where there are more.</p>
         </div>
         <div class="field" id="dtgField" hidden>
@@ -1175,6 +1200,8 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
           </div>
           <div class="flat-sw" id="flatSw"></div>
           <p class="f-note" id="flatNote">Every area becomes one flat colour, so Image Trace finds clean shapes.</p>
+          <div class="lv-sub">Change a colour</div>
+          <div class="ink-set" id="flatTo"></div>
           <label class="check-row"><input type="checkbox" id="flatSnap"> Pure white and pure black</label>
           <p class="f-note">Nearly-white becomes true white, and nearly-black true black.</p>
           <div class="f-head"><label for="flatSmooth">Smooth jagged edges</label><output id="flatSmoothOut" for="flatSmooth">4</output></div>
@@ -2059,7 +2086,7 @@ function engine(){
     };
     // A part's own Brightness (the same midtone curve as Levels) is done before the knock-out, so the part is judged by its
     // new colours; its selection is worked out once, before the change, and kept in sc for the part's own action.
-    const BL = rules.map(R => { if (!R.bri || R.action === 'remove' || R.action === 'recolour' || R.action === 'off') return null;
+    const BL = rules.map(R => { if (!R.bri || R.action === 'remove' || R.action === 'recolour' || R.action === 'ink' || R.action === 'off') return null;
       const t = new Float32Array(256), e = Math.pow(2, -R.bri/100); for (let v = 0; v < 256; v++) t[v] = 255*Math.pow(v/255, e); return t; });
     const isPre = rules.map((R, k) => !!BL[k] || R.action === 'keepas' || R.action === 'off'), pre = rules.map((R, k) => isPre[k] ? k : -1).filter(k => k >= 0);
     const sc = new Float32Array(nr + 1);
@@ -2070,6 +2097,7 @@ function engine(){
     const crisp = !p.cut && p.crisp > 0 ? Math.max(1, Math.round(p.crisp)) : 0; // crisp outlines: see the two passes below
     let amt = crisp ? new Uint8Array(w*h) : null, amn = null, amx = null;
     const nodr = rules.map((R, k) => R.action === 'nodots' ? k : -1).filter(k => k >= 0); // No dots ranges: these parts are a clean cut inside a halftone
+    const inkr = rules.map((R, k) => R.action === 'ink' ? k : -1).filter(k => k >= 0), zn = inkr.length ? new Uint8Array(w*h) : null; // Solid colour parts: what prints here prints in the part's colour
     const rampr = p.cut ? [] : rules.map((R, k) => R.action === 'ramp' ? k : -1).filter(k => k >= 0); // Own dots ranges: these parts have their own knock-out fade
     let sel = selOut >= 0 && selOut < nr ? new Uint8Array(w*h) : null;
     let on = 0;
@@ -2200,13 +2228,16 @@ function engine(){
         if (nd){ if (c < nd){ cls[i >> 2] = 1; continue; } c = 1; } // No dots: solid or removed, never screened
         else { ch[(c > 1 ? 100 : c*100 + 0.5) | 0]++; c = lut[(c*1024) | 0]; } // ch: the chart of ink amounts
         if (c <= 0 || c < cut){ cls[i >> 2] = 1; continue; }
+        let zv = 0;
+        if (zn){ const Lz = (0.299*r + 0.587*g + 0.114*b)/255; for (const k of inkr){ const s = wt(k, r, g, b, Lz, x, y); if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0; if (s >= 0.5) zv = k + 1; } zn[i >> 2] = zv; }
         if (cov) cov[i >> 2] = nd && !fo ? 0 : c >= 1 ? 255 : Math.max(1, (c*255 + 0.5) | 0); // a No dots part is never faded inward
         if (c < 1 && !cut){
           const u = fx - Math.floor(fx), v = fy - Math.floor(fy);
-          if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]){ cls[i >> 2] = 2; if (fo){ out[i] = r; out[i+1] = g; out[i+2] = b; } continue; } // fo: the gap's colour is kept for the fade, and cleared after it
+          if (c <= t[((v*N) | 0)*N + ((u*N) | 0)]){ cls[i >> 2] = 2; if (fo){ if (zv){ const T = rules[zv - 1].to; out[i] = T[0]; out[i+1] = T[1]; out[i+2] = T[2]; } else { out[i] = r; out[i+1] = g; out[i+2] = b; } } continue; } // fo: the gap's colour is kept for the fade, and cleared after it
           cls[i >> 2] = 3;
         } else cls[i >> 2] = 4;
-        if (one){ out[i] = ir; out[i+1] = ig; out[i+2] = ib; }
+        if (zv){ const T = rules[zv - 1].to; out[i] = T[0]; out[i+1] = T[1]; out[i+2] = T[2]; }
+        else if (one){ out[i] = ir; out[i+1] = ig; out[i+2] = ib; }
         else if (boost && c < 1){ const R1 = kr + (r - kr)*boost, G1 = kg + (g - kg)*boost, B1 = kb + (b - kb)*boost; out[i] = R1; out[i+1] = G1; out[i+2] = B1; } // a dot in its bright colour
         else { out[i] = r; out[i+1] = g; out[i+2] = b; }
         out[i+3] = 255; on++;
@@ -2487,6 +2518,9 @@ function engine(){
         for (const c of C) c.off = (F.drop || []).some(d => d[0] === c.r && d[1] === c.g && d[2] === c.b); // colours left out by hand
         if (C.every(c => c.off)) C[0].off = false;
         const L = C.filter(c => !c.off);
+        if (F.map && F.map.length) for (const c of L){ // a colour that prints as another: matched to the colour it was set on, a little leeway either way
+          let bd = 2700, bt = null; for (const m of F.map){ const d = (m[0] - c.r)*(m[0] - c.r) + (m[1] - c.g)*(m[1] - c.g) + (m[2] - c.b)*(m[2] - c.b); if (d <= bd){ bd = d; bt = m; } }
+          c.t = bt ? [bt[3], bt[4], bt[5]] : null; }
         assign(L);
         // tidy: a patch of colour with no solid middle (thinner than the smallest detail) dissolves into its neighbours when it
         // is a speck, or a mix of the two colours beside it (the line a soft edge leaves between them)
@@ -2586,8 +2620,16 @@ function engine(){
           }
         }
         for (const c of L) c.n = 0;
-        for (let k = 0; k < n; k++){ const v = idx[k]; if (v === 255) continue; const c = L[v], j = k*4; out[j] = c.r; out[j+1] = c.g; out[j+2] = c.b; out[j+3] = 255; c.n++; }
-        flat = {pal: C.filter(c => c.off || c.n > 0).map(c => [c.r, c.g, c.b, c.off ? 0 : c.n/total, c.off ? 1 : 0]), tidied};
+        for (let k = 0; k < n; k++){ const v = idx[k]; if (v === 255) continue; const c = L[v], j = k*4, T = c.t; if (T){ out[j] = T[0]; out[j+1] = T[1]; out[j+2] = T[2]; } else { out[j] = c.r; out[j+1] = c.g; out[j+2] = c.b; } out[j+3] = 255; c.n++; }
+        flat = {pal: C.filter(c => c.off || c.n > 0).map(c => [c.r, c.g, c.b, c.off ? 0 : c.n/total, c.off ? 1 : 0].concat(c.t && !c.off ? c.t : [c.r, c.g, c.b])), tidied}; // 5-7: the colour it prints as
+      }
+    }
+    if (zn && flat){ // Solid colour parts win over the flat colours. Ink that smoothing added along an outline takes the colour of the marked area it sits in.
+      const geo = inkr.filter(k => rules[k].type === 'all' && RM[k] && !rules[k].invert);
+      for (let k = 0, n = w*h; k < n; k++){
+        if (cls[k] < 3) continue; let zv = zn[k];
+        if (!zv && geo.length){ const x = k % w, y = (k - x)/w; for (const q of geo){ const M = RM[q]; let u = ((x + 0.5)*M.w/W0) | 0, v = ((y + 0.5)*M.h/H0) | 0; if (u > M.w - 1) u = M.w - 1; if (v > M.h - 1) v = M.h - 1; if (M.d[v*M.w + u] >= 128) zv = q + 1; } }
+        if (zv){ const T = rules[zv - 1].to, j = k*4; out[j] = T[0]; out[j+1] = T[1]; out[j+2] = T[2]; }
       }
     }
     // Shirt-colour edge: the print's ink grown outwards by this much and filled with the shirt colour behind it, like
@@ -2805,7 +2847,7 @@ const routeOf = f => f === 'cut' ? 'cut' : 'dots';
 function lookName(look, finish){ look = look || st.look; const t = LOOK_TEXT[routeOf(finish || st.finish)][look] || LOOK_TEXT.dots[look] || LOOK_TEXT.cut[look]; return t ? t[0] : look; }
 const $ = id => document.getElementById(id);
 const st = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-            ink: 'art', inkHex: '#ffffff', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'cut', cut: 50,
+            ink: 'art', inkHex: '#ffffff', inks: '', shirt: '#111111', knock: null, widthCm: 25, zoom: 'fit', cx: 0, cy: 0, view: 'shirt', paneA: 'orig', paneB: 'shirt', finish: 'cut', cut: 50,
             edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', hard: 0, brushV: 50, paintHex: '#ffffff', sharp: 0, sradius: 1, noise: 0, pale: 0, skin: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, dtg: false, dtgHex: 'shirt', blkOn: false, blk: 20, clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true, speckMm: 0.3, areaV: 60, flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatBg: 'auto', flatBgHex: '#000000'}; // the trim starts off on each visit (not in KEEP), so it's never left on by surprise
 // remembered on each computer; the Split sides aren't, so every visit starts Before · On shirt | After · On shirt
 const ST0 = JSON.parse(JSON.stringify(st)); // the settings a new visit starts with
@@ -2932,7 +2974,7 @@ function params(){
           cut: st.finish === 'cut' ? st.cut/100 : 0, rules: rules.map(partParams), guard: selGuardOn() ? areaMask(art.selA).id : null, selOut: rules.length ? activeRule : -1,
           hlv: st.finish === 'cut' || hlvIdentity() ? null : {b: st.hb/100, g: st.hg, w: st.hw/100, ob: st.hob/100, ow: st.how/100},
           rich: st.rich && st.finish !== 'cut', crisp: st.crisp && st.finish !== 'cut' ? 3 : 0, speck: !!st.speck, speckT: st.finish === 'cut' ? Math.max(3, Math.round((st.speckMm/25.4*DPI)**2)) : 0,
-          flat: isFlat() ? {n: st.flatN, snap: !!st.flatSnap, tidy: Math.round(st.flatTidy/25.4*DPI), smooth: (st.flatSmooth == null ? 4 : +st.flatSmooth)*0.16, up: art ? toMm(st.widthCm)/25.4*DPI/art.w : 1, drop: st.flatDrop ? st.flatDrop.split(',').map(hexRgb) : []} : null,
+          flat: isFlat() ? {n: st.flatN, snap: !!st.flatSnap, tidy: Math.round(st.flatTidy/25.4*DPI), smooth: (st.flatSmooth == null ? 4 : +st.flatSmooth)*0.16, up: art ? toMm(st.widthCm)/25.4*DPI/art.w : 1, drop: st.flatDrop ? st.flatDrop.split(',').map(hexRgb) : [], map: inkMap()} : isMulti() ? {n: inkN(), snap: true, tidy: Math.round(0.5/25.4*DPI), smooth: 4*0.16, up: art ? toMm(st.widthCm)/25.4*DPI/art.w : 1, drop: [], map: inkMap()} : null,
           clean: st.clean && st.finish !== 'cut', levels: lvIdentity() ? null : {...lv}, inkBlack: blkOnNow() && !isFlat() ? {rgb: hexRgb(blkHex()), yb: linY(hexRgb(blkHex())), ys: linY(hexRgb(st.shirt))} : null, backing: st.back ? {px: st.back, rgb: hexRgb(st.backHex || st.shirt)} : null, bg: st.bgOn && !isDtg() ? {rgb: st.bgHex ? hexRgb(st.bgHex) : null, tol: st.bgTol/100} : null, thru: st.thruOn ? {rgb: hexRgb(thruHex()), floor: Math.max(1, Math.round((st.thruFloor || 4)*2.55)), r: Math.max(2, Math.min(6, Math.round(1.5*outW()/Math.max(1, art.w))))} : null, edge: st.emode === 'near' ? st.edge : 0, etol: st.etol/100, contract: st.emode === 'near' ? 0 : st.edge, hard: st.finish === 'cut' ? 0 : st.hard/100,
           fade: st.fade && st.finish !== 'cut' ? {px: Math.max(1, Math.round(st.fade/25.4*DPI)), out: st.fadeDir !== 'in', spread: st.fadeDir === 'spread', max: [Math.round(MAX_SHORT/2.54*DPI), Math.round(MAX_LONG/2.54*DPI)]} : null};
 }
@@ -3188,7 +3230,7 @@ function selMask(W, H){ // 255 inside the selection, 0 outside, at the print's p
 function syncSel(){
   const on = !!(art && art.sel); if (!$('selBox')) return;
   $('selBox').setAttribute('aria-pressed', String(selTool === 'box')); $('selLoop').setAttribute('aria-pressed', String(selTool === 'loop'));
-  if ($('selClear').hidden === on){ $('selClear').hidden = !on; $('selShadows').hidden = !on; $('selKnock').hidden = !on; $('selOnly').hidden = !on; renderRules(); } if ($('selNote').hidden === on) $('selNote').hidden = !on;
+  if ($('selClear').hidden === on){ $('selClear').hidden = !on; $('selShadows').hidden = !on; $('selKnock').hidden = !on; $('selInk').hidden = !on; $('selOnly').hidden = !on; renderRules(); } if ($('selNote').hidden === on) $('selNote').hidden = !on;
   if (on){ const g = selGuardOn(); $('selOnly').setAttribute('aria-pressed', String(g));
     const t = g ? 'Changes now happen inside the selection only. The rest prints as opened.' : 'Only skin tones, pale colours, smoothing and sharpen stay inside the selection.'; if ($('selNote').textContent !== t) $('selNote').textContent = t; }
   stage.classList.toggle('selecting', !!selTool);
@@ -3257,7 +3299,7 @@ function paint(m){
   lastCls = new Uint8Array(m.cls); lastSel = m.sel ? new Uint8Array(m.sel) : null; paintN++;
   chist = m.ch ? new Uint32Array(m.ch) : null; drawHhisto();
   prepareViews();
-  outReady = true; lastOn = m.on; lastSpeck = [m.speck || 0, m.pin || 0]; syncSpeck(); dtgHintSoon(m.bg, m.on); lastFlat = m.flat || null; syncFlat();
+  outReady = true; lastOn = m.on; lastSpeck = [m.speck || 0, m.pin || 0]; syncSpeck(); dtgHintSoon(m.bg, m.on); lastFlat = m.flat || null; syncFlat(); syncInkSet();
   $('saveBtn').disabled = false;
   render(); updateChecks(); syncLegend();
 }
@@ -4263,7 +4305,7 @@ $('densChips').addEventListener('click', e => { const b = e.target.closest('[dat
 function syncChips(boxId, attr, val){ for (const b of $(boxId).querySelectorAll(`[data-${attr}]`)) b.setAttribute('aria-pressed', String(b.dataset[attr] === String(val))); }
 $('angleChips').addEventListener('click', e => { const b = e.target.closest('[data-angle]'); if (!b) return; st.angle = +b.dataset.angle; syncChips('angleChips', 'angle', st.angle); remember(); schedule(); });
 $('shapeChips').addEventListener('click', e => { const b = e.target.closest('[data-shape]'); if (!b) return; st.shape = b.dataset.shape; syncChips('shapeChips', 'shape', st.shape); remember(); schedule(); });
-function setInk(mode, hex){ if (mode) st.ink = mode; if (hex){ st.inkHex = hex.toLowerCase(); st.ink = 'one'; } noteChange(st.ink === 'one' ? `One solid colour ${st.inkHex.toUpperCase()}` : 'Original colours'); syncInk(); syncSums(); remember(); schedule(); }
+function setInk(mode, hex){ if (mode) st.ink = mode; if (hex){ st.inkHex = hex.toLowerCase(); st.ink = 'one'; } noteChange(st.ink === 'one' ? `One solid colour ${st.inkHex.toUpperCase()}` : INK_NAMES[st.ink] || 'Original colours'); syncInk(); syncSums(); remember(); schedule(); }
 $('inkChips').addEventListener('click', e => { const b = e.target.closest('[data-ink]'); if (b) setInk(b.dataset.ink); });
 $('inkPick').addEventListener('input', e => setInk(null, e.target.value));
 document.addEventListener('click', e => { const t = e.target.closest ? e.target : null; if (!t) return; const h = t.closest('[data-inkhex]'), m = t.closest('[data-inkset]'); if (h) setInk(null, h.dataset.inkhex); else if (m) setInk(m.dataset.inkset); });
@@ -4273,12 +4315,71 @@ $('lookQuick').addEventListener('click', e => { const b = e.target.closest('[dat
   const bgEl = $('bgOn'), want = v === 'bg' ? true : v === 'edges' ? false : null; // the two prep-only recipes differ only in the background
   if (want !== null && bgEl.checked !== want){ bgEl.checked = want; bgEl.dispatchEvent(new Event('change', {bubbles: true})); }
   syncLookQuick(); syncQuick(); });
+var INK_NAMES = {art: 'Original colours', one: 'One solid colour', two: 'Two solid colours', three: 'Three solid colours'};
+function inkN(){ return st.ink === 'two' ? 2 : st.ink === 'three' ? 3 : 0; }
+function isMulti(){ return inkN() > 0 && st.finish === 'cut' && !st.flat && !st.dtg; } /* two or three solid colours: Clean cut only */
+function inkPairs(){ return (st.inks || '').split(',').map(x => x.split(':')).filter(a => a.length === 2 && /^#[0-9a-f]{6}$/.test(a[0]) && /^#[0-9a-f]{6}$/.test(a[1])); } /* "found colour:prints as" */
+function inkMap(){ return inkPairs().map(a => hexRgb(a[0]).concat(hexRgb(a[1]))); }
+function inkParts(){ let rs = []; try { rs = rules; } catch(e){} return rs.map((R, i) => [R, i]).filter(x => x[0].action === 'ink'); }
+function setInkTo(from, to){ /* to: a colour, or nothing for its own colour again */
+  const f = hexRgb(from), L = inkPairs().filter(a => { const c = hexRgb(a[0]); return (c[0] - f[0])**2 + (c[1] - f[1])**2 + (c[2] - f[2])**2 > 2700; });
+  if (to && to.toLowerCase() !== from) L.push([from, to.toLowerCase()]);
+  st.inks = L.slice(-12).map(a => a.join(':')).join(','); noteChange(to ? `${from.toUpperCase()} prints as ${to.toUpperCase()}` : `${from.toUpperCase()} prints as itself again`);
+  syncInkSet(); if (isFlat()) syncFlat(); syncSums(); remember(); schedule();
+}
+function inkRows(el, pal){ /* one row a colour: the colour found, and what it prints as. Only redrawn when the colours change, so an open colour picker stays open. */
+  const pct = v => v >= 10 ? Math.round(v) + '%' : v >= 0.1 ? v.toFixed(1) + '%' : 'under 0.1%';
+  const html = pal.map(c => { const f = rgbHex(c[0], c[1], c[2]);
+    return `<div class="ink-c"><i style="background:${f}" aria-hidden="true"></i><span class="ink-h">${f.toUpperCase()}<small>${pct(c[3]*100)} of the ink</small></span><span class="ink-as">prints as</span><span class="colorbox"><input type="color" data-inkfrom="${f}" aria-label="${f.toUpperCase()} prints as"></span><button class="link" type="button" data-inkback="${f}" hidden>Reset</button></div>`; }).join('');
+  if (el._h !== html){ el._h = html; el.innerHTML = html; }
+  for (const c of pal){ const f = rgbHex(c[0], c[1], c[2]), t = c.length > 7 ? rgbHex(c[5], c[6], c[7]) : f, inp = el.querySelector(`[data-inkfrom="${f}"]`); if (!inp) continue;
+    if (inp !== document.activeElement && inp.value !== t) inp.value = t; el.querySelector(`[data-inkback="${f}"]`).hidden = t === f; }
+}
+function syncInkSet(){
+  if (!$('inkSet')) return;
+  const n = inkN(), multi = isMulti(), pal = multi && lastFlat ? lastFlat.pal.filter(c => !c[4]) : [];
+  for (const b of $('inkChips').querySelectorAll('[data-ink="two"], [data-ink="three"]')) b.classList.toggle('na', !(st.finish === 'cut' && !st.flat && !st.dtg));
+  $('inkSet').hidden = !n;
+  if (n){ const t = !multi ? 'Two and three colours work in Clean cut. This style is printing the original colours.' : !pal.length ? 'Finding the colours…'
+      : `The art’s ${pal.length === 1 ? 'main colour' : pal.length + ' main colours'}, each one flat.${pal.length < n ? ` The art has no more than ${pal.length}.` : ''} Pick what each prints as.`;
+    if ($('inkSetNote').textContent !== t) $('inkSetNote').textContent = t; inkRows($('inkSetRows'), pal); }
+  const parts = inkParts(), el = $('inkPartRows'); $('inkParts').hidden = !parts.length;
+  const html = parts.map(([R, i], k) => `<div class="ink-c"><span class="colorbox"><input type="color" data-inkpart="${i}" aria-label="Colour of selection ${k + 1}"></span><span class="ink-h">Selection ${k + 1}<small>Part ${i + 1}${R.off ? ', off' : ''}</small></span><button class="link" type="button" data-inkdel="${i}">Remove</button></div>`).join('');
+  if (el._h !== html){ el._h = html; el.innerHTML = html; }
+  for (const [R, i] of parts){ const inp = el.querySelector(`[data-inkpart="${i}"]`); if (inp && inp !== document.activeElement && inp.value !== (R.to || '#ffffff')) inp.value = R.to || '#ffffff'; }
+  inkLabel();
+}
+for (const id of ['inkSetRows', 'flatTo', 'quickFlatTo']){
+  $(id).addEventListener('input', e => { const f = e.target.dataset && e.target.dataset.inkfrom; if (f) setInkTo(f, e.target.value); });
+  $(id).addEventListener('click', e => { const b = e.target.closest('[data-inkback]'); if (b) setInkTo(b.dataset.inkback, null); });
+}
+$('inkPartRows').addEventListener('input', e => { const i = e.target.dataset && e.target.dataset.inkpart; if (i == null || !rules[+i]) return; rules[+i].to = e.target.value.toLowerCase(); noteChange('Selection colour'); renderRules(); schedule(); });
+$('inkPartRows').addEventListener('click', e => { const b = e.target.closest('[data-inkdel]'); if (!b) return;
+  e.stopPropagation(); /* the list redraws itself: the menu stays open */
+  const i = +b.dataset.inkdel; if (!rules[i]) return; if (pickFor === i) endPick(); if (areaTool){ areaTool = null; aStroke = null; syncBrush(); }
+  rules.splice(i, 1); activeRule = Math.max(0, Math.min(activeRule, rules.length - 1)); noteChange('Coloured selection removed'); syncRules(); schedule(); });
+/* Select, Colour here: what prints inside the selection prints in one colour, and stays that way */
+let selInkFor = null;
+function selInkPart(hex){
+  if (!art || !art.sel) return;
+  let R = selInkFor && selInkFor.art === art && selInkFor.v === art.selV && rules.includes(selInkFor.R) ? selInkFor.R : null;
+  if (!R){
+    if (rules.length >= MAX_RULES){ toast(`A design can have ${MAX_RULES} parts. Delete one under Fine-tune, Parts, first.`); return; }
+    if (cropping) endCrop(false); if (picking) endPick(); selTool = null; selDraw = null;
+    R = Object.assign(newRule('all', 'ink'), {area: [selArea()], to: hex});
+    rules.push(R); selInkFor = {R, v: art.selV, art}; activeRule = rules.length - 1;
+    noteChange('Colour the selection'); syncRules(); syncSel(); drawBrush(); schedule();
+    toast('What prints inside the selection is this colour now. It stays after you clear the selection.');
+  } else if (R.to !== hex){ R.to = hex; noteChange('Selection colour'); syncRules(); schedule(); }
+}
+$('selInk').addEventListener('click', () => selInkPart($('selInkPick').value.toLowerCase()));
+$('selInkPick').addEventListener('input', e => selInkPart(e.target.value.toLowerCase()));
 function syncInk(){ syncChips('inkChips', 'ink', st.ink); $('inkRow').hidden = st.ink !== 'one'; $('inkPick').value = st.inkHex; syncBlk();
-  const one = st.ink === 'one'; $('inkDropSw').hidden = !one; $('inkDropSw').style.background = st.inkHex; inkLabel();
+  const one = st.ink === 'one'; $('inkDropSw').hidden = !one; $('inkDropSw').style.background = st.inkHex; syncInkSet(); inkLabel();
   for (const b of document.querySelectorAll('[data-inkhex]')) b.setAttribute('aria-pressed', String(one && b.dataset.inkhex === st.inkHex.toLowerCase())); }
 function inkLabel(){ // the Ink menu's button says what is on, so nothing hides inside it
-  const one = st.ink === 'one', t = (one ? 'Solid' : 'Original') + (st.blkOn ? ' · black ink on' : '');
-  if ($('inkDropVal').textContent !== t) $('inkDropVal').textContent = t; $('inkDropBtn').classList.toggle('has', one || !!st.blkOn);
+  const one = st.ink === 'one', multi = isMulti(), secs = inkParts().length, t = (one ? 'Solid' : multi ? `${inkN()} colours` : 'Original') + (secs ? ` · ${secs} selection${secs === 1 ? '' : 's'}` : '') + (st.blkOn ? ' · black ink on' : '');
+  if ($('inkDropVal').textContent !== t) $('inkDropVal').textContent = t; $('inkDropBtn').classList.toggle('has', one || multi || secs > 0 || !!st.blkOn);
 }
 function syncBlk(){
   $('blkOn').checked = st.blkOn; $('blkField').hidden = !st.blkOn;
@@ -4385,7 +4486,7 @@ $('dtgPick').addEventListener('input', e => setDtgHex(e.target.value));
 var lastFlat = null; // the colours the engine found: [r, g, b, share of the ink, left out]
 const TRACE_BGS = ['#00ff00', '#ff00ff', '#00ffff', '#ffff00', '#ff0000', '#0000ff', '#ff8000', '#808080', '#000000', '#ffffff'];
 function colourGap(a, b){ const rm = (a[0] + b[0])/2, dr = a[0] - b[0], dg = a[1] - b[1], db = a[2] - b[2]; return Math.sqrt((2 + rm/256)*dr*dr + 4*dg*dg + (2 + (255 - rm)/256)*db*db)/765; } // 0 the same, 1 black to white
-function flatUsed(){ return lastFlat ? lastFlat.pal.filter(c => !c[4]) : []; }
+function flatUsed(){ return lastFlat ? lastFlat.pal.filter(c => !c[4]).map(c => c.length > 7 ? [c[5], c[6], c[7], c[3], c[4]] : c) : []; } // as they print
 function nearestGap(hex){ const c = hexRgb(hex); let best = 1, at = null; for (const q of flatUsed()){ const g = colourGap(c, q); if (g < best){ best = g; at = q; } } return [best, at]; }
 // the colour behind the saved Trace prep PNG, or null for none. Auto: the bright colour furthest from every colour in the logo.
 function traceBgHex(){
@@ -4423,7 +4524,8 @@ function syncFlatBg(){
 $('flatBgChips').addEventListener('click', e => { const b = e.target.closest('[data-flatbg]'); if (!b) return; st.flatBg = b.dataset.flatbg; syncFlatBg(); syncFileName(); updateChecks(); remember(); });
 $('flatBgPick').addEventListener('input', e => { st.flatBgHex = e.target.value.toLowerCase(); syncFlatBg(); updateChecks(); remember(); });
 function syncFlat(){
-  const on = isFlat(); $('flatField').hidden = !on; if (!on) return;
+  const on = isFlat(); $('flatField').hidden = !on; $('quickFlat').hidden = !on; if (!on) return;
+  syncChips('quickFlatChips', 'flatn', st.flatN); { const up = lastFlat ? lastFlat.pal.filter(c => !c[4]) : []; inkRows($('flatTo'), up); inkRows($('quickFlatTo'), up); }
   syncFlatBg();
   syncChips('flatChips', 'flatn', st.flatN); $('flatSnap').checked = !!st.flatSnap;
   const pal = lastFlat ? lastFlat.pal : [], used = pal.filter(c => !c[4]).length;
@@ -4432,7 +4534,7 @@ function syncFlat(){
   $('flatNote').textContent = !lastFlat ? 'Every area becomes one flat colour, so Image Trace finds clean shapes.'
     : `${st.flatN ? '' : 'Found '}${used} flat colour${used === 1 ? '' : 's'}${st.flatN && used < st.flatN ? ` (the art has no more than ${used})` : ''}. Two that should be one? Click one to leave it out, and its areas join the nearest colour left.`;
 }
-$('flatChips').addEventListener('click', e => { const b = e.target.closest('[data-flatn]'); if (!b) return; st.flatN = +b.dataset.flatn; st.flatDrop = ''; syncFlat(); remember(); schedule(); });
+for (const id of ['flatChips', 'quickFlatChips']) $(id).addEventListener('click', e => { const b = e.target.closest('[data-flatn]'); if (!b) return; st.flatN = +b.dataset.flatn; st.flatDrop = ''; syncFlat(); remember(); schedule(); });
 $('flatSw').addEventListener('click', e => { const b = e.target.closest('[data-flathex]'); if (!b) return;
   const h = b.dataset.flathex, list = st.flatDrop ? st.flatDrop.split(',') : [], i = list.indexOf(h);
   if (i >= 0) list.splice(i, 1); else { if (lastFlat && lastFlat.pal.filter(c => !c[4]).length < 2){ toast('One colour has to stay.'); return; } list.push(h); }
@@ -4470,10 +4572,11 @@ function nameGroup(id, name, tip){ // a step's title, its fold button and the "D
 const RULE_TYPES = [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights'], ['greys', 'Greys, black & white'], ['sample', 'Sampled colours'], ['all', 'Everything (in a marked area)']];
 const ACTION_TIPS = {remove: 'Remove the selected parts.', fade: 'Turn the selected parts into dots, keeping some of the ink.', solid: 'Print the selected parts fully solid.',
   recolour: 'Change the selected colours to another colour, e.g. black text to white for a dark tee. Done before the knock-out.',
+  ink: 'Whatever prints in this part prints in one colour you pick. Nothing is added or removed: only the colour changes.',
   ramp: 'Give the selected parts their own dots: their own “Shirt shows through up to” and “Full ink from”, so one part can be dotted less (or more) than the rest of the design.',
   nodots: 'Keep the selected parts free of dots, as in Clean cut: solid ink, or removed at the threshold. The rest of the design is still halftoned.',
   keepas: 'Leave this part on the main settings. Use it with Brightness to lighten or darken just this part.'};
-const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['ramp', 'Own dots'], ['solid', 'Keep solid'], ['nodots', 'No dots'], ['keepas', 'Main dots'], ['recolour', 'Recolour']];
+const RULE_ACTIONS = [['remove', 'Remove'], ['fade', 'Fade to dots'], ['ramp', 'Own dots'], ['solid', 'Keep solid'], ['nodots', 'No dots'], ['keepas', 'Main dots'], ['recolour', 'Recolour'], ['ink', 'Solid colour']];
 const RULE_DEFAULTS = [['shadows', 'remove'], ['highlights', 'solid'], ['midtones', 'fade'], ['sample', 'remove']];
 const MAX_RULES = 6;
 function newRule(type, action){ return {type, action, samples: [], range: 50, fuzz: 20, keep: 50, cut: 50, k0: 10, k1: 30, invert: false, to: '#ffffff'}; }
@@ -4540,14 +4643,15 @@ function renderRules(){
       ${R.action === 'keepas' ? `<p class="f-note">This part keeps the main settings. Move Brightness to lighten or darken just this part.</p>` : ''}
       ${R.action === 'nodots' ? ruleSlider(i, 'cut', 'Threshold', R.cut == null ? 50 : R.cut) + `<p class="f-note">${st.finish === 'cut' ? 'Clean cut has no dots anywhere, so this changes nothing. Choose Halftone to use it.' : `No dots here: these parts print solid, or are removed where they are less solid than the threshold. Only colours within ${st.ktol}% of the knock-out colour drop out (the Knock-out tolerance), so the part keeps its shading as solid ink.`}</p>` : ''}
       ${R.action === 'recolour' ? `<div class="knock"><span class="colorbox"><input type="color" data-k="to" value="${R.to || '#ffffff'}" aria-label="New colour for part ${i + 1}"></span><span>The selected colours become this colour, before the knock-out.</span></div>` : ''}
-      ${R.action !== 'remove' && R.action !== 'recolour' && st.finish !== 'cut' ? briSlider(i, R.bri || 0) : ''}
+      ${R.action === 'ink' ? `<div class="knock"><span class="colorbox"><input type="color" data-k="to" value="${R.to || '#ffffff'}" aria-label="Colour for part ${i + 1}"></span><span>What prints in this part prints in this colour.</span></div>` : ''}
+      ${R.action !== 'remove' && R.action !== 'recolour' && R.action !== 'ink' && st.finish !== 'cut' ? briSlider(i, R.bri || 0) : ''}
     </div>`).join('');
   $('addRule').hidden = rules.length >= MAX_RULES;
   $('addRule').textContent = rules.length ? 'Add another part' : 'Add a part';
   syncShowChips(); syncPickChips();
 }
 function syncRules(){
-  renderRules(); setTimeout(syncQuick, 0);
+  renderRules(); syncInkSet(); setTimeout(syncQuick, 0);
   $('viewTray').querySelector('[data-view="sel"]').hidden = !rules.length;
   syncPaneOptions();
   if (!rules.length && st.view === 'sel') setView(viewBeforeSel);
@@ -4804,6 +4908,8 @@ function updateChecks(){
     (softPct != null && softPct >= 1 ? `The art had ${softPct}% see-through pixels (glows, shadows, fades, soft edges). ` : '') + 'Every pixel is now solid ink or clear film, so the film has no haze.']);
   const md = minDotMm();
   if (st.finish === 'cut') rows.push(['good', '✓', 'Clean cut, no dots', `Pixels at least ${st.cut}% solid print fully solid. The rest is removed.`]);
+  if (isMulti() && lastFlat){ const n = lastFlat.pal.filter(c => !c[4]).length;
+    rows.push(['good', '✓', `${n} solid colour${n === 1 ? '' : 's'}`, 'Every part of the design prints in one flat colour, with a hard edge where two meet. Pick what each prints as in the Ink menu.']); }
   if (isFlat() && lastFlat){ const n = lastFlat.pal.filter(c => !c[4]).length;
     rows.push(['good', '✓', `${n} flat colour${n === 1 ? '' : 's'}`, 'Every area is one flat colour with a hard edge, ready for Image Trace in Illustrator.' + (lastFlat.tidied ? ` ${lastFlat.tidied} speck${lastFlat.tidied === 1 ? '' : 's'} and in-between lines tidied away.` : '')]);
     if (traceBgHex()) rows.push(['info', '▣', `Tracing background ${traceBgHex().toUpperCase()}`, `The saved PNG has this colour behind the logo, with a small margin. In Image Trace, ask for ${n + 1} colours, then delete the background shape.`]);
@@ -4978,7 +5084,7 @@ $('smoothBtn').addEventListener('change', e => { if (!art) return; art.smooth = 
 function cleanStart(){ // a new design starts clean: fixes made for the last design don't follow it. The workshop's own settings stay
   // (print style, Quick start, lpi, angle, dot shape, dot limits, threshold, black ink, shirt colour).
   const L = LOOKS[st.look] || LOOKS.knock;
-  Object.assign(st, {k0: L.k0, k1: L.k1, mid: L.mid, con: L.con, ktol: DEFAULTS.ktol, clean: DEFAULTS.clean, rich: DEFAULTS.rich, ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex}, HLV0, EDGE_KEYS, SHARP_KEYS, BG_KEYS, {flatDrop: ''});
+  Object.assign(st, {k0: L.k0, k1: L.k1, mid: L.mid, con: L.con, ktol: DEFAULTS.ktol, clean: DEFAULTS.clean, rich: DEFAULTS.rich, ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex, inks: ''}, HLV0, EDGE_KEYS, SHARP_KEYS, BG_KEYS, {flatDrop: ''});
   rules = []; activeRule = 0; if (st.look === 'shadows') ensureShadowRule();
 }
 function setArt(el, w, h, name, isSample, dpi, kind){
@@ -5563,7 +5669,7 @@ function settingsText(){
     (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (knockLook(st.look) ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
-         (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.finish !== 'cut' && !hlvIdentity() ? `; halftone levels ${st.hb} ${st.hg.toFixed(2)} ${st.hw}, output ${st.hob}-${st.how}` : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
+         (st.clean && st.finish !== 'cut' ? '; clean colour dots' : '') + (st.finish !== 'cut' && !hlvIdentity() ? `; halftone levels ${st.hb} ${st.hg.toFixed(2)} ${st.hw}, output ${st.hob}-${st.how}` : '') + (st.ink === 'one' ? `; one colour ${st.inkHex.toUpperCase()}` : '') + (isMulti() ? `; ${inkN()} solid colours` : '') + (st.blkOn ? `; DTF black ink as ${blkHex().toUpperCase()}` : '') +
          (st.hard && st.finish !== 'cut' ? `; hard edge ${st.hard}%` : '') + (st.fade && st.finish !== 'cut' ? `; edge faded ${st.fade} mm ${st.fadeDir === 'spread' ? 'outward, dots spread' : st.fadeDir === 'out' ? 'outward' : 'inward'}` : '') + (st.back ? `; shirt-colour edge ${st.back} px ${(st.backHex || st.shirt).toUpperCase()}` : '') + (art.strokesN ? `; ${art.strokesN} touch-up strokes` : '') + (st.thruOn ? `; see-through areas made solid on ${thruHex().toUpperCase()}, floor ${st.thruFloor}%` : '') + (st.bgOn ? `; background ${(st.bgHex || (Array.isArray(bgFound) ? rgbHex(bgFound[0], bgFound[1], bgFound[2]) : 'edge')).toUpperCase()} removed within ${st.bgTol}%` : '') + (st.sharp ? `; sharpened ${st.sharp}% radius ${st.sradius} px` : '') + (st.edge ? `; edge trimmed ${st.edge} px` + (st.emode === 'near' ? ` within ${st.etol}% of ${(st.knock || st.shirt).toUpperCase()}` : ', any colour') : '') +
          `; ${toMm(st.widthCm)} x ${toMm(st.widthCm*art.h/art.w)} mm at 300 dpi` + (hasRoom() ? `, ${pxToMm(printPxW())} x ${pxToMm(printPxH())} mm with the fade` : '') + (art.smooth ? '; enlarged pixels smoothed' : '');
 }
@@ -5662,7 +5768,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'speckMm', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'pale', 'skin', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'dtg', 'dtgHex', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'speckMm', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'inks', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'pale', 'skin', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'dtg', 'dtgHex', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatBg', 'flatBgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => { if (!(x && typeof x.name === 'string' && x.s && typeof x.s === 'object')) return false; cleanDeep(x.s); x.rules = cleanDeep(x.rules); x.levels = cleanDeep(x.levels); return true; };
@@ -6037,7 +6143,7 @@ const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, clean: v => v ? 'Clean colour dots on' : 'Clean colour dots off', rich: v => v ? 'Rich fade dots on' : 'Rich fade dots off', crisp: v => v ? 'Crisp outlines on' : 'Crisp outlines off', speck: v => v ? 'Speck clean-up on' : 'Speck clean-up off', ktol: v => `Knock-out tolerance ${v}%`,
   hb: () => 'Halftone levels', hg: () => 'Halftone levels', hw: () => 'Halftone levels', hob: () => 'Halftone output levels', how: () => 'Halftone output levels',
   mid: v => `Ink amount ${sign(v)}`, con: v => `Ink contrast ${sign(v)}`, drop: v => `Drop dots under ${v}%`, solid: v => `Solid above ${v}%`,
-  ink: v => v === 'one' ? 'One solid colour' : 'Original colours', inkHex: v => `Solid colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
+  ink: v => INK_NAMES[v] || 'Original colours', inks: () => 'A colour prints as another', inkHex: v => `Solid colour ${v.toUpperCase()}`, shirt: () => 'Shirt colour',
   knock: v => v ? `Knock-out ${v.toUpperCase()}` : 'Knock-out follows the shirt',
   thruOn: v => v ? 'See-through areas made solid' : 'See-through areas left as they are', thruHex: v => v === 'shirt' ? 'Backing follows the shirt colour' : `Backing colour ${String(v).toUpperCase()}`, thruFloor: v => `Leave out fainter than ${v}%`,
   flatBg: v => ({auto: 'Tracing background: Auto', black: 'Tracing background: Black', white: 'Tracing background: White', own: 'Tracing background: own colour', off: 'Tracing background off'}[v] || 'Tracing background'), flatBgHex: v => `Tracing background ${String(v).toUpperCase()}`,
@@ -6248,7 +6354,7 @@ const SUMS = { // short, so a title stays on one line
   knockGroup: () => `${st.knock ? st.knock.toUpperCase() : 'Shirt colour'} · ${st.finish === 'cut' ? `${st.ktol}%` : `${st.k0}–${st.k1}%` + (st.clean ? ' · clean' : '')}`,
   rangeGroup: () => rules.length ? `${rules.length} part${rules.length === 1 ? '' : 's'}` : 'None',
   toneGroup: () => { const l = densLevel(); return `Dots · ${l ? DENS_NAMES[l] : `own ${st.drop}/${st.solid}%`}` + (hlvIdentity() ? '' : ' · levels') + (st.mid || st.con ? ' · ink ±' : ''); },
-  inkGroup: () => `${st.ink === 'one' ? 'One solid colour' : 'Original colours'} · black ${st.blkOn ? st.blk + '%' : 'as is'}`,
+  inkGroup: () => `${INK_NAMES[st.ink] || 'Original colours'} · black ${st.blkOn ? st.blk + '%' : 'as is'}`,
   edgeGroup: () => { const p = []; if (st.hard && st.finish !== 'cut') p.push(`hard ${st.hard}%`); if (st.fade && st.finish !== 'cut') p.push(`fade ${st.fade} mm ${st.fadeDir === 'spread' ? 'out, spread' : st.fadeDir === 'out' ? 'out' : 'in'}`); if (st.edge) p.push(`trim ${st.edge} px`); if (st.back) p.push(`edge ${st.back} px`); return p.length ? p.join(' · ').replace(/^./, c => c.toUpperCase()) : 'Off'; },
   touchGroup: () => art && art.strokesN ? `${art.strokesN} touch-up${art.strokesN === 1 ? '' : 's'}` : 'None',
   checkGroup: () => checkWarns ? `${checkWarns} to check` : 'Ready'
@@ -6379,7 +6485,7 @@ function stepDone(g){
   syncFoldAll();
 }
 const DEFAULTS = {look: 'knock', lpi: 30, angle: 22.5, shape: 'round', k0: 10, k1: 70, ktol: 8, mid: 0, con: 0, drop: 14, solid: 88,
-                  ink: 'art', inkHex: '#ffffff', shirt: '#111111', finish: 'cut', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, noise: 0, pale: 0, skin: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, dtg: false, dtgHex: 'shirt', clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
+                  ink: 'art', inkHex: '#ffffff', inks: '', shirt: '#111111', finish: 'cut', cut: 50, hard: 0, edge: 0, etol: 30, emode: 'any', back: 0, backHex: null, fade: 0, fadeDir: 'in', sharp: 0, sradius: 1, noise: 0, pale: 0, skin: 0, bgOn: false, bgTol: 12, bgHex: null, thruOn: false, thruHex: '#ffffff', thruFloor: 4, dtg: false, dtgHex: 'shirt', clean: false, hb: 0, hg: 1, hw: 100, hob: 0, how: 100, rich: false, crisp: true, speck: true};
 function resetToDefaults(){ // every setting back to the start, the crop and size as opened; one History step, so Undo brings it all back
   if (cropping) endCrop(false);
   if (picking) endPick();
@@ -6417,7 +6523,7 @@ const STEP_RESETS = {
   sharpGroup: {name: 'Sharpen & smooth', vals: () => ({...SHARP_KEYS})},
   touchGroup: {name: 'Touch up', same: () => !art || !art.strokesN, reset: () => { art.strokesN = 0; rebuildEdits(art); buildSrcSoon(); }},
   toneGroup: {name: 'Ink density', vals: () => ({mid: lookVal('mid'), con: lookVal('con'), ...densVals('std'), ...HLV0})},
-  inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex})}
+  inkGroup: {name: 'Ink colour', vals: () => ({ink: DEFAULTS.ink, inkHex: DEFAULTS.inkHex, inks: ''})}
 };
 function stepIsReset(id){ const r = STEP_RESETS[id]; if (r.same) return r.same(); const v = r.vals(); return Object.keys(v).every(k => st[k] === v[k]); }
 function syncResets(){ for (const b of document.querySelectorAll('.step-reset')) b.hidden = stepIsReset(b.dataset.reset); }
@@ -7556,8 +7662,8 @@ async function geFile(src, name){
   const b = await r.blob(), n = name || (/^data:|^blob:/i.test(src) ? 'art.png' : decodeURIComponent(src.split(/[?#]/)[0].split('/').pop() || 'art.png'));
   return new File([b], n, {type: b.type || 'image/png'});
 }
-const GE_TYPES = {knock: 'hex?', backHex: 'hex?', bgHex: 'hex?', shirt: 'hex', inkHex: 'hex', thruHex: 'hex', flatBgHex: 'hex', dtgHex: 'shirtOrHex', flatDrop: 'text'};
-const GE_WORDS = {finish: ['cut', 'dots'], ink: ['art', 'one'], shape: ['round', 'ellipse', 'line', 'square'], emode: ['any', 'near'], fadeDir: ['in', 'out', 'spread'], flatBg: ['auto', 'black', 'white', 'own', 'off'],
+const GE_TYPES = {knock: 'hex?', backHex: 'hex?', bgHex: 'hex?', shirt: 'hex', inkHex: 'hex', inks: 'text', thruHex: 'hex', flatBgHex: 'hex', dtgHex: 'shirtOrHex', flatDrop: 'text'};
+const GE_WORDS = {finish: ['cut', 'dots'], ink: ['art', 'one', 'two', 'three'], shape: ['round', 'ellipse', 'line', 'square'], emode: ['any', 'near'], fadeDir: ['in', 'out', 'spread'], flatBg: ['auto', 'black', 'white', 'own', 'off'],
   look: [...new Set(Object.keys(LOOK_TEXT.dots).concat(Object.keys(LOOK_TEXT.cut)))]};
 function geCheck(changes){ // only real settings, of the right kind
   const out = {};
