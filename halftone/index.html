@@ -646,6 +646,23 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .tdrop-pop.menu .btn:hover{background:var(--soft)}
 .tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
 .mv-menu{min-width:190px}
+#tabsAll{flex:none;align-self:center;margin-bottom:2px}
+#tabsAllBtn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tdrop-pop.tabs-pop{width:min(420px,calc(100vw - 24px));padding:0;z-index:12}
+.tabs-pop-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-bottom:1px solid var(--line);font-size:14px}
+.tabs-pop-list{display:grid;max-height:min(60vh,520px);overflow:auto}
+.tabs-row{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+.tabs-row:last-child{border-bottom:0}
+.tabs-row.on{background:var(--soft)}
+.tabs-go{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 12px;border:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.tabs-go:hover,.tabs-x:hover{background:var(--soft)}
+.tabs-go img,.tabs-nopic{flex:none;width:44px;height:44px;border-radius:var(--r);border:1px solid var(--line-strong);object-fit:cover;background:var(--soft)}
+.tabs-t{display:grid;gap:2px;min-width:0}
+.tabs-t b{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs-t span{font-size:13px;color:var(--muted)}
+.tabs-row.on .tabs-t b{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+.tabs-x{flex:none;width:48px;border:0;border-left:1px solid var(--line);background:none;color:var(--muted);font:inherit;font-size:20px;cursor:pointer}
+.tabs-x:hover{color:var(--ink)}
 .chk-acts{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
 .chk-chg b{color:var(--ink)}
 .chk-bulk{grid-column:1/-1;display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap;padding:12px 16px;border:2px solid var(--ink);border-radius:var(--r);background:var(--soft);font-size:15px;font-weight:600}
@@ -931,6 +948,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <div class="stage-col">
       <div class="tabs" id="tabs">
         <div class="tabs-list" id="tabsList" role="tablist" aria-label="Open designs"></div>
+        <div class="tdrop right" data-tdrop="tabs" data-stay id="tabsAll" hidden><button class="link tdrop-btn" type="button" id="tabsAllBtn" aria-haspopup="true" aria-expanded="false" data-tip="Every open design in one list: go to one, or close the ones you’re done with."><span id="tabsAllTxt">All tabs</span><i class="car" aria-hidden="true"></i></button><div class="tdrop-pop tabs-pop" id="tabsAllPop" hidden></div></div>
         <div class="tabs-actions" id="tabsActions" hidden><button class="link" type="button" id="allApplyBtn">Copy settings to all</button><button class="link" type="button" id="allSaveBtn">Save all</button></div>
       </div>
       <div class="stage-bar">
@@ -5079,7 +5097,34 @@ function renderTabs(){
       `${artThumb(a) ? `<img class="tab-pic" src="${artThumb(a)}" alt="">` : ''}${dirty ? '<span class="tab-dot" aria-hidden="true"></span>' : ''}<span class="tab-t">${esc(name)}</span></button>` +
       (docs.length > 1 || (a && !a.isSample) ? `<button class="tab-x" type="button" data-close="${d.id}" aria-label="Close ${esc(name)}" data-tip="Close this design">×</button>` : '') + '</div>';
   }).join('') + '<button class="tab-add" type="button" id="tabAdd" aria-label="Open art in a new tab" data-tip="Open art in a new tab. Dropping or pasting art opens a new tab too.">+</button>';
+  syncTabsAll();
+  const on = $('tabsList').querySelector('.tab.on'), L = $('tabsList'); // the design on screen is always in view in the strip
+  if (on && L.scrollWidth > L.clientWidth){ const a = on.offsetLeft - L.offsetLeft, b = a + on.offsetWidth; if (a < L.scrollLeft) L.scrollLeft = a - 8; else if (b > L.scrollLeft + L.clientWidth) L.scrollLeft = b - L.clientWidth + 8; }
 }
+/* All tabs: every open design in one list */
+const TABS_ALL_FROM = 4;
+function syncTabsAll(){
+  const real = docs.filter(d => { const a = d === cur ? art : d.art; return a && !a.isSample; }), show = docs.length >= TABS_ALL_FROM;
+  $('tabsAll').hidden = !show; if (!show){ $('tabsAllPop').hidden = true; $('tabsAllBtn').setAttribute('aria-expanded', 'false'); return; }
+  $('tabsAllTxt').textContent = `All tabs (${docs.length})`;
+  const saved = real.filter(d => d !== cur && !d.unsaved);
+  $('tabsAllPop').innerHTML = `<div class="tabs-pop-head"><b>${docs.length} of ${MAX_DOCS} designs open</b><button class="btn small" type="button" data-tabs-clear${saved.length ? '' : ' disabled'} data-tip="Closes every design with nothing unsaved. The one on screen stays open.">Close the saved ones${saved.length ? ` (${saved.length})` : ''}</button></div><div class="tabs-pop-list" role="list">` +
+    docs.map(d => { const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample, cm = d === cur ? st.widthCm : d.snap && d.snap.w;
+      return `<div class="tabs-row${d === cur ? ' on' : ''}" role="listitem"><button class="tabs-go" type="button" data-go="${d.id}"${d === cur ? ' aria-current="true"' : ''}>${artThumb(a) ? `<img src="${artThumb(a)}" alt="">` : '<span class="tabs-nopic"></span>'}<span class="tabs-t"><b>${esc(name)}</b><span>${a && cm ? `${toMm(cm)} × ${toMm(cm*a.h/a.w)} mm` : ''}${d === cur ? ' · on screen' : ''}${dirty ? ' · not saved' : ''}${d.batch ? ' · from Batch' : ''}</span></span></button>` +
+        (docs.length > 1 || (a && !a.isSample) ? `<button class="tabs-x" type="button" data-shut="${d.id}" aria-label="Close ${esc(name)}">×</button>` : '') + '</div>'; }).join('') + '</div>';
+}
+$('tabsAllBtn').addEventListener('click', () => setTimeout(() => { const L = $('tabsAllPop').querySelector('.tabs-pop-list'), on = L && L.querySelector('.tabs-row.on'); if (on && !$('tabsAllPop').hidden) L.scrollTop = Math.max(0, on.offsetTop - L.offsetTop - L.clientHeight/2 + on.offsetHeight/2); }, 0)); // the design on screen is in view when the list opens
+$('tabsAllPop').addEventListener('click', e => {
+  e.stopPropagation(); // the list redraws itself, so it decides for itself when to close
+  const go = e.target.closest('[data-go]'), shut = e.target.closest('[data-shut]');
+  if (go){ const d = docs.find(d => d.id === +go.dataset.go); dropClose(); if (d) switchTo(d); return; }
+  if (shut){ const d = docs.find(d => d.id === +shut.dataset.shut); if (d){ if (d === cur || d.unsaved) dropClose(); closeDoc(d); } return; }
+  if (e.target.closest('[data-tabs-clear]')){
+    const gone = docs.filter(d => d !== cur && d.art && !d.art.isSample && !d.unsaved); if (!gone.length) return;
+    for (const d of gone) closeDoc(d);
+    toast(`${gone.length} saved design${gone.length === 1 ? '' : 's'} closed.`);
+  }
+});
 $('tabs').addEventListener('click', e => {
   const x = e.target.closest('[data-close]'); if (x){ const d = docs.find(d => d.id === +x.dataset.close); if (d) closeDoc(d); return; }
   const t = e.target.closest('[data-doc]'); if (t){ const d = docs.find(d => d.id === +t.dataset.doc); if (d) switchTo(d); return; }
