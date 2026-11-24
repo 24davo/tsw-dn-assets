@@ -646,6 +646,19 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .tdrop-pop.menu .btn:hover{background:var(--soft)}
 .tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
 .mv-menu{min-width:190px}
+.chk-acts{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
+.chk-chg b{color:var(--ink)}
+.chk-bulk{grid-column:1/-1;display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap;padding:12px 16px;border:2px solid var(--ink);border-radius:var(--r);background:var(--soft);font-size:15px;font-weight:600}
+.chk-bulk span{flex:1 1 240px}
+.ball{display:grid;gap:12px;padding:16px;background:var(--soft);border:2px solid var(--ink);border-radius:var(--r)}
+.ball-title{margin:0;font-size:18px;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--ink)}
+.ball-note{margin:0;font-size:14px;color:var(--muted)}
+.ball .bg-quick > span:first-child{min-width:104px}
+.ball select{height:34px;max-width:100%}
+.ball-dup b{font-size:14px}
+.ball-say{flex:1 1 280px;font-weight:500;color:var(--muted)}
+.ball .bg-head + .ball-note + .bg-quick ~ .ball-dup,.ball .bg-quick ~ .ball-dup{padding-top:12px;border-top:1px solid var(--line)}
+.bi-dup{font-weight:700;color:var(--ink)}
 .batch.chk{z-index:16}
 #chkBody{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
 .chk-head{grid-column:1/-1;margin:8px 0 0;font-size:16px;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--ink)}
@@ -902,7 +915,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
       <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
     </div>
   </header>
-  <div class="batch-note" id="batchNote" hidden><span id="batchNoteTxt"></span><button class="btn" type="button" id="batchNoteBack">Back to Batch, no change</button><button class="btn primary" type="button" id="batchNoteUse">Use for the group</button></div>
+  <div class="batch-note" id="batchNote" hidden><span id="batchNoteTxt"></span><button class="btn" type="button" id="batchNoteBack">Back to Batch, no change</button><button class="btn" type="button" id="batchNoteOne" data-tip="Only this file takes these settings. It moves to a group of its own, right under its old group, and the other files stay as they are.">Use for this file only</button><button class="btn primary" type="button" id="batchNoteUse">Use for the group</button></div>
 
   <main class="work">
     <section class="welcome" id="welcome" aria-labelledby="wTitle" hidden>
@@ -1618,6 +1631,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <button class="btn primary" type="button" id="batchRun" disabled data-tip="Works out every ticked group that is set up, and saves one zip with a folder for each group.">Process ticked groups</button>
     <button class="btn" type="button" id="batchToGang" disabled data-tip="Works out every ticked group that is set up and puts the prints on a gang sheet, where you set how many of each.">Send ticked to a sheet</button>
     <button class="btn" type="button" id="batchCheck" disabled hidden data-tip="Works out every ticked group that is set up, then asks Claude to look at each result and flag the ones that need a hand. Nothing is saved or changed.">Check with Claude</button>
+    <button class="btn" type="button" id="batchCheckLast" hidden data-tip="Opens the last check again, as it was. Nothing is sent again.">Back to Claude’s check</button>
     <button class="btn" type="button" id="batchJoin" disabled data-tip="Puts the files of every ticked group into one group, like names that each arrived as a group of their own. Untick the groups to leave out first.">Join ticked groups</button>
     <button class="btn" type="button" id="batchUndo" disabled>Undo</button>
     <button class="btn" type="button" id="batchNew">New group</button>
@@ -6619,7 +6633,7 @@ async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; ans
     const tb = batchTrimOf(im, w, h); URL.revokeObjectURL(url);
     let thumb = ''; try { thumb = c.toDataURL('image/png'); } catch(e){}
     const mm = Math.round(+x.widthMm) || 0;
-    g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), lab: String(x.label || '').slice(0, 160), labShort: String(x.labelShort || '').slice(0, 60), w, h, tb, thumb, file, on: true, mm, kept: false});
+    g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), lab: String(x.label || '').slice(0, 160), labShort: String(x.labelShort || '').slice(0, 60), w, h, tb, thumb, file, on: true, mm, kept: false, sig: await batchSig(file)});
     { const it = g.items[g.items.length - 1]; it.orders = artIds(x.orders); if (it.orders.length) artGot(it.orders, 'b:' + it.key); }
     out.count++;
   }
@@ -6771,17 +6785,93 @@ function batchSplit(g){ // the ticked files leave for a group of their own, righ
   for (const x of g.items) x.on = true;
   return ng;
 }
-function batchShow(){ hideWelcome(); $('batch').hidden = false; renderBatch(); chkStatus(); }
+/* A file's fingerprint: its length and two running sums over every byte. Two files with the same one are the same file. */
+async function batchSig(file){
+  try { const a = new Uint8Array(await file.arrayBuffer()); let h1 = 0x811c9dc5, h2 = 0x1b873593;
+    for (let i = 0; i < a.length; i++){ h1 = Math.imul(h1 ^ a[i], 0x01000193); h2 = (Math.imul(h2 + a[i], 0x85ebca6b) ^ (h2 >>> 13)) | 0; }
+    return a.length + ':' + (h1 >>> 0).toString(36) + ':' + (h2 >>> 0).toString(36);
+  } catch(e){ return ''; }
+}
+let batchSigBusy = false;
+async function batchSigs(){ // files kept from an earlier visit get their fingerprint here
+  if (batchSigBusy) return; batchSigBusy = true; let any = false;
+  try { for (const g of [...batchGroups]) for (const it of [...g.items]) if (it.sig === undefined && it.file){ it.sig = await batchSig(it.file); any = true; } } catch(e){}
+  batchSigBusy = false; if (any) renderBatch();
+}
+function batchDupes(){ // copy -> the first file in the batch with the same fingerprint
+  const first = new Map(), copy = new Map();
+  for (const g of batchGroups) for (const it of g.items){ if (!it.sig) continue; const f = first.get(it.sig); if (f) copy.set(it, f); else first.set(it.sig, it); }
+  return copy;
+}
+const batchAllTargets = () => batchGroups.filter(g => g.on && !g.locked);
+function batchAllStrip(dup){
+  const many = batchGroups.length > 1, copies = dup.size; if (!many && !copies) return '';
+  const T = batchAllTargets(), ticked = batchGroups.filter(g => g.on).length, locked = ticked - T.length;
+  const same = f => T.length && T.every(g => f(g) === f(T[0])) ? f(T[0]) : null;
+  let html = '<section class="ball">';
+  if (many){
+    const fit = same(g => g.fit), mm = same(g => !batchSized(g) ? '' : g.fit === 's' ? String(toMm(batchCm(g, batchWidestIt(g)))) : String(round1(g.fitMm))), trimAll = T.length > 0 && T.every(g => g.trim), trimSome = T.some(g => g.trim), quick = same(g => g.quick || ''), pre = same(g => g.preset ? g.preset.where + '|' + g.preset.name : '');
+    const off = T.length ? '' : ' disabled';
+    html += `<div class="bg-head"><h3 class="ball-title">All ticked groups</h3><span class="bg-count">${ticked} of ${batchGroups.length} groups ticked${locked ? ` · ${locked} locked, left as ${locked === 1 ? 'it is' : 'they are'}` : ''}</span><span class="bg-grow"></span>
+      <button class="link" type="button" data-act="alltick">Tick all groups</button><button class="link" type="button" data-act="allnone">Untick all groups</button></div>
+    <p class="ball-note">${T.length ? `A change here goes to ${T.length === 1 ? 'the one ticked group' : `all ${T.length} ticked groups`} at once. Undo takes it back in one step.` : 'Tick the groups to change, then set them all here in one go.'}</p>
+    <div class="bg-quick"><span>Speed buttons</span>${batchQuicks().map(Q => `<button class="chip" type="button" data-act="allquick" data-q="${Q.q}" aria-pressed="${quick === Q.q[0] + ':' + Q.label}"${off} data-tip="${esc(Q.tip)}">${esc(Q.label)}</button>`).join('')}</div>
+    <div class="bg-quick"><span>Preset</span><select data-allpreset aria-label="Preset for all ticked groups"${off}>${batchPresetOpts({preset: pre && T[0].preset ? T[0].preset : null})}</select></div>
+    <div class="bg-quick"><span>Print size</span>
+      <select data-allfit aria-label="How all ticked groups are sized"${off}><option value=""${fit ? '' : ' selected'}>${T.length > 1 && !fit ? 'Mixed' : 'Choose…'}</option><option value="s"${fit === 's' ? ' selected' : ''}>One scale, set by the widest file</option><option value="w"${fit === 'w' ? ' selected' : ''}>Every file the same width</option><option value="h"${fit === 'h' ? ' selected' : ''}>Every file the same height</option></select>
+      <label class="bg-w"><input type="number" inputmode="decimal" min="5" max="500" step="1" data-allw value="${mm || ''}" placeholder="${mm === null && T.length > 1 ? 'mixed' : 'mm'}"${off}> mm ${fit === 'h' ? 'tall' : fit ? 'wide' : ''}</label>
+      <label class="bg-trim"><input type="checkbox" data-alltrim ${trimAll ? 'checked' : ''}${trimSome && !trimAll ? ' data-mixed' : ''}${off}> Trim each file to its art</label></div>`;
+  }
+  if (copies){
+    const on = [...dup.keys()].filter(it => it.on).length, designs = new Set([...dup.values()]).size;
+    html += `<div class="bg-quick ball-dup"><span>Same files</span><b>${copies} file${copies === 1 ? ' is an exact copy' : 's are exact copies'} of ${designs === 1 ? 'another file' : 'other files'} here.</b>
+      <span class="ball-say">${on ? 'Keep one of each to work out, save and check each design once. Left ticked, a copy saves in every folder.' : 'The copies are unticked, so each design is done once.'}</span>
+      <button class="btn small" type="button" data-act="dupone"${on ? '' : ' disabled'}>Keep one of each</button><button class="link" type="button" data-act="dupall"${on === copies ? ' disabled' : ''}>Tick the copies again</button></div>`;
+  }
+  return html + '</section>';
+}
+function batchAllClick(b){
+  const act = b.dataset.act;
+  if (act === 'alltick' || act === 'allnone'){ batchMark(`${act === 'alltick' ? 'ticked' : 'unticked'} all groups`); for (const g of batchGroups) g.on = act === 'alltick'; }
+  else if (act === 'allquick'){ const T = batchAllTargets(); if (!T.length) return; batchMark(`the Speed button on ${T.length} group${T.length === 1 ? '' : 's'}`); for (const g of T) batchUseQuick(g, b.dataset.q); batchBar(`${b.textContent} set on ${T.length} group${T.length === 1 ? '' : 's'}.`); }
+  else if (act === 'dupone' || act === 'dupall'){
+    const dup = batchDupes(); let n = 0, held = 0;
+    batchMark(act === 'dupone' ? 'kept one of each same file' : 'ticked the copies again');
+    if (act === 'dupall'){ for (const g of batchGroups) for (const it of g.items) if (dup.has(it) && !it.on){ if (g.locked) held++; else { it.on = true; n++; } } }
+    else { const kept = new Set(), many = new Set([...dup.values()].map(it => it.sig)); // the first ticked one of each stays; a locked group's ticks can't change
+      for (const g of batchGroups) for (const it of g.items) if (it.on && many.has(it.sig) && g.locked) kept.add(it.sig);
+      for (const g of batchGroups) for (const it of g.items){ if (!it.on || !many.has(it.sig) || g.locked) continue; if (kept.has(it.sig)){ it.on = false; n++; } else kept.add(it.sig); } }
+    batchBar(act === 'dupone' ? (n ? `${n} cop${n === 1 ? 'y' : 'ies'} unticked. Each design is done once.` : 'Each design is already ticked once.') : `${n} cop${n === 1 ? 'y' : 'ies'} ticked again.` + (held ? ` ${held} in locked groups left as ${held === 1 ? 'it is' : 'they are'}.` : ''));
+  }
+  else return;
+  batchKeepSoon(); renderBatch();
+}
+function batchAllChange(T){
+  const G = batchAllTargets(); if (!G.length){ renderBatch(); return; }
+  const n = `${G.length} group${G.length === 1 ? '' : 's'}`;
+  if (T.hasAttribute('data-allpreset')){ if (!T.value) return; batchMark(`the preset on ${n}`); for (const g of G) batchUsePreset(g, T.value); batchBar(`Preset set on ${n}.`); }
+  else if (T.hasAttribute('data-allfit')){ if (!T.value){ renderBatch(); return; } batchMark(`how ${n} are sized`); for (const g of G){ batchFit(g, T.value); for (const x of g.items) x.saved = false; } }
+  else if (T.hasAttribute('data-alltrim')){ batchMark(`trim on ${n}`); for (const g of G){ g.trim = T.checked; for (const x of g.items) x.saved = false; } batchBar(`Trim ${T.checked ? 'on' : 'off'} for ${n}.`); }
+  else if (T.hasAttribute('data-allw')){
+    const v = parseFloat(T.value); if (!(v > 0)){ renderBatch(); return; }
+    batchMark(`the print size of ${n}`); let done = 0;
+    for (const g of G){ const widest = batchWidest(g); if (!widest) continue; if (g.fit === 's') g.scale = Math.min(v, 500)/10/widest; else g.fitMm = round1(Math.min(v, 500)); g.scaleFrom = 'user'; for (const x of g.items) x.saved = false; done++; }
+    batchBar(`${round1(Math.min(v, 500))} mm set on ${done} group${done === 1 ? '' : 's'}.`);
+  }
+  else return;
+  batchKeepSoon(); renderBatch();
+}
+function batchShow(){ hideWelcome(); $('batch').hidden = false; renderBatch(); chkStatus(); batchSigs(); }
 function renderBatch(){
   syncBatchTools();
   const run = batchGroups.filter(g => g.on && batchReady(g)).length;
-  $('batchCheck').disabled = !run; $('batchToGang').disabled = !run; $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
+  $('batchCheckLast').hidden = !chkItems.length; $('batchCheck').disabled = !run; $('batchToGang').disabled = !run; $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
   if ($('batch').hidden) return;
   if (!batchGroups.length){
     $('batchBody').innerHTML = '<div class="batch-empty"><b>No groups yet</b><p>A group is a set of files that share one set-up, like the back names of an order. An order sent from the Workboard arrives here already in its groups. For anything else, start a group and add its files, or drop files or a zip here.</p><button class="btn primary" type="button" data-act="first">Start a group and add files</button></div>';
     return;
   }
-  const quicks = batchQuicks(), picked = batchPicked();
+  const quicks = batchQuicks(), picked = batchPicked(), dup = batchDupes();
   const card = g => {
     const L = g.locked, sized = batchSized(g), on = g.items.filter(it => it.on), ready = on.filter(it => !batchTooBig(g, it)), W = batchWidestIt(g), some = on.length > 0 && on.length < g.items.length;
     const set = g.snap ? `<b>${esc(g.desc || 'Set up')}</b>` : '<b>Not set up yet.</b>' + (L ? '' : ' Pick a preset or a Speed button, or set it up on a file.');
@@ -6793,7 +6883,7 @@ function renderBatch(){
           <div class="bi-pic"${L ? '' : ' data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up."'}>${it.thumb ? `<img src="${it.thumb}" alt="" draggable="false">` : ''}</div>
           <input class="bi-tick" type="checkbox" ${it.on ? 'checked' : ''}${L ? ' disabled' : ''} aria-label="Include ${esc(it.name)}">
           ${L ? '' : `<button class="bi-x" type="button" data-act="drop" aria-label="Remove ${esc(it.name)}">×</button>`}
-          <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}
+          <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${dup.has(it) ? `<div class="bi-note bi-dup" title="The same file as ${esc(dup.get(it).name)}">Same file as ${esc(dup.get(it).name)}</div>` : ''}${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}
           <div class="bi-row">${big ? '<span class="bi-warn">Over 400 × 500 mm</span>' : `<span>${sized ? `${toMm(cm)} × ${toMm(cm*b.h/b.w)} mm` : `${b.w} × ${b.h} px`}</span>`}${it.saved ? '<span>Saved</span>' : ''}</div></div>`;
       }).join('')}</div>`;
     const tick = `<input class="bg-tick" type="checkbox" ${g.on ? 'checked' : ''} aria-label="Include the group ${esc(g.name)} in Process ticked groups" data-tip="Ticked groups are worked out together by Process ticked groups.">`;
@@ -6827,19 +6917,21 @@ function renderBatch(){
       ${grid}</section>`;
   };
   const orders = batchOrderList();
-  $('batchBody').innerHTML = orders.map((o, i) => {
+  $('batchBody').innerHTML = batchAllStrip(dup) + orders.map((o, i) => {
     const gs = batchGroups.filter(g => g.order === o), files = gs.reduce((n, g) => n + g.items.length, 0), note = (gs.find(g => g.orderNote) || {}).orderNote;
     const head = o || orders.length > 1 ? `<div class="bo-head" data-o="${i}"><h3>${o ? esc(o) : 'Other groups'}</h3>
       <span class="bg-count">${gs.length} group${gs.length === 1 ? '' : 's'} · ${files} file${files === 1 ? '' : 's'}${note ? ' · ' + esc(note) : ''}</span><span class="bg-grow"></span>
       <button class="link" type="button" data-act="oall">Tick all groups</button><button class="link" type="button" data-act="onone">Untick all groups</button><button class="link" type="button" data-act="odel">Remove ${o ? 'this order' : 'these groups'}</button></div>` : '';
     return head + gs.map(card).join('');
   }).join('');
+  const mixed = $('batchBody').querySelector('[data-alltrim][data-mixed]'); if (mixed) mixed.indeterminate = true;
 }
 const batchFind = el => { const card = el.closest('.bgroup'), g = card && batchGroups.find(g => g.id === +card.dataset.g), cell = el.closest('.bitem'); return {g, it: g && cell ? g.items.find(it => it.key === cell.dataset.k) : null}; };
 $('batchBody').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || batchBusy) return;
   const act = b.dataset.act;
   if (act === 'first'){ batchAddTo = batchGroup(); renderBatch(); $('batchIn').click(); return; }
+  if (b.closest('.ball')){ batchAllClick(b); return; }
   const head = b.closest('.bo-head');
   if (head){
     const o = batchOrderList()[+head.dataset.o], gs = batchGroups.filter(g => g.order === o);
@@ -6882,6 +6974,7 @@ $('batchBody').addEventListener('click', e => {
   batchKeepSoon(); renderBatch();
 });
 $('batchBody').addEventListener('change', e => {
+  if (e.target.closest('.ball')){ batchAllChange(e.target); return; }
   const {g, it} = batchFind(e.target); if (!g) return;
   const T = e.target;
   if (T.classList.contains('bg-tick') || !g.locked) batchMark(T.classList.contains('bg-tick') ? `the tick on the group “${g.name}”` : T.classList.contains('bi-tick') && it ? `the tick on ${it.name}` : T.classList.contains('bg-name') ? `renamed “${g.name}”`
@@ -6977,22 +7070,38 @@ async function batchSetup(g, it){
 }
 function syncBatchNote(){
   const b = cur && cur.batch, g = b && batchGroups.find(g => g.id === b.g);
-  $('batchNote').hidden = !g;
-  if (g) $('batchNoteTxt').textContent = `Setting up the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Choose the preset or settings and the print size on this file. Every ticked file gets the same settings, sized the way the group is set.`;
+  $('batchNote').hidden = !g; $('batchNoteOne').hidden = !g || g.items.length < 2 || g.locked;
+  $('batchNoteBack').textContent = g && b.fromChk ? 'Back to Claude’s check, no change' : 'Back to Batch, no change';
+  if (g && b.fromChk){ const it = g.items.find(x => x.key === b.key); $('batchNoteTxt').textContent = `From Claude’s check: ${it ? it.name : 'this design'}, in the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Change it here, then choose whether the change is for this file only or the whole group.`; }
+  else if (g) $('batchNoteTxt').textContent = `Setting up the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Choose the preset or settings and the print size on this file. Every ticked file gets the same settings, sized the way the group is set.`;
 }
 function batchLeaveTab(){ // closes the set-up tab without questions and goes back to the Batch screen
   const d = cur; if (!d || !d.batch) return;
-  clearTimeout(stepTimer); unsaved = false; d.unsaved = false; d.batch = null;
+  const toChk = !!d.batch.fromChk; clearTimeout(stepTimer); unsaved = false; d.unsaved = false; d.batch = null;
   const i = docs.indexOf(d);
   if (docs.length > 1){ docs.splice(i, 1); cur = null; loadDoc(docs[Math.min(i, docs.length - 1)]); }
   else { docs = []; cur = null; art = null; renderTabs(); sampleArt().then(c => { if (!art){ setArt(c, c.width, c.height, 'Sample art', true, DPI); art.quiet = true; art.thruTold = true; } }); }
   forgetDoc(d); d.art = null; d.steps = null;
   batchShow();
+  if (toChk && chkItems.length) chkOpen();
 }
 $('batchNoteBack').addEventListener('click', batchLeaveTab);
-$('batchNoteUse').addEventListener('click', () => {
-  const b = cur && cur.batch, g = b && batchGroups.find(g => g.id === b.g); if (!g || !art) return;
+$('batchNoteUse').addEventListener('click', () => batchNoteApply(false));
+$('batchNoteOne').addEventListener('click', () => batchNoteApply(true));
+function batchNoteApply(one){
+  const b = cur && cur.batch; let g = b && batchGroups.find(g => g.id === b.g); if (!g || !art) return;
   commitStep();
+  if (one){ // this file leaves for a group of its own, right under its old one, at the same size
+    const it0 = g.items.find(x => x.key === b.key);
+    if (it0 && g.items.length > 1 && !g.locked){
+      batchMark(`set up ${it0.name} on its own`);
+      const ng = batchGroup(`${g.name.slice(0, 36)} · ${it0.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 20)}`, '', g.order, g.orderNote);
+      batchGroups.pop(); batchGroups.splice(batchGroups.indexOf(g) + 1, 0, ng);
+      Object.assign(ng, {scale: g.scale, scaleFrom: g.scale ? 'user' : '', fit: g.fit, fitMm: g.fitMm, trim: g.trim, on: g.on});
+      if (g.scale) g.scaleFrom = 'user';
+      g.items.splice(g.items.indexOf(it0), 1); ng.items.push(it0); it0.on = true; b.g = ng.id; g = ng;
+    }
+  }
   const src = snapshot(), opt = $('presetSel').selectedOptions[0];
   g.snap = {s: src.s, lv: src.lv, rules: src.rules.filter(R => !R.area)};
   const it = g.items.find(x => x.key === b.key), f = it ? it.w/art.fullW : 1, full = art.crop.x === 0 && art.crop.y === 0 && art.crop.w >= art.fullW && art.crop.h >= art.fullH;
@@ -7003,8 +7112,8 @@ $('batchNoteUse').addEventListener('click', () => {
   g.desc = (opt && $('presetSel').value ? opt.textContent.trim() + ' · ' : '') + lookName() + (st.finish === 'cut' ? ' · clean cut' : ` · ${st.lpi} lpi`);
   for (const it of g.items) it.saved = false;
   batchKeepSoon(); batchLeaveTab();
-  toast(`“${g.name}” is set up. Tick the files and save.`);
-});
+  toast(one ? `“${g.name}” has its own set-up now.` : `“${g.name}” is set up. Tick the files and save.`);
+}
 
 // a zip with the files stored as they are (PNGs are already packed)
 async function makeZip(files){
@@ -7027,13 +7136,13 @@ async function makeZip(files){
 /* Save: each ticked file is put through the editor in turn (off the tabs, so nothing there changes), worked out at its
    group's settings and scale. One group saves a zip named after the group. Process ticked groups (whole) saves every
    ticked group in one zip, a folder for each group, named after the order when they share one. */
-async function batchSave(groups, whole, toSheet){ // toSheet: the finished prints go to the gang sheet, not a zip
+async function batchSave(groups, whole, toSheet, only){ // toSheet: the finished prints go to the gang sheet, not a zip; only: just these files (a Set of keys)
   if (batchBusy || saving) return;
   const notSet = groups.filter(g => g.items.some(it => it.on) && !(g.snap && batchSized(g))).length;
   groups = groups.filter(g => g.snap && batchSized(g));
   const jobs = []; let left = 0;
-  for (const g of groups) for (const it of g.items) if (it.on){ if (batchTooBig(g, it)) left++; else jobs.push({g, it}); }
-  if (!jobs.length) return;
+  for (const g of groups) for (const it of g.items) if (it.on && (!only || only.has(it.key))){ if (batchTooBig(g, it)) left++; else jobs.push({g, it}); }
+  if (!jobs.length){ if (only) toast('That file isn’t ticked or set up in the batch any more.'); return; }
   batchBusy = true; batchStopped = false; saving = true; $('saveBtn').disabled = true;
   $('batchBusyTxt').textContent = `Working out 1 of ${jobs.length}…`; $('batchBusy').hidden = false;
   stashDoc(); clearTimeout(stepTimer);
@@ -7055,7 +7164,7 @@ async function batchSave(groups, whole, toSheet){ // toSheet: the finished print
         await new Promise(r => setTimeout(r, 30));
         for (let n = 0; n < 400; n++){ await idle(); if (outReady) break; await new Promise(r => setTimeout(r, 25)); }
         if (!outReady) throw new Error('not ready');
-        if (toSheet === 'check'){ await new Promise(r => setTimeout(r, 90)); files.push({name: fileName(), blob: null, it, g, check: chkCapture()}); URL.revokeObjectURL(url); continue; }
+        if (toSheet === 'check'){ await new Promise(r => setTimeout(r, 90)); files.push({name: fileName(), blob: null, it, g, check: {...chkCapture(), stamp: chkStamp(g)}}); URL.revokeObjectURL(url); continue; }
         if (toSheet){ if (!await gangAdd(labelled(traceCanvas() || outCanvas), {name: fileName().replace(/\.png$/i, ''), order: g.order || '', orders: it.orders || null, artKey: 'b:' + it.key})) throw new Error('empty'); files.push({name: fileName(), blob: null, it, g}); URL.revokeObjectURL(url); continue; }
         const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('no png')), 'image/png'));
         const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()], ['TSW-Recipe', recipeText()]]);
@@ -7095,7 +7204,7 @@ async function batchSave(groups, whole, toSheet){ // toSheet: the finished print
   if (ok) for (const f of files){ f.it.saved = true; if (f.it.orders && f.it.orders.length) artSaved(f.it.orders, 'b:' + f.it.key); }
   batchBusy = false; saving = false; $('saveBtn').disabled = !outReady; $('batchBusyTxt').textContent = 'Working…'; $('batchBusy').hidden = true;
   batchKeepSoon(); renderBatch();
-  if (toSheet === 'check'){ if (batchStopped) toast('Stopped. Nothing was checked.'); else if (files.length) chkRun(files, failed, left); else toast('Those files couldn’t be worked out.'); return; }
+  if (toSheet === 'check'){ if (batchStopped) toast('Stopped. Nothing was checked.'); else if (files.length) chkRun(files, failed, left, !!only); else toast('Those files couldn’t be worked out.'); if (only && (batchStopped || !files.length) && chkItems.length) chkOpen(); return; }
   if (toSheet && !batchStopped){ if (files.length){ $('batch').hidden = true; $('batchBar').hidden = true; gangShow(); toast(`${files.length} print${files.length === 1 ? '' : 's'} added to the sheet.` + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: too big at this scale.` : '')); } else toast('Those files couldn’t be worked out.'); return; }
   if (batchStopped) toast('Stopped. Nothing was saved.');
   else if (ok && (failed || left || notSet || whole)) toast(`Saved ${files.length} PNG${files.length === 1 ? '' : 's'}` + (whole ? ` from ${done} group${done === 1 ? '' : 's'}` : '') + ' in one zip.' + (failed ? ` ${failed} couldn’t be worked out.` : '') + (left ? ` ${left} left out: over 400 × 500 mm at this scale.` : '') + (notSet ? ` ${notSet} ticked group${notSet === 1 ? ' isn’t' : 's aren’t'} set up yet.` : ''));
@@ -7249,7 +7358,7 @@ async function batchRestore(){
       g.items.push({key: String(x.key), name: String(x.name || 'artwork.png'), note: String(x.note || ''), lab: String(x.lab || '').slice(0, 160), labShort: String(x.labShort || '').slice(0, 60), w: x.w, h: x.h, tb: x.tb && x.tb.w > 0 && x.tb.h > 0 ? {x: +x.tb.x || 0, y: +x.tb.y || 0, w: +x.tb.w, h: +x.tb.h} : x.tb === null ? null : undefined, thumb: /^data:image\/png;base64,/.test(x.thumb || '') ? x.thumb : '', file, on: x.on !== false, mm: +x.mm || 0, kept: true, saved: !!x.saved});
     }
   }
-  renderBatch(); batchTrims();
+  renderBatch(); batchTrims(); batchSigs();
 }
 window.addEventListener('pagehide', () => { if (batchKeepTimer) batchKeepNow(); });
 batchRestore().catch(() => 0);
@@ -7277,17 +7386,28 @@ function chkCapture(){ // the design on screen: a small before | after picture o
     softGlow: box && box.dataset.glow && !isDtg() ? +box.dataset.glow : null, specks: lastSpeck ? lastSpeck[0] : 0, dpi: Math.round(art.w/(wMm/25.4)),
     style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: (lookQuickNow() === 'bg' ? QS_BG[0] : lookName()).slice(0, 60), shirt: st.shirt, settings: settingsText().slice(0, 600)}};
 }
+const chkStamp = g => JSON.stringify([g.snap, g.fit, g.fitMm, g.scale, g.trim]); // the set-up a design is worked out with
+function chkFind(c){ for (const g of batchGroups){ const it = g.items.find(x => x.key === c.key); if (it) return {g, it}; } return {}; }
+const chkChanged = c => { const {g} = chkFind(c); return !!g && c.verdict !== 'wait' && chkStamp(g) !== c.stamp; };
+const chkFlag = c => (c.verdict === 'problem' || c.verdict === 'look') && !c.ignored;
+function chkOpen(){ $('toast').hidden = true; $('chk').hidden = false; chkRender(); $('chkClose').focus(); }
 function chkRender(){
-  const done = chkItems.filter(c => c.verdict !== 'wait').length, flagged = chkItems.filter(c => c.verdict === 'problem' || c.verdict === 'look'), off = chkItems.filter(c => c.verdict === 'off').length;
+  const done = chkItems.filter(c => c.verdict !== 'wait').length, flagged = chkItems.filter(chkFlag), off = chkItems.filter(c => c.verdict === 'off').length, mine = chkItems.filter(c => c.ignored && c.verdict !== 'fine'), changed = chkItems.filter(chkChanged);
   $('chkSum').textContent = chkBusy ? `Claude is looking: ${done} of ${chkItems.length} done.` :
-    `${chkItems.length - off} of ${chkItems.length} design${chkItems.length === 1 ? '' : 's'} checked. ` + (flagged.length ? `${flagged.length} to look at.` : 'None flagged.') + (off ? ` ${off} not checked.` : '') + (chkLeft != null ? ` ${chkLeft} check${chkLeft === 1 ? '' : 's'} left today.` : '') + ' Nothing was saved or changed.';
+    `${chkItems.length - off} of ${chkItems.length} design${chkItems.length === 1 ? '' : 's'} checked. ` + (flagged.length ? `${flagged.length} to look at.` : 'None to look at.') + (mine.length ? ` ${mine.length} marked fine by you.` : '') + (off ? ` ${off} not checked.` : '') + (changed.length ? ` ${changed.length} changed since.` : '') + (chkLeft != null ? ` ${chkLeft} check${chkLeft === 1 ? '' : 's'} left today.` : '');
   $('chkStop').hidden = !chkBusy;
   const rank = {problem: 0, look: 1, off: 2, wait: 3, fine: 4};
-  const card = c => `<article class="chk-card${c.verdict === 'problem' || c.verdict === 'look' ? ' flag' : ''}" data-ref="${c.ref}"><div class="chk-top"><span class="chk-name">${esc(c.name)}</span><span class="chk-tag is-${c.verdict}">${CHK_WORD[c.verdict]}</span></div>` +
-    `<img alt="Before on the left, after on the right" src="${c.pic}">` + (c.reason ? `<p class="chk-why">${esc(c.reason)}</p>` : '') + (CHK_TIPS[c.suggestion] ? `<p class="chk-tip"><b>Try:</b> ${esc(CHK_TIPS[c.suggestion])}</p>` : '') +
-    `<p class="chk-facts">${c.facts.widthMm} × ${c.facts.heightMm} mm · ${c.facts.inkCm2} cm² of ink · about ${c.facts.dpi} dpi · ${esc(c.group)}</p><button class="btn" type="button" data-chk-open>Open in editor</button></article>`;
-  const first = chkItems.filter(c => rank[c.verdict] < 4).sort((a, b) => rank[a.verdict] - rank[b.verdict]), rest = chkItems.filter(c => c.verdict === 'fine');
-  $('chkBody').innerHTML = (first.length ? `<h3 class="chk-head">${chkBusy ? 'In progress and flagged' : 'Look at these first'} (${first.length})</h3>` + first.map(card).join('') : '') + (rest.length ? `<h3 class="chk-head">Fine (${rest.length})</h3>` + rest.map(card).join('') : '');
+  const card = c => { const ch = chkChanged(c), fl = chkFlag(c);
+    return `<article class="chk-card${fl ? ' flag' : ''}" data-ref="${c.ref}"><div class="chk-top"><span class="chk-name">${esc(c.name)}</span>${c.again && c.verdict !== 'wait' ? '<span class="chk-tag is-fine">Checked again</span>' : ''}<span class="chk-tag is-${c.ignored && c.verdict !== 'fine' ? 'fine' : c.verdict}">${c.ignored && c.verdict !== 'fine' ? 'Fine by you' : CHK_WORD[c.verdict]}</span></div>` +
+    `<img alt="Before on the left, after on the right" src="${c.pic}">` + (c.reason ? `<p class="chk-why">${esc(c.reason)}</p>` : '') + (CHK_TIPS[c.suggestion] && !c.ignored ? `<p class="chk-tip"><b>Try:</b> ${esc(CHK_TIPS[c.suggestion])}</p>` : '') +
+    (ch ? '<p class="chk-tip chk-chg"><b>Changed since this check.</b> The picture and verdict are from before the change.</p>' : '') +
+    `<p class="chk-facts">${c.facts.widthMm} × ${c.facts.heightMm} mm · ${c.facts.inkCm2} cm² of ink · about ${c.facts.dpi} dpi · ${esc((chkFind(c).g || {}).name || c.group)}</p>` +
+    `<div class="chk-acts">${ch ? '<button class="btn primary" type="button" data-chk-again>Check again</button>' : ''}<button class="btn" type="button" data-chk-open>Open in editor</button>${fl ? '<button class="btn" type="button" data-chk-ok>Fine as it is</button>' : ''}${c.ignored && c.verdict !== 'fine' ? '<button class="link" type="button" data-chk-flag>Flag it again</button>' : ''}</div></article>`; };
+  const first = chkItems.filter(c => rank[c.verdict] < 4 && !c.ignored).sort((a, b) => rank[a.verdict] - rank[b.verdict]), rest = chkItems.filter(c => c.verdict === 'fine');
+  $('chkBody').innerHTML = (changed.length > 1 && !chkBusy ? `<div class="chk-bulk"><span>${changed.length} designs have changed since they were checked.</span><button class="btn primary" type="button" data-chk-againall>Check the ${changed.length} again</button></div>` : '') +
+    (first.length ? `<h3 class="chk-head">${chkBusy ? 'In progress and flagged' : 'Look at these first'} (${first.length})</h3>` + first.map(card).join('') : '') +
+    (mine.length ? `<h3 class="chk-head">Marked fine by you (${mine.length})</h3>` + mine.map(card).join('') : '') + (rest.length ? `<h3 class="chk-head">Fine (${rest.length})</h3>` + rest.map(card).join('') : '');
+  $('batchCheckLast').hidden = !chkItems.length;
 }
 async function chkAsk(c, batch, again){
   try {
@@ -7301,27 +7421,57 @@ async function chkAsk(c, batch, again){
   } catch(e){ c.verdict = 'off'; c.reason = 'The board couldn’t be reached. Check the connection and try again.'; }
   return '';
 }
-async function chkRun(files, failed, left){
-  const share = files.map(f => f.check.facts.inkShare).sort((a, b) => a - b), mid = share.length % 2 ? share[(share.length - 1)/2] : (share[share.length/2 - 1] + share[share.length/2])/2;
-  chkItems = files.map((f, i) => ({ref: 'c' + (i + 1) + Math.random().toString(36).slice(2, 10), name: f.it.name, group: f.g.name, g: f.g.id, key: f.it.key, pic: f.check.pic, facts: f.check.facts, verdict: 'wait', reason: '', suggestion: 'none'}));
+async function chkRun(files, failed, left, merge){ // merge: a re-check of some designs; their cards update and the rest stay
+  const fresh = (f, i) => ({ref: 'c' + (i + 1) + Math.random().toString(36).slice(2, 10), name: f.it.name, group: f.g.name, g: f.g.id, key: f.it.key, pic: f.check.pic, facts: f.check.facts, stamp: f.check.stamp, verdict: 'wait', reason: '', suggestion: 'none', ignored: false, again: false});
+  let send;
+  if (merge){ send = []; files.forEach((f, i) => { const n = fresh(f, i), at = chkItems.findIndex(c => c.key === n.key); n.again = true; if (at >= 0) chkItems[at] = n; else chkItems.push(n); send.push(n); }); }
+  else { const was = new Map(chkItems.map(c => [c.key, c])); // a design you marked fine stays that way while its set-up hasn't changed
+    chkItems = files.map(fresh); for (const c of chkItems){ const o = was.get(c.key); if (o && o.ignored && o.stamp === c.stamp) c.keepOk = true; } send = chkItems; }
+  const share = chkItems.map(c => c.facts.inkShare).sort((a, b) => a - b), mid = share.length % 2 ? share[(share.length - 1)/2] : (share[share.length/2 - 1] + share[share.length/2])/2;
   chkStopped = false; chkBusy = true; $('toast').hidden = true; $('chk').hidden = false; chkRender(); $('chkClose').focus();
   if (failed || left) toast((failed ? `${failed} couldn’t be worked out. ` : '') + (left ? `${left} left out: too big at this scale.` : ''));
-  const batch = {count: chkItems.length, medianInkShare: +mid.toFixed(1)}, queue = [...chkItems]; let halt = false;
-  const worker = async () => { while (queue.length && !chkStopped && !halt){ const c = queue.shift(); if (await chkAsk(c, batch) === 'halt') halt = true; if (!$('chk').hidden) chkRender(); } };
-  await Promise.all(Array.from({length: Math.min(CHK_AT_ONCE, chkItems.length)}, worker));
-  const why = chkItems.find(c => c.verdict === 'off' && c.reason);
-  for (const c of chkItems) if (c.verdict === 'wait'){ c.verdict = 'off'; c.reason = chkStopped ? 'Stopped before this one was checked.' : (why ? why.reason : 'Not checked.'); }
+  const batch = {count: chkItems.length, medianInkShare: +mid.toFixed(1)}, queue = [...send]; let halt = false;
+  const worker = async () => { while (queue.length && !chkStopped && !halt){ const c = queue.shift(); if (await chkAsk(c, batch) === 'halt') halt = true; if (c.keepOk && (c.verdict === 'problem' || c.verdict === 'look')) c.ignored = true; if (!$('chk').hidden) chkRender(); } };
+  await Promise.all(Array.from({length: Math.min(CHK_AT_ONCE, send.length)}, worker));
+  const why = send.find(c => c.verdict === 'off' && c.reason);
+  for (const c of send) if (c.verdict === 'wait'){ c.verdict = 'off'; c.reason = chkStopped ? 'Stopped before this one was checked.' : (why ? why.reason : 'Not checked.'); }
   chkBusy = false; chkRender();
+}
+function chkAgain(cards){ // just these designs are worked out and sent again
+  const keys = new Set(cards.map(c => c.key)), gs = batchGroups.filter(g => g.items.some(it => keys.has(it.key)));
+  if (!gs.length){ toast('Those files are no longer in the batch.'); return; }
+  if (gs.some(g => !(g.snap && batchSized(g)))){ toast('Set that group up first, then check again.'); return; }
+  $('chk').hidden = true; batchSave(gs, true, 'check', keys);
 }
 $('chkStop').addEventListener('click', () => { chkStopped = true; });
 $('chkClose').addEventListener('click', () => { chkStopped = true; $('chk').hidden = true; if (!$('batch').hidden) $('batchCheck').focus(); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('chk').hidden) $('chkClose').click(); });
+$('batchCheckLast').addEventListener('click', () => { if (chkItems.length && !batchBusy) chkOpen(); });
 $('chkBody').addEventListener('click', e => {
-  const b = e.target.closest('[data-chk-open]'); if (!b || chkBusy) return;
-  const c = chkItems.find(x => x.ref === b.closest('.chk-card').dataset.ref), g = c && batchGroups.find(G => G.id === c.g), it = g && g.items.find(x => x.key === c.key);
+  if (chkBusy) return;
+  if (e.target.closest('[data-chk-againall]')){ chkAgain(chkItems.filter(chkChanged)); return; }
+  const b = e.target.closest('[data-chk-open], [data-chk-ok], [data-chk-flag], [data-chk-again]'); if (!b) return;
+  const c = chkItems.find(x => x.ref === b.closest('.chk-card').dataset.ref); if (!c) return;
+  if (b.hasAttribute('data-chk-ok')){ c.ignored = true; chkRender(); return; }
+  if (b.hasAttribute('data-chk-flag')){ c.ignored = false; chkRender(); return; }
+  if (b.hasAttribute('data-chk-again')){ chkAgain([c]); return; }
+  const {g, it} = chkFind(c);
   if (!it){ toast('That file is no longer in the batch.'); return; }
-  $('chk').hidden = true; batchSetup(g, it);
+  if (g.locked){ toast('That group is locked. Unlock it in the Batch screen to change it.'); return; }
+  $('chk').hidden = true; chkToEditor(g, it);
 });
+/* Open in editor lands in the editor on that design, every time (owner, 24 Nov: "so I work on the correct design").
+   One design from the check is open at a time: earlier ones close, so the tabs can't fill up and stop the next one
+   opening. A design that is already open is shown, not opened twice. If it can't open, the sheet comes back and says why. */
+async function chkToEditor(g, it){
+  const has = d => !!(d.batch && d.batch.key === it.key && (d === cur ? art : d.art)), same = docs.find(has);
+  for (const d of [...docs]) if (d !== cur && d !== same && d.batch && d.batch.fromChk){ docs.splice(docs.indexOf(d), 1); forgetDoc(d); d.art = null; d.steps = null; }
+  if (same){ $('batch').hidden = true; if (same !== cur) switchTo(same); same.batch.g = g.id; same.batch.fromChk = true; renderTabs(); syncBatchNote(); return; }
+  $('toast').hidden = true;
+  try { await batchSetup(g, it); } catch(e){}
+  if (cur && cur.batch && cur.batch.key === it.key && $('batch').hidden){ cur.batch.fromChk = true; syncBatchNote(); return; }
+  const why = $('toast').hidden ? '' : $('toast').textContent; chkOpen(); toast(why || 'That design couldn’t be opened in the editor. Try again in a moment.');
+}
 /* ---------- Batch with Claude: the mini guide in the More menu ---------- */
 {
 const box = $('claudeHelp'), shut = () => { if (box.hidden) return; box.hidden = true; $('moreBtn').focus(); };
