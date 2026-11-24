@@ -648,7 +648,8 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .mv-menu{min-width:190px}
 .tab-ok{flex:none;color:var(--good);font-size:13px;font-weight:800;line-height:1}
 .tabs-t span b.tabs-ok{display:inline;font-size:13px;font-weight:700;color:var(--good);text-decoration:none}
-.tabs-pop-save{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-bottom:1px solid var(--line);font-size:14px}
+.tabs-pop-save{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid var(--line);font-size:14px}
+.tabs-pop-save .tabs-all{margin-right:auto}
 .tabs-all{display:inline-flex;align-items:center;gap:8px;font-weight:700;cursor:pointer}
 .tabs-ck{flex:none;display:flex;align-items:center;justify-content:center;width:44px;cursor:pointer}
 .tabs-ck input,.tabs-all input{width:20px;height:20px;margin:0;accent-color:var(--accent);cursor:pointer}
@@ -1734,6 +1735,13 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
       </ul>
     </div>
     <div class="cal-actions"><button class="btn primary" type="button" id="claudeHelpClose">Close</button></div>
+  </div>
+</div>
+<div class="cal" id="shutDlg" role="dialog" aria-modal="true" aria-labelledby="shutTitle" hidden>
+  <div class="cal-box ask-box">
+    <h2 class="cal-title" id="shutTitle">Close without saving?</h2>
+    <p class="cal-text" id="shutText"></p>
+    <div class="cal-actions"><button class="btn" type="button" id="shutCancel">Cancel</button><button class="btn primary" type="button" id="shutGo">Close them</button></div>
   </div>
 </div>
 <div class="cal" id="askSave" role="dialog" aria-modal="true" aria-labelledby="askSaveTitle" hidden>
@@ -5255,6 +5263,37 @@ async function tabsSaveTicked(){
   } else if (why) toast(why);
   $('saveBtn').disabled = !outReady; renderTabs();
 }
+/* Close ticked (v129): the ticked designs close together. Nothing unsaved among them: they just close. Otherwise one
+   question covers them all, so ten tabs never mean ten questions. */
+function closeMany(list){
+  const gone = new Set(list.filter(d => docs.includes(d))); if (!gone.size) return 0;
+  const keep = docs.filter(d => !gone.has(d)), old = cur, curGoes = !!(old && gone.has(old)), at = old ? docs.indexOf(old) : 0;
+  if (curGoes){ clearTimeout(stepTimer); unsaved = false; }
+  for (const d of gone){ forgetDoc(d); tabsPick.delete(d.id); if (d !== old){ d.art = null; d.steps = null; } }
+  if (!keep.length){ // nothing left open: back to the start screen, with the sample art behind it
+    docs = []; cur = null; art = null; renderTabs(); if (old){ old.art = null; old.steps = null; }
+    sampleArt().then(c => { if (!art){ setArt(c, c.width, c.height, 'Sample art', true, DPI); art.quiet = true; art.thruTold = true; } showWelcome(); });
+    return gone.size;
+  }
+  docs = keep;
+  if (curGoes){ cur = null; loadDoc(docs[Math.min(at, docs.length - 1)]); old.art = null; old.steps = null; } else renderTabs();
+  return gone.size;
+}
+function tabsShutTicked(){
+  if (cur && art) stashDoc(); // so the design on screen knows whether it has unsaved changes
+  const list = docs.filter(d => tabsPick.has(d.id) && tabsPickable(d)); if (!list.length) return;
+  const dirty = list.filter(d => d.unsaved).length, n = list.length;
+  const go = () => { const k = closeMany(list); dropClose(); toast(`${k} design${k === 1 ? '' : 's'} closed.`); };
+  if (!dirty){ go(); return; }
+  $('shutTitle').textContent = n === 1 ? 'Close this design without saving?' : `Close ${n} designs without saving?`;
+  $('shutText').textContent = (n === 1 ? 'It has changes that haven’t been saved as a PNG.' : dirty === n ? `${dirty === 2 ? 'Both' : `All ${n}`} have changes that haven’t been saved as a PNG.` : `${dirty} of them ${dirty === 1 ? 'has' : 'have'} changes that haven’t been saved as a PNG.`) + ' Closing can’t be undone.';
+  $('shutGo').textContent = n === 1 ? 'Close it' : `Close all ${n}`;
+  $('shutGo').onclick = () => { $('shutDlg').hidden = true; go(); };
+  $('shutDlg').hidden = false; $('shutCancel').focus();
+}
+$('shutCancel').addEventListener('click', () => { $('shutDlg').hidden = true; });
+$('shutDlg').addEventListener('click', e => { if (e.target === $('shutDlg')) $('shutDlg').hidden = true; });
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('shutDlg').hidden){ $('shutDlg').hidden = true; e.stopPropagation(); } }, true);
 function syncTabsAll(){
   const real = docs.filter(d => { const a = d === cur ? art : d.art; return a && !a.isSample; }), show = docs.length >= TABS_ALL_FROM;
   $('tabsAll').hidden = !show; if (!show){ $('tabsAllPop').hidden = true; $('tabsAllBtn').setAttribute('aria-expanded', 'false'); return; }
@@ -5262,9 +5301,9 @@ function syncTabsAll(){
   const saved = real.filter(d => d !== cur && !d.unsaved);
   for (const id of [...tabsPick]) if (!docs.some(d => d.id === id && tabsPickable(d))) tabsPick.delete(id);
   const canPick = docs.filter(tabsPickable), pickN = tabsPick.size;
-  $('tabsAllPop').innerHTML = `<div class="tabs-pop-save"><label class="tabs-all"><input type="checkbox" data-pick-all${tabsSaving ? ' disabled' : ''}${pickN && pickN === canPick.length ? ' checked' : ''}> Tick all</label><button class="btn small primary" type="button" data-tabs-save${pickN && !tabsSaving ? '' : ' disabled'} data-tip="Saves every ticked design’s print PNG in one go. Two or more come down together as one zip.">${tabsSaving ? esc(tabsSaving) : pickN ? `Save ticked (${pickN})` : 'Save ticked'}</button></div><div class="tabs-pop-head"><b>${docs.length > MAX_DOCS ? `${docs.length} designs open (${MAX_DOCS}, plus ${docs.length - MAX_DOCS} from the check)` : `${docs.length} of ${MAX_DOCS} designs open`}</b><button class="btn small" type="button" data-tabs-clear${saved.length ? '' : ' disabled'} data-tip="Closes every design with nothing unsaved. The one on screen stays open.">Close the saved ones${saved.length ? ` (${saved.length})` : ''}</button></div><div class="tabs-pop-list" role="list">` +
+  $('tabsAllPop').innerHTML = `<div class="tabs-pop-save"><label class="tabs-all"><input type="checkbox" data-pick-all${tabsSaving ? ' disabled' : ''}${pickN && pickN === canPick.length ? ' checked' : ''}> Tick all</label><button class="btn small primary" type="button" data-tabs-save${pickN && !tabsSaving ? '' : ' disabled'} data-tip="Saves every ticked design’s print PNG in one go. Two or more come down together as one zip.">${tabsSaving ? esc(tabsSaving) : pickN ? `Save ticked (${pickN})` : 'Save ticked'}</button><button class="btn small" type="button" data-tabs-shut${pickN && !tabsSaving ? '' : ' disabled'} data-tip="Closes every ticked design in one go, without saving. If any have changes, it asks once for all of them.">${pickN ? `Close ticked (${pickN})` : 'Close ticked'}</button></div><div class="tabs-pop-head"><b>${docs.length > MAX_DOCS ? `${docs.length} designs open (${MAX_DOCS}, plus ${docs.length - MAX_DOCS} from the check)` : `${docs.length} of ${MAX_DOCS} designs open`}</b><button class="btn small" type="button" data-tabs-clear${saved.length ? '' : ' disabled'} data-tip="Closes every design with nothing unsaved. The one on screen stays open.">Close the saved ones${saved.length ? ` (${saved.length})` : ''}</button></div><div class="tabs-pop-list" role="list">` +
     docs.map(d => { const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample, cm = d === cur ? st.widthCm : d.snap && d.snap.w;
-      return `<div class="tabs-row${d === cur ? ' on' : ''}" role="listitem"><label class="tabs-ck">${tabsPickable(d) ? `<input type="checkbox" data-pick="${d.id}"${tabsPick.has(d.id) ? ' checked' : ''}${tabsSaving ? ' disabled' : ''} aria-label="Tick ${esc(name)} to save">` : ''}</label><button class="tabs-go" type="button" data-go="${d.id}"${d === cur ? ' aria-current="true"' : ''}>${artThumb(a) ? `<img src="${artThumb(a)}" alt="">` : '<span class="tabs-nopic"></span>'}<span class="tabs-t"><b>${esc(name)}</b><span>${a && cm ? `${toMm(cm)} × ${toMm(cm*a.h/a.w)} mm` : ''}${d === cur ? ' · on screen' : ''}${dirty ? ' · not saved' : d.saved && a && !a.isSample ? ' · <b class="tabs-ok">✓ saved</b>' : ''}${d.batch ? ' · from Batch' : ''}</span></span></button>` +
+      return `<div class="tabs-row${d === cur ? ' on' : ''}" role="listitem"><label class="tabs-ck">${tabsPickable(d) ? `<input type="checkbox" data-pick="${d.id}"${tabsPick.has(d.id) ? ' checked' : ''}${tabsSaving ? ' disabled' : ''} aria-label="Tick ${esc(name)}">` : ''}</label><button class="tabs-go" type="button" data-go="${d.id}"${d === cur ? ' aria-current="true"' : ''}>${artThumb(a) ? `<img src="${artThumb(a)}" alt="">` : '<span class="tabs-nopic"></span>'}<span class="tabs-t"><b>${esc(name)}</b><span>${a && cm ? `${toMm(cm)} × ${toMm(cm*a.h/a.w)} mm` : ''}${d === cur ? ' · on screen' : ''}${dirty ? ' · not saved' : d.saved && a && !a.isSample ? ' · <b class="tabs-ok">✓ saved</b>' : ''}${d.batch ? ' · from Batch' : ''}</span></span></button>` +
         (docs.length > 1 || (a && !a.isSample) ? `<button class="tabs-x" type="button" data-shut="${d.id}" aria-label="Close ${esc(name)}">×</button>` : '') + '</div>'; }).join('') + '</div>';
 }
 $('tabsAllBtn').addEventListener('click', () => setTimeout(() => { const L = $('tabsAllPop').querySelector('.tabs-pop-list'), on = L && L.querySelector('.tabs-row.on'); if (on && !$('tabsAllPop').hidden) L.scrollTop = Math.max(0, on.offsetTop - L.offsetTop - L.clientHeight/2 + on.offsetHeight/2); }, 0)); // the design on screen is in view when the list opens
@@ -5286,6 +5325,7 @@ $('tabsAllPop').addEventListener('click', e => {
     return; }
   if (e.target.closest('[data-tabs-save]')){ tabsSaveTicked(); return; }
   if (tabsSaving) return;
+  if (e.target.closest('[data-tabs-shut]')){ tabsShutTicked(); return; }
   if (e.target.closest('[data-tabs-clear]')){
     const gone = docs.filter(d => d !== cur && d.art && !d.art.isSample && !d.unsaved); if (!gone.length) return;
     for (const d of gone) closeDoc(d);
