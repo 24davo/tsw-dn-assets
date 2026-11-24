@@ -646,6 +646,16 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .tdrop-pop.menu .btn:hover{background:var(--soft)}
 .tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
 .mv-menu{min-width:190px}
+.cal-box.bh-box{width:min(640px,100%);gap:16px}
+.bh-lead{margin:0;font-size:15px;line-height:1.5;color:var(--ink)}
+.bh-steps{margin:0;padding:0;list-style:none;counter-reset:bh;display:grid;gap:12px}
+.bh-steps li{counter-increment:bh;position:relative;display:grid;gap:2px;padding-left:44px;font-size:15px;line-height:1.45}
+.bh-steps li::before{content:counter(bh);position:absolute;left:0;top:0;width:30px;height:30px;display:grid;place-items:center;border:2px solid var(--ink);border-radius:var(--r);font-weight:800;font-size:15px}
+.bh-steps li > span{color:var(--muted)}
+.bh-steps .bh-say{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--soft);color:var(--ink);font-weight:600}
+.bh-say > span{flex:1 1 260px}
+.bh-know{padding:14px 16px;border:1px solid var(--line);border-radius:var(--r);font-size:14px;line-height:1.5}
+.bh-know ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px;color:var(--muted)}
 .panel-bar{z-index:5}
 .panel-bar .tdrop-btn{display:inline-flex;align-items:center;gap:6px}
 .panel-bar .tdrop-btn .car{margin-bottom:4px}
@@ -865,6 +875,7 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
       <button class="btn" type="button" id="gangBtn" data-tip="Gang sheet: finished prints packed onto one sheet of film, with a quantity for each.">Sheet</button>
       <div class="tdrop right" id="moreDrop"><button class="btn tdrop-btn" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false">More<i class="car" aria-hidden="true"></i></button><div class="tdrop-pop menu" hidden>
       <a class="btn" id="helpBtn" href="https://24davo.github.io/tsw-dn-assets/halftone/guide/" target="_blank" rel="noopener" style="text-decoration:none">Guide</a>
+      <button class="btn" id="claudeHelpBtn" type="button" data-tip="How to have Claude prepare a whole folder of similar designs the same way.">Batch with Claude</button>
       <button class="btn" id="fullBtn" type="button" aria-pressed="false" hidden data-tip="Fills the whole screen with Graphic Engine. The browser’s bars and the taskbar hide until you leave it. Esc leaves.">Full screen</button>
       <button class="btn" id="installBtn" type="button" hidden data-tip="Puts this in its own window, like a program: no browser tabs or address bar, its own icon on the taskbar, and the taskbar stays in view.">Install app</button>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
@@ -1605,6 +1616,31 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
     <p class="cal-text" id="allText"></p>
     <label class="check-row"><input type="checkbox" id="allSize"> <span id="allSizeTxt">Include the print size</span></label>
     <div class="cal-actions"><button class="btn" type="button" id="allCancel">Cancel</button><button class="btn primary" type="button" id="allApply">Apply</button></div>
+  </div>
+</div>
+<div class="cal" id="claudeHelp" role="dialog" aria-modal="true" aria-labelledby="claudeHelpTitle" hidden>
+  <div class="cal-box bh-box">
+    <h2 class="cal-title" id="claudeHelpTitle">Batch with Claude</h2>
+    <p class="bh-lead">For a big order of similar designs. You prepare one, Claude does the rest the same way and shows you the results to check.</p>
+    <ol class="bh-steps">
+      <li><b>Put the artwork in one folder</b><span>All the designs for the job, on the main Mac. PNG, JPG, WebP or SVG.</span></li>
+      <li><b>Prepare one design here by hand</b><span>Open one, choose the print style, Quick start and print size, and adjust until it looks right.</span></li>
+      <li><b>Save it</b><span>Save PNG as usual. The saved file remembers every setting you used.</span></li>
+      <li><b>Ask Claude</b><span>In the Graphic Engine chat, say which folder, and which saved file to copy:</span>
+        <span class="bh-say"><span id="claudeHelpSay">Run Graphic Engine on the folder [folder name], like the saved file [file name].</span><button class="btn" type="button" id="claudeHelpCopy">Copy</button></span></li>
+      <li><b>Read the check sheet</b><span>Claude sends back a page with a before and after of every design. The ones in pink need a look first.</span></li>
+      <li><b>Fix the odd ones here</b><span>Open any that need a hand, adjust and save. Then print as usual.</span></li>
+    </ol>
+    <div class="bh-know"><b>Good to know</b>
+      <ul>
+        <li>All one width? Add “all 250 mm wide” to what you say. Otherwise each design fits inside the size of the one you prepared.</li>
+        <li>Brush work and marked areas belong to one design, so they are not copied to the others.</li>
+        <li>A design saved before 24 November has no settings inside it. Save it again first.</li>
+        <li>Claude never marks Art ready and never changes presets. Those stay with you.</li>
+        <li>Always look over the check sheet before anything goes to print.</li>
+      </ul>
+    </div>
+    <div class="cal-actions"><button class="btn primary" type="button" id="claudeHelpClose">Close</button></div>
   </div>
 </div>
 <div class="cal" id="askSave" role="dialog" aria-modal="true" aria-labelledby="askSaveTitle" hidden>
@@ -7187,6 +7223,19 @@ async function batchRestore(){
 }
 window.addEventListener('pagehide', () => { if (batchKeepTimer) batchKeepNow(); });
 batchRestore().catch(() => 0);
+/* ---------- Batch with Claude: the mini guide in the More menu ---------- */
+{
+const box = $('claudeHelp'), shut = () => { if (box.hidden) return; box.hidden = true; $('moreBtn').focus(); };
+$('claudeHelpBtn').addEventListener('click', () => { box.hidden = false; $('claudeHelpClose').focus(); });
+$('claudeHelpClose').addEventListener('click', shut);
+box.addEventListener('click', e => { if (e.target === box) shut(); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') shut(); });
+$('claudeHelpCopy').addEventListener('click', async () => {
+  const t = $('claudeHelpSay').textContent;
+  try { await navigator.clipboard.writeText(t); toast('Copied. Paste it into the chat and fill in the two names.'); }
+  catch(e){ const r = document.createRange(); r.selectNodeContents($('claudeHelpSay')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Selected. Press Ctrl or Cmd + C to copy.'); }
+});
+}
 /* ---------- the command list: Graphic Engine run by a script instead of by hand (window.tswGE) ---------- */
 {
 const geWait = ms => new Promise(r => setTimeout(r, ms));
