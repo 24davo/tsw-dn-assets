@@ -434,6 +434,9 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .bt-pics.n4 .bt-pic img{max-height:86px}
 .bt-more{display:grid;place-items:center;background:var(--soft);border-radius:2px;font-size:18px;font-weight:800;color:var(--muted)}
 .bt-line{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-w{font-size:14px;white-space:nowrap}
+.bt-w input{width:84px;height:40px;font-size:15px}
+.bgroup.tile{grid-template-columns:minmax(0,1fr)}
 .bt-set{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bt-set.todo{color:var(--warn,#e6a23c);font-weight:700}
 .bt-acts{display:flex;gap:8px;flex-wrap:wrap}
@@ -7180,6 +7183,7 @@ function renderBatch(){
         <div class="bt-head">${tick}<span class="bt-name" title="${esc(g.name)}">${esc(g.name)}</span>${L ? '<span class="bg-lock"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg> Locked</span>' : ''}</div>
         <div class="bt-pics ${cls}">${pics.map(it => `<div class="bt-pic" data-k="${esc(it.key)}"${L ? '' : ' data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up."'} title="${esc(it.name)}">${it.thumb ? `<img src="${it.thumb}" alt="${esc(it.name)}" draggable="false">` : ''}</div>`).join('')}${g.items.length > 4 ? `<div class="bt-more">+${g.items.length - 3}</div>` : ''}</div>
         <div class="bt-line">${g.items.length} file${g.items.length === 1 ? '' : 's'}${on.length < g.items.length ? ` · ${on.length} ticked` : ''} · ${big ? '<span class="bi-warn">over 400 × 500 mm</span>' : sizeShort}${allSaved ? ' · <span class="bt-ok">✓ saved</span>' : ''}</div>
+        ${L ? '' : `<label class="bg-w bt-w" data-tip="${g.fit === 's' ? (g.items.length > 1 ? 'The widest file prints this wide and the others follow at the same scale.' : 'How wide this design prints.') : g.fit === 'w' ? 'Every file in the group is made this wide.' : 'Every file in the group is made this tall.'} Details has the other ways to size a group."><span>Print size</span><input type="number" inputmode="decimal" min="5" max="500" step="1" data-w value="${!sized ? '' : g.fit === 's' ? toMm(batchCm(g, W)) : round1(g.fitMm)}" placeholder="mm" aria-label="Print size of the group ${esc(g.name)} in mm"> mm ${g.fit === 'h' ? 'tall' : 'wide'}</label>`}
         <div class="bt-set${g.snap ? '' : ' todo'}" title="${esc(g.snap ? g.desc || 'Set up' : 'Not set up yet')}">${g.snap ? esc(g.desc || 'Set up') : 'Not set up yet'}</div>
         <div class="bt-acts">${L ? '' : `<button class="btn small" type="button" data-act="setup"${g.items.length ? '' : ' disabled'} data-tip="Opens a file from this group in the editor. Set it up there, then choose Use for the group.">Open in editor</button>`}<button class="btn small" type="button" data-act="full" data-tip="Opens this group out: preset, Speed buttons, print size and every file.">Details</button></div></section>`;
     }
