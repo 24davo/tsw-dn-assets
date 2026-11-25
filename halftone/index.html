@@ -416,6 +416,29 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .bo-head h3{margin:0;font-size:18px;font-weight:800;letter-spacing:-.01em;text-transform:none;color:var(--ink)}
 .bg-tick{width:22px;height:22px;margin:0;cursor:pointer;accent-color:var(--accent)}
 .bgroup.off{opacity:.62}
+.bview{display:inline-flex;gap:4px;align-items:center}
+.bo-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(264px,1fr));align-items:start;grid-auto-flow:dense}
+.bo-grid > .bgroup:not(.tile){grid-column:1/-1}
+.bgroup.tile{gap:10px;padding:12px;align-content:start}
+.bgroup.tile.on{border-color:var(--ink)}
+.bt-head{display:flex;align-items:center;gap:10px;min-width:0}
+.bt-name{flex:1;min-width:0;font-size:16px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-pics{display:grid;gap:4px;height:176px;grid-template-columns:1fr}
+.bt-pics.n2{grid-template-columns:1fr 1fr}
+.bt-pics.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.bt-pic{display:grid;place-items:center;min-width:0;min-height:0;background:#808080;border-radius:2px;overflow:hidden;cursor:pointer}
+.bgroup.locked .bt-pic{cursor:default}
+.bt-pic img{max-width:100%;max-height:100%;min-height:0;display:block;object-fit:contain}
+.bt-pics.n1 .bt-pic img{max-height:176px}
+.bt-pics.n2 .bt-pic img{max-height:176px}
+.bt-pics.n4 .bt-pic img{max-height:86px}
+.bt-more{display:grid;place-items:center;background:var(--soft);border-radius:2px;font-size:18px;font-weight:800;color:var(--muted)}
+.bt-line{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-set{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-set.todo{color:var(--warn,#e6a23c);font-weight:700}
+.bt-acts{display:flex;gap:8px;flex-wrap:wrap}
+.bt-acts .btn{flex:1;white-space:nowrap}
+.bt-ok{color:#58c98b;font-weight:700}
 .bg-set select,.bg-quick select{height:34px;max-width:260px;padding:0 8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600}
 .bg-head .link:disabled{opacity:.45;cursor:default;text-decoration:none}
 .bg-lock{padding:2px 8px;border-radius:4px;background:var(--ink);color:var(--panel);font-size:12px;font-weight:700}
@@ -1688,6 +1711,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
     <button class="btn" type="button" id="batchJoin" disabled data-tip="Puts the files of every ticked group into one group, like names that each arrived as a group of their own. Untick the groups to leave out first.">Join ticked groups</button>
     <button class="btn" type="button" id="batchUndo" disabled>Undo</button>
     <button class="btn" type="button" id="batchNew">New group</button>
+    <span class="bview" role="group" aria-label="How the groups are shown"><button class="chip" type="button" id="batchViewTiles" aria-pressed="true" data-tip="Each group as a small card, side by side. Details opens a group out.">Tiles</button><button class="chip" type="button" id="batchViewList" aria-pressed="false" data-tip="Every group opened out, one under the other.">List</button></span>
     <button class="btn" type="button" id="batchClose">Back to the editor</button>
   </div>
   <div class="batch-body" id="batchBody"></div>
@@ -7115,7 +7139,15 @@ function batchAllChange(T){
   batchKeepSoon(); renderBatch();
 }
 function batchShow(){ hideWelcome(); $('batch').hidden = false; renderBatch(); chkStatus(); batchSigs(); }
+/* v130: Tiles or List. In Tiles every group with files is a small card until Details opens it out (g.full). One group
+   alone is always opened out: there is nothing to see side by side. The choice is remembered on this computer. */
+let batchView = 'tiles'; try { if (localStorage.getItem('tsw-ge-batch-view') === 'list') batchView = 'list'; } catch(e){}
+const batchAsTile = g => batchView === 'tiles' && !g.full && g.items.length > 0 && batchGroups.length > 1;
+function batchSetView(v){ batchView = v; try { localStorage.setItem('tsw-ge-batch-view', v); } catch(e){} if (v === 'tiles') for (const g of batchGroups) g.full = false; renderBatch(); }
+$('batchViewTiles').addEventListener('click', () => batchSetView('tiles'));
+$('batchViewList').addEventListener('click', () => batchSetView('list'));
 function renderBatch(){
+  $('batchViewTiles').setAttribute('aria-pressed', String(batchView === 'tiles')); $('batchViewList').setAttribute('aria-pressed', String(batchView === 'list'));
   syncBatchTools();
   const run = batchGroups.filter(g => g.on && batchReady(g)).length;
   $('batchCheckLast').hidden = !chkItems.length; $('batchCheck').disabled = !run; $('batchToGang').disabled = !run; $('batchRun').disabled = !run; $('batchRun').textContent = run ? `Process ${run} ticked group${run === 1 ? '' : 's'}` : 'Process ticked groups';
@@ -7140,6 +7172,18 @@ function renderBatch(){
           <div class="bi-row">${big ? '<span class="bi-warn">Over 400 × 500 mm</span>' : `<span>${sized ? `${toMm(cm)} × ${toMm(cm*b.h/b.w)} mm` : `${b.w} × ${b.h} px`}</span>`}${it.saved ? '<span>Saved</span>' : ''}</div></div>`;
       }).join('')}</div>`;
     const tick = `<input class="bg-tick" type="checkbox" ${g.on ? 'checked' : ''} aria-label="Include the group ${esc(g.name)} in Process ticked groups" data-tip="Ticked groups are worked out together by Process ticked groups.">`;
+    if (batchAsTile(g)){ // v130: the group as a small card
+      const pics = g.items.length > 4 ? g.items.slice(0, 3) : g.items.slice(0, 4), cls = g.items.length === 1 ? 'n1' : g.items.length === 2 ? 'n2' : 'n4';
+      const allSaved = on.length > 0 && on.every(it => it.saved), big = on.some(it => batchTooBig(g, it));
+      const sizeShort = !sized ? 'no print size yet' : g.items.length === 1 ? `${toMm(batchCm(g, g.items[0]))} × ${toMm(batchCm(g, g.items[0])*batchBox(g, g.items[0]).h/batchBox(g, g.items[0]).w)} mm` : sizeTxt;
+      return `<section class="bgroup tile${g.on ? ' on' : ' off'}${L ? ' locked' : ''}" data-g="${g.id}">
+        <div class="bt-head">${tick}<span class="bt-name" title="${esc(g.name)}">${esc(g.name)}</span>${L ? '<span class="bg-lock"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg> Locked</span>' : ''}</div>
+        <div class="bt-pics ${cls}">${pics.map(it => `<div class="bt-pic" data-k="${esc(it.key)}"${L ? '' : ' data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up."'} title="${esc(it.name)}">${it.thumb ? `<img src="${it.thumb}" alt="${esc(it.name)}" draggable="false">` : ''}</div>`).join('')}${g.items.length > 4 ? `<div class="bt-more">+${g.items.length - 3}</div>` : ''}</div>
+        <div class="bt-line">${g.items.length} file${g.items.length === 1 ? '' : 's'}${on.length < g.items.length ? ` · ${on.length} ticked` : ''} · ${big ? '<span class="bi-warn">over 400 × 500 mm</span>' : sizeShort}${allSaved ? ' · <span class="bt-ok">✓ saved</span>' : ''}</div>
+        <div class="bt-set${g.snap ? '' : ' todo'}" title="${esc(g.snap ? g.desc || 'Set up' : 'Not set up yet')}">${g.snap ? esc(g.desc || 'Set up') : 'Not set up yet'}</div>
+        <div class="bt-acts">${L ? '' : `<button class="btn small" type="button" data-act="setup"${g.items.length ? '' : ' disabled'} data-tip="Opens a file from this group in the editor. Set it up there, then choose Use for the group.">Open in editor</button>`}<button class="btn small" type="button" data-act="full" data-tip="Opens this group out: preset, Speed buttons, print size and every file.">Details</button></div></section>`;
+    }
+    const fold = batchView === 'tiles' && batchGroups.length > 1 && g.items.length ? '<button class="link" type="button" data-act="tile" data-tip="Folds this group back to a small card.">Show as a tile</button>' : '';
     const count = `<span class="bg-count">${g.items.length} file${g.items.length === 1 ? '' : 's'} · ${on.length} ticked${g.note ? ' · ' + esc(g.note) : ''}</span>`;
     if (L) return `<section class="bgroup locked${g.on ? '' : ' off'}" data-g="${g.id}">
       <div class="bg-head">${tick}<input class="bg-name" type="text" value="${esc(g.name)}" size="${Math.max(4, Math.min(30, g.name.length + 1))}" disabled aria-label="Group name">
@@ -7147,7 +7191,7 @@ function renderBatch(){
         <span class="bg-lock"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg> Locked</span>
         <span class="bg-lset">${set} · ${sizeTxt}${g.trim ? ' · trimmed to the art' : ''}</span>
         <span class="bg-strip">${g.items.slice(0, 10).map(it => `<span${it.on ? '' : ' class="off"'} title="${esc(it.name)}">${esc(it.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 14))}</span>`).join('')}${g.items.length > 10 ? `<span class="more">+${g.items.length - 10}</span>` : ''}</span>
-        <span class="bg-grow"></span><button class="btn small" type="button" data-act="lock" data-tip="Unlock to change the set-up, the size or the files. It still saves with Process ticked groups while it is locked.">Unlock to change</button></div></section>`;
+        <span class="bg-grow"></span>${fold}<button class="btn small" type="button" data-act="lock" data-tip="Unlock to change the set-up, the size or the files. It still saves with Process ticked groups while it is locked.">Unlock to change</button></div></section>`;
     return `<section class="bgroup${g.on ? '' : ' off'}" data-g="${g.id}">
       <div class="bg-head">${tick}<input class="bg-name" type="text" value="${esc(g.name)}" maxlength="60" aria-label="Group name">
         ${count}<span class="bg-grow"></span>
@@ -7156,7 +7200,7 @@ function renderBatch(){
         <button class="link" type="button" data-act="split"${some ? '' : ' disabled'} data-tip="Pick files out into a group of their own, like the custom names in a set. Untick all, tick the ones that belong together, then click this.">Move ticked to a new group</button>
         <button class="link" type="button" data-act="add">Add files</button>
         <button class="link" type="button" data-act="lock" data-tip="Keeps this group as it is: its set-up, size and files can’t change until you unlock it. It still saves with Process ticked groups.">Lock</button>
-        <button class="link" type="button" data-act="del">Remove group</button></div>
+        <button class="link" type="button" data-act="del">Remove group</button>${fold}</div>
       <div class="bg-set"><span>${set}</span>
         <select data-preset aria-label="Preset for the group ${esc(g.name)}" data-tip="The group’s set-up from a preset, without opening the editor. The print size stays as it is here.">${batchPresetOpts(g)}</select>
         <span class="bg-grow"></span>
@@ -7175,11 +7219,11 @@ function renderBatch(){
     const head = o || orders.length > 1 ? `<div class="bo-head" data-o="${i}"><h3>${o ? esc(o) : 'Other groups'}</h3>
       <span class="bg-count">${gs.length} group${gs.length === 1 ? '' : 's'} · ${files} file${files === 1 ? '' : 's'}${note ? ' · ' + esc(note) : ''}</span><span class="bg-grow"></span>
       <button class="link" type="button" data-act="oall">Tick all groups</button><button class="link" type="button" data-act="onone">Untick all groups</button><button class="link" type="button" data-act="odel">Remove ${o ? 'this order' : 'these groups'}</button></div>` : '';
-    return head + gs.map(card).join('');
+    return head + `<div class="bo-grid">${gs.map(card).join('')}</div>`;
   }).join('');
   const mixed = $('batchBody').querySelector('[data-alltrim][data-mixed]'); if (mixed) mixed.indeterminate = true;
 }
-const batchFind = el => { const card = el.closest('.bgroup'), g = card && batchGroups.find(g => g.id === +card.dataset.g), cell = el.closest('.bitem'); return {g, it: g && cell ? g.items.find(it => it.key === cell.dataset.k) : null}; };
+const batchFind = el => { const card = el.closest('.bgroup'), g = card && batchGroups.find(g => g.id === +card.dataset.g), cell = el.closest('.bitem, .bt-pic'); return {g, it: g && cell ? g.items.find(it => it.key === cell.dataset.k) : null}; };
 $('batchBody').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || batchBusy) return;
   const act = b.dataset.act;
@@ -7199,6 +7243,7 @@ $('batchBody').addEventListener('click', e => {
     batchKeepSoon(); renderBatch(); return;
   }
   const {g, it} = batchFind(b); if (!g) return;
+  if (act === 'full' || act === 'tile'){ g.full = act === 'full'; renderBatch(); const el = $('batchBody').querySelector(`.bgroup[data-g="${g.id}"]`); if (el) el.scrollIntoView({block: 'nearest'}); return; }
   if (g.locked && !['lock', 'files', 'save'].includes(act)) return;
   const what = {lock: `${g.locked ? 'unlocked' : 'locked'} “${g.name}”`, quick: `the Speed button on “${g.name}”`, split: `moved ticked files out of “${g.name}”`, all: `ticked all files in “${g.name}”`,
     none: `unticked all files in “${g.name}”`, del: `removed the group “${g.name}”`, drop: it ? `removed ${it.name}` : ''}[act];
