@@ -977,6 +977,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
       </div></div>
       <button class="btn" type="button" id="openBtn">Open art</button>
       <input type="file" id="fileIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
+      <button class="btn" id="sendBoardBtn" type="button" hidden disabled data-tip="Sends the finished print file to this design’s job on the Workboard, ready to download at the RIP station. For one-off designs that don’t need a folder of their own.">Send to the Workboard</button>
       <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
     </div>
   </header>
@@ -5238,7 +5239,7 @@ function artThumb(a){ // the file as it was opened, for its tab
   return a.thumb;
 }
 function renderTabs(){
-  persistSoon(); syncBatchNote();
+  persistSoon(); syncBatchNote(); setTimeout(syncSendBoard, 0);
   $('tabsActions').hidden = docs.filter(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample).length < 2;
   $('tabsList').innerHTML = docs.map(d => {
     const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
@@ -5592,6 +5593,7 @@ window.addEventListener('message', async e => {
     if (!batchBusy){ $('batch').hidden = true; $('chk').hidden = true; } // the design just sent is what staff came to see
     toast(`Opened from the Workboard: ${name}`);
     const ids = artIds(m.orders); if (ids.length && art){ art.orders = ids; art.artKey = 'd:' + (cur ? cur.id : name); artGot(ids, art.artKey); }
+    syncSendBoard();
   }
   const room = Math.max(0, MAX_DOCS - docs.length + (art && art.isSample ? 1 : 0));
   try { e.source.postMessage(ok ? {tsw: 'ge-opened', ok, id: m.id, room} : {tsw: 'ge-opened', ok, id: m.id, why: wasFull ? 'full' : 'unreadable', room}, e.origin); } catch(err){}
@@ -5823,6 +5825,62 @@ async function savePng(){ // answers true once the PNG is saved
   if (ok){ commitStep(); unsaved = false; if (cur) cur.saved = true; renderTabs(); savedMoment(fileName()); if (art && art.orders) artSaved(art.orders, art.artKey); }
   return ok;
 }
+/* ---------- Send to the Workboard (v132) ---------- */
+const PF_URL = '/api/ge/print-file';
+let pfOn = false, pfMaxMb = 0, pfKeepDays = 0, pfAsked = false, pfBusy = false;
+async function pfStatus(){ // is the board able to take print files? Asked once per visit, and only where a board could answer
+  if (pfAsked || !/^https?:$/.test(location.protocol) || !location.pathname.startsWith('/engine/')) return;
+  pfAsked = true;
+  try { const r = await fetch(PF_URL, {credentials: 'same-origin', headers: {Accept: 'application/json'}}); if (!r.ok) return; const j = await r.json(); pfOn = !!(j && j.enabled === true); pfMaxMb = j && j.maxMb > 0 ? +j.maxMb : 0; pfKeepDays = j && j.keepDays > 0 ? Math.round(+j.keepDays) : 0; } catch(e){ pfOn = false; }
+  syncSendBoard();
+}
+function sendBoardIds(){ // the board jobs the design on screen belongs to: sent straight to a tab, or opened from a Batch group
+  if (!art || art.isSample) return [];
+  if (art.orders && art.orders.length) return artIds(art.orders);
+  const b = cur && cur.batch; if (!b) return [];
+  for (const g of batchGroups){ const it = g.items.find(x => x.key === b.key); if (it) return artIds(it.orders); }
+  return [];
+}
+function syncSendBoard(){
+  const el = $('sendBoardBtn'); if (!el) return;
+  const ids = pfOn ? sendBoardIds() : [];
+  el.hidden = !ids.length; el.disabled = !ids.length || !outReady || saving || pfBusy;
+  if (ids.length && !pfBusy && !el.classList.contains('saved')) el.textContent = 'Send to the Workboard';
+}
+async function sendToBoard(){
+  const ids = sendBoardIds(); if (!ids.length || !pfOn || pfBusy || saving || !art) return false;
+  pfBusy = saving = true; $('saveBtn').disabled = true; syncSendBoard();
+  const name = fileName(), sent = []; let why = '';
+  try {
+    await idle();
+    $('busyTxt').textContent = 'Preparing the PNG…'; $('busy').hidden = false;
+    await new Promise(r => setTimeout(r, 30));
+    const png = await tabsPng();
+    if (pfMaxMb && png.size > pfMaxMb*1048576) throw new Error(`That file is ${Math.ceil(png.size/1048576)} MB, more than the Workboard takes (${pfMaxMb} MB). Save the PNG instead.`);
+    for (const id of ids){
+      $('busyTxt').textContent = `Sending to ${id}…`;
+      const q = new URLSearchParams({name: name.slice(0, 160), widthMm: String(toMm(st.widthCm)), heightMm: String(toMm(st.widthCm*art.h/art.w))});
+      const r = await fetch('/api/orders/' + encodeURIComponent(id) + '/print-file?' + q, {method: 'POST', credentials: 'same-origin', body: png, headers: {'Content-Type': 'image/png'}}); // the plain PNG, so the board can stream a big file straight to storage
+      if (r.status === 401){ why = 'Sign in to the Workboard, then try again.'; break; }
+      const a = await r.json().catch(() => null), w = a && a.why;
+      if (r.ok && a && a.ok) sent.push(id);
+      else { why = r.status === 413 || w === 'too_big' ? 'That file is too big for the Workboard. Save the PNG instead.' : w === 'unknown_job' ? `The job ${id} isn’t open on the Workboard now, so it can’t take the file. Save the PNG instead.` : w === 'full' ? 'The Workboard’s print file space is full. Clear some finished ones there, or save the PNG instead.' : w === 'off' ? 'Sending print files is switched off on the Workboard. Save the PNG instead.' : 'The Workboard didn’t take the file. Save the PNG instead.'; break; }
+    }
+  } catch(err){ why = err && err.message ? err.message : 'Sending didn’t work. Save the PNG instead.'; }
+  finally { $('busy').hidden = true; $('busyTxt').textContent = 'Updating…'; pfBusy = saving = false; $('saveBtn').disabled = !outReady; }
+  if (sent.length){
+    commitStep(); unsaved = false; if (cur) cur.saved = true; renderTabs();
+    const el = $('sendBoardBtn'); el.classList.add('saved'); el.innerHTML = TICK + ' Sent'; setTimeout(() => { el.classList.remove('saved'); syncSendBoard(); }, 3200);
+    let note = $('savedNote');
+    if (!note){ note = document.createElement('p'); note.id = 'savedNote'; note.className = 'f-note saved-note'; note.setAttribute('aria-live', 'polite'); $('checkGroup').appendChild(note); }
+    note.innerHTML = `<b>${esc(name)}</b> is on the Workboard, on ${esc(sent.join(', '))}, ready to download at the RIP station.${pfKeepDays ? ` The Workboard keeps it for ${pfKeepDays} days.` : ''}`;
+    if (art && art.orders) artSaved(art.orders, art.artKey);
+    toast(why ? `Sent to ${sent.join(', ')}. ${why}` : `Sent to the Workboard: ${sent.join(', ')}.`);
+  } else if (why) toast(why);
+  syncSendBoard();
+  return sent.length > 0;
+}
+$('sendBoardBtn').addEventListener('click', () => { sendToBoard(); });
 let savedTimer = 0;
 function savedMoment(name){ // the save buttons turn to a green Saved with a drawn tick, and a line says where the file went
   const bs = [$('saveBtn'), document.querySelector('#checkGroup .step-next')].filter(Boolean);
@@ -5834,6 +5892,8 @@ function savedMoment(name){ // the save buttons turn to a green Saved with a dra
   savedTimer = setTimeout(() => { for (const b of bs) b.classList.remove('saved'); $('saveBtn').textContent = 'Save PNG'; syncStepButtons(); }, 3200);
 }
 $('saveBtn').addEventListener('click', () => { savePng(); });
+new MutationObserver(syncSendBoard).observe($('saveBtn'), {attributes: true, attributeFilter: ['disabled']}); // Save PNG is ready exactly when sending is
+pfStatus();
 async function downloadsCap(){
   if (!window.claude || typeof window.claude.use !== 'function') return null;
   try { return await Promise.race([window.claude.use('downloads'), new Promise(r => setTimeout(() => r(null), 10000))]); } catch(e){ return null; }
