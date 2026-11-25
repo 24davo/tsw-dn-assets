@@ -172,7 +172,14 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .cols-dot{display:inline-block;width:12px;height:12px;border-radius:2px;border:1px solid rgba(128,128,128,.6);margin-right:5px;vertical-align:-1px}
 .pick-live{position:absolute;z-index:7;display:flex;align-items:center;gap:8px;padding:5px 9px 5px 5px;background:var(--panel);border:1.5px solid var(--line-strong);border-radius:var(--r);font-size:12px;font-weight:700;pointer-events:none}
 .pick-live[hidden]{display:none}
-.cc{position:fixed;z-index:30;width:316px;max-width:calc(100vw - 16px);display:grid;gap:10px;padding:12px;background:var(--panel);color:var(--ink);border:1.5px solid var(--line-strong);border-radius:var(--r);font-size:13px}
+.cc{position:fixed;z-index:30;width:324px;max-width:calc(100vw - 16px);display:grid;gap:10px;padding:0 12px 12px;background:var(--panel);color:var(--ink);border:2px solid var(--ink);outline:5px solid rgba(0,0,0,.45);border-radius:var(--r);font-size:13px}
+.cc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 -12px;padding:9px 12px;background:var(--ink);color:var(--bg);font-size:13px;font-weight:800;letter-spacing:.02em;cursor:move;user-select:none;-webkit-user-select:none;touch-action:none}
+.cc-grip{display:flex;align-items:center;gap:3px;font-size:11px;font-weight:600;opacity:.8}
+.cc-grip i{width:3px;height:3px;border-radius:50%;background:currentColor}
+.cc-grip i:nth-child(6){margin-right:5px}
+.cc-keep{display:grid;gap:6px}
+.cc-lab{font-weight:700}
+.cc-lab small{font-weight:500;color:var(--muted);margin-left:6px}
 .cc[hidden]{display:none}
 .cc-top{display:flex;align-items:center;gap:12px}
 .cc-sw{display:flex;flex:1;height:44px;border:1px solid rgba(128,128,128,.55);border-radius:var(--r);overflow:hidden}
@@ -191,9 +198,10 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .cc-rgb{display:flex;gap:10px}
 .cc-rgb label{display:flex;align-items:center;gap:5px;font-weight:600}
 .cc-rgb input{width:62px}
-.cc-kept{display:flex;flex-wrap:wrap;gap:5px}
-.cc-kept:empty{display:none}
-.cc-k{width:30px;height:30px;padding:0;border:1px solid rgba(128,128,128,.6);border-radius:3px;cursor:pointer}
+.cc-kept{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.cc-k{height:34px;padding:0;border:1.5px solid rgba(128,128,128,.7);border-radius:3px;cursor:pointer;font:inherit;font-size:16px;font-weight:700;line-height:1}
+.cc-k.empty{background:transparent;border-style:dashed;border-color:var(--line-strong);color:var(--muted)}
+.cc-k.empty:hover{border-color:var(--ink);color:var(--ink)}
 .cc-acts{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .cc-acts.end{justify-content:flex-end}
 .cc #ccPick[aria-pressed="true"]{border-color:var(--accent)}
@@ -1846,14 +1854,15 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
 </div>
 <div class="art-bar" id="artBar" role="status" hidden><span id="artBarTxt"></span><button type="button" class="yes" id="artBarYes">Mark Art ready on the board</button><button type="button" id="artBarNo">Not yet</button></div>
 <div class="cc" id="cc" role="dialog" aria-label="Colour" hidden>
+  <div class="cc-head" id="ccHead" data-tip="Drag here to move the box out of the way."><span>Colour</span><span class="cc-grip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i> Drag to move</span></div>
   <div class="cc-top"><span class="cc-sw"><i id="ccOld" data-tip="The colour before. Click to go back to it."></i><i id="ccNew"></i></span>
     <label class="cc-hex"><span>Hex</span><input type="text" id="ccHex" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour code"></label></div>
   <div class="cc-row"><span>Hue</span><input type="range" class="cc-range" id="ccH" min="0" max="360" step="1" aria-label="Hue"><input type="number" id="ccHn" min="0" max="360" step="1" aria-label="Hue, 0 to 360"></div>
   <div class="cc-row"><span>Saturation</span><input type="range" class="cc-range" id="ccS" min="0" max="100" step="1" aria-label="Saturation"><input type="number" id="ccSn" min="0" max="100" step="1" aria-label="Saturation, 0 to 100"></div>
   <div class="cc-row"><span>Brightness</span><input type="range" class="cc-range" id="ccV" min="0" max="100" step="1" aria-label="Brightness"><input type="number" id="ccVn" min="0" max="100" step="1" aria-label="Brightness, 0 to 100"></div>
   <div class="cc-rgb"><label>R <input type="number" id="ccR" min="0" max="255" step="1" aria-label="Red, 0 to 255"></label><label>G <input type="number" id="ccG" min="0" max="255" step="1" aria-label="Green, 0 to 255"></label><label>B <input type="number" id="ccB" min="0" max="255" step="1" aria-label="Blue, 0 to 255"></label></div>
-  <div class="cc-kept" id="ccKept"></div>
-  <div class="cc-acts"><button class="btn small" type="button" id="ccPick" aria-pressed="false" data-tip="Then click any colour you can see.">Pick from the screen</button><button class="link" type="button" id="ccKeep" data-tip="Adds this colour to the Colours list, for every tab.">Keep in Colours</button></div>
+  <div class="cc-keep"><span class="cc-lab">Kept colours <small>Click an empty slot to keep this one</small></span><div class="cc-kept" id="ccKept"></div></div>
+  <div class="cc-acts"><button class="btn small" type="button" id="ccPick" aria-pressed="false" data-tip="Then click any colour you can see.">Pick from the screen</button></div>
   <div class="cc-acts end"><button class="btn small" type="button" id="ccCancel">Cancel</button><button class="btn small primary" type="button" id="ccDone">Done</button></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
@@ -4378,7 +4387,8 @@ function colsSync(){
   $('colsPick').setAttribute('aria-pressed', String(picking && pickFor === 'tray'));
 }
 function colHold(h){ colHeld = h || null; if (colHeld){ try { if (navigator.clipboard) navigator.clipboard.writeText(colHeld.toUpperCase()).catch(() => {}); } catch(e){} } colsSync(); }
-function colAdd(h){ cols = [h, ...cols.filter(x => x !== h)].slice(0, COLS_MAX); try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); } catch(e){} colHold(h); }
+function colStore(h){ if (!cols.includes(h)) cols = [...cols, h].slice(-COLS_MAX); try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); } catch(e){} } // slots fill in order; when all twelve are full the oldest makes room
+function colAdd(h){ colStore(h); colHold(h); }
 function viewHexAt(e){ // the colour on screen under the pointer, whatever is showing there
   const r = view.getBoundingClientRect(), k = view.width/Math.max(1, r.width), x = Math.floor((e.clientX - r.left)*k), y = Math.floor((e.clientY - r.top)*k);
   if (x < 0 || y < 0 || x >= view.width || y >= view.height) return null;
@@ -4440,7 +4450,9 @@ function ccSync(){
   $('ccS').style.background = `linear-gradient(to right,${css(hsvRgb(cc.h, 0, Math.max(cc.v, 12)))},${css(hsvRgb(cc.h, 100, Math.max(cc.v, 12)))})`;
   $('ccV').style.background = `linear-gradient(to right,#000,${css(hsvRgb(cc.h, cc.s, 100))})`;
   $('ccNew').style.background = hex; $('ccOld').style.background = cc.from;
-  $('ccKept').innerHTML = cols.map(h => `<button class="cc-k" type="button" data-cck="${h}" style="background:${h}" title="${h.toUpperCase()}" aria-label="Use ${h.toUpperCase()}"></button>`).join('');
+  { let html = cols.map(h => `<button class="cc-k" type="button" data-cck="${h}" style="background:${h}" title="${h.toUpperCase()}" aria-label="Use ${h.toUpperCase()}"></button>`).join('');
+    for (let i = cols.length; i < COLS_MAX; i++) html += '<button class="cc-k empty" type="button" data-ccadd aria-label="Keep this colour in an empty slot" title="Keep this colour here">+</button>';
+    if ($('ccKept')._h !== html){ $('ccKept')._h = html; $('ccKept').innerHTML = html; } }
   $('ccPick').setAttribute('aria-pressed', String(picking && pickFor === 'cc'));
 }
 function ccOpen(inp){
@@ -4449,6 +4461,7 @@ function ccOpen(inp){
   cc = {el: inp, key: ccKeyOf(inp), from: hex, sent: hex, h: 0, s: 0, v: 0, hex}; ccFromHex(hex);
   const el = $('cc'); el.hidden = false; ccSync();
   const r = inp.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+  if (ccPos){ ccPos = ccPlace(ccPos.x, Math.min(ccPos.y, Math.max(4, window.innerHeight - h - 4))); return; } // where it was last dragged to, kept whole on screen
   el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + 'px';
   el.style.top = (r.bottom + 8 + h <= window.innerHeight - 8 ? r.bottom + 8 : Math.max(8, r.top - h - 8)) + 'px';
 }
@@ -4465,8 +4478,16 @@ $('ccHex').addEventListener('input', e => { if (!cc) return; let v = e.target.va
 $('ccHex').addEventListener('blur', () => ccSync());
 for (const id of ['ccR', 'ccG', 'ccB']) $(id).addEventListener('input', () => { if (!cc) return; const c = ['ccR', 'ccG', 'ccB'].map(k => Math.round(parseFloat($(k).value))); if (c.some(v => !isFinite(v) || v < 0 || v > 255)) return; ccFromHex(rgbHex(c[0], c[1], c[2])); ccApply(); ccSync(); });
 $('ccOld').addEventListener('click', () => { if (!cc) return; ccFromHex(cc.from); ccApply(); ccSync(); });
-$('ccKept').addEventListener('click', e => { const b = e.target.closest('[data-cck]'); if (!b || !cc) return; ccFromHex(b.dataset.cck); ccApply(); ccSync(); });
-$('ccKeep').addEventListener('click', () => { if (!cc) return; const h = cc.hex || ccHexNow(); cols = [h, ...cols.filter(x => x !== h)].slice(0, COLS_MAX); try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); } catch(err){} colsSync(); ccSync(); toast(`${h.toUpperCase()} kept in Colours.`); });
+$('ccKept').addEventListener('click', e => { if (!cc) return;
+  if (e.target.closest('[data-ccadd]')){ const h = cc.hex || ccHexNow(); if (cols.includes(h)){ toast(`${h.toUpperCase()} is already kept.`); return; } colStore(h); colsSync(); ccSync(); toast(`${h.toUpperCase()} kept, for every tab.`); return; }
+  const b = e.target.closest('[data-cck]'); if (!b) return; ccFromHex(b.dataset.cck); ccApply(); ccSync(); });
+/* the box moves by its title bar, and opens where it was last left */
+let ccPos = null, ccDrag = null;
+function ccPlace(x, y){ const el = $('cc'); x = Math.max(4, Math.min(window.innerWidth - el.offsetWidth - 4, x)); y = Math.max(4, Math.min(window.innerHeight - 44, y)); el.style.left = x + 'px'; el.style.top = y + 'px'; return {x, y}; }
+$('ccHead').addEventListener('pointerdown', e => { const r = $('cc').getBoundingClientRect(); ccDrag = {dx: e.clientX - r.left, dy: e.clientY - r.top}; e.preventDefault(); });
+window.addEventListener('pointermove', e => { if (!ccDrag) return; if (e.pointerType === 'mouse' && !e.buttons){ ccDrag = null; return; } ccPos = ccPlace(e.clientX - ccDrag.dx, e.clientY - ccDrag.dy); }, true); // on the window, so a fast drag that leaves the bar still moves the box
+for (const ev of ['pointerup', 'pointercancel']) window.addEventListener(ev, () => { ccDrag = null; }, true);
+window.addEventListener('resize', () => { if (cc && ccPos) ccPos = ccPlace(ccPos.x, ccPos.y); });
 $('ccPick').addEventListener('click', () => { if (!cc) return; if (picking && pickFor === 'cc'){ endPick(); ccSync(); return; } if (!art) return; if (cropping) endCrop(false); if (turning) endTurn(false); if (picking) endPick(); selTool = null; selDraw = null; startPick('cc'); ccSync(); });
 $('ccDone').addEventListener('click', () => ccClose(true));
 $('ccCancel').addEventListener('click', () => ccClose(false));
