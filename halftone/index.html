@@ -157,6 +157,22 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .crop-bar{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100% - 24px);padding:6px 6px 6px 12px;font-size:13px;font-weight:600}
 .stage.cropping #view{cursor:crosshair}
 .stage.turning #view{cursor:default}
+.cols-pop{min-width:280px;display:grid;gap:8px}
+.cols-pop[hidden]{display:none}
+.cols-say{margin:0;font-size:12px;line-height:1.45;color:var(--muted)}
+.cols-list{display:grid;gap:4px}
+.col-row{display:flex;gap:4px}
+.col-use{flex:1;display:grid;grid-template-columns:28px auto;column-gap:10px;align-items:center;text-align:left;min-height:44px;padding:5px 10px 5px 6px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.col-use:hover{border-color:var(--line-strong)}
+.col-use i{grid-row:span 2;width:28px;height:28px;border-radius:3px;border:1px solid rgba(128,128,128,.5)}
+.col-use small{font-size:11px;font-weight:500;color:var(--muted)}
+.col-row.held .col-use{border-color:var(--accent)}
+.col-x{width:36px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--muted);font:inherit;font-size:16px;cursor:pointer}
+.col-x:hover{color:var(--ink);border-color:var(--line-strong)}
+.cols-dot{display:inline-block;width:12px;height:12px;border-radius:2px;border:1px solid rgba(128,128,128,.6);margin-right:5px;vertical-align:-1px}
+.pick-live{position:absolute;z-index:7;display:flex;align-items:center;gap:8px;padding:5px 9px 5px 5px;background:var(--panel);border:1.5px solid var(--line-strong);border-radius:var(--r);font-size:12px;font-weight:700;pointer-events:none}
+.pick-live[hidden]{display:none}
+.pick-live i{width:22px;height:22px;border-radius:3px;border:1px solid rgba(128,128,128,.6)}
 .turn-bar input[type="range"]{width:220px;max-width:46vw;height:36px;accent-color:var(--accent)}
 .turn-bar .turn-num{display:flex;align-items:center;gap:4px}
 .turn-bar input[type="number"]{width:78px;height:36px;padding:0 8px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:var(--bg);color:var(--ink);font:inherit;font-weight:700}
@@ -914,7 +930,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
 .group{scroll-margin-top:150px}
 .step-q::before{content:attr(data-n);display:block;margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 /* v94: versions in Split; Quick start as a feature; pink outline on Quick adjust */
-.pp-tag.ver{background:var(--accent);border-color:var(--accent);color:#ffffff}
+.pp-tag.tab,.pp-tag.ver{background:var(--accent);border-color:var(--accent);color:#ffffff}
 .vers #verSplit{margin-left:auto}
 .vers #verSplit + #verNew{margin-left:8px}
 .look-fold{gap:12px;min-height:76px;padding:10px 12px;border-width:2px;border-color:var(--ink);background:var(--soft)}
@@ -1029,6 +1045,11 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
           <button class="chip" type="button" id="selOnly" hidden aria-pressed="true" data-tip="Leave the rest untouched. On: everything you change happens inside the selection, and the rest prints as opened. Off: only skin tones, pale colours, smoothing and sharpen stay inside.">Rest untouched</button>
           <span class="sel-note" id="selNote" hidden></span>
         </div></div></div>
+        <div class="tdrop" data-tdrop="cols" data-stay><button class="chip tdrop-btn" type="button" id="colsDropBtn" aria-haspopup="true" aria-expanded="false" data-tip="Pick any colour you can see and keep it. Kept colours stay as you change tabs, ready to use in any colour square."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3M3 13l1-3.5 6-6 2.5 2.5-6 6L3 13z"/></svg><span>Colours</span><b class="tdrop-val" id="colsDropVal"></b><i class="car" aria-hidden="true"></i></button><div class="tdrop-pop cols-pop" hidden>
+          <button class="chip" type="button" id="colsPick" aria-pressed="false" data-tip="Then click any colour you can see: the art, the result, or another tab in Split view.">Pick a colour</button>
+          <p class="cols-say" id="colsSay"></p>
+          <div class="cols-list" id="colsList"></div>
+        </div></div>
         <div class="tgroup" role="group" aria-label="View" id="viewTray" title="Press V to step through the views"><span class="tg-label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>View</span>
           <button class="chip" type="button" data-view="shirt" aria-pressed="true">On shirt</button>
           <button class="chip" type="button" data-view="clear" aria-pressed="false" title="The print on a transparent background. Press T to flick to and from it.">Transparent</button>
@@ -1104,6 +1125,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
         <button class="btn small" type="button" id="turnCancel">Cancel</button><button class="btn small primary" type="button" id="turnApply">Apply</button></div>
       <div class="hint" id="brushHint" hidden></div>
       <div class="hint" id="pickHint" hidden>Click the colour to knock out · Esc to cancel</div>
+      <div class="pick-live" id="pickLive" hidden><i></i><span></span></div>
       <div class="drop" id="drop" hidden>Drop the art to open it</div>
     </section>
     </div>
@@ -2956,6 +2978,7 @@ const origCanvas = document.createElement('canvas'), origCtx = origCanvas.getCon
 let lastCls = null, paintN = 0, origFor = 0, origMips = null;
 // history: the last 40 changes to this design (see the History section)
 let steps = [], stepPos = -1, stepTimer = 0, stepLabel = null, restoring = false, unsaved = false;
+let cols = [], colHeld = null, paneTabsSig = '', lastCurId = 0; // Colours: the kept colours (every tab shares them) and the one ready to use; which tabs the Split view menus list
 let turning = null;  // while straightening: {prev, w0, h0, q (quarter turns), fine (degrees), from}
 let cropping = null; // while drawing a crop: {prev, F, rect: [x0, y0, x1, y1] in file pixels, drag, geo}
 let folds = [];      // the panel's sections, filled once their titles become fold buttons
@@ -3197,7 +3220,7 @@ const PANES = [ // [kind, group, name, what it shows, picture]
   ['map', 'after', 'Ink map', 'White prints solid, pink turns into dots, grey is removed.', 'map'],
   ['sel', 'after', 'Selection', 'The active part: white is selected.', 'sel']
 ];
-const PANE_GROUPS = {before: 'Before', after: 'After', ver: 'Other versions'};
+const PANE_GROUPS = {before: 'Before', after: 'After', ver: 'Other versions', tab: 'Other tabs'};
 const CHECKS = 'repeating-conic-gradient(#cccccc 0 25%, #ffffff 0 50%) 0 0/8px 8px';
 const clearLegend = () => { const s = srcStats, cut = s && s.vis && outReady ? Math.round((1 - lastOn/s.vis)*100) : 0; return [[CHECKS, cut > 0 ? `Clear film · ink area down ${cut}%` : 'Clear film']]; };
 const ORIGCLEAR_LEGEND = [[CHECKS, 'Clear film']];
@@ -3236,7 +3259,7 @@ function prepareViews(){
   if (ks.some(k => isMask(k) && !isClear(k) && !isWhite(k))) buildOrigMask();
 }
 function levelsFor(kind){
-  if (isVer(kind)){ const v = verOf(kind); return v && v.pic ? v.pic.mips : null; }
+  if (isVer(kind) || isTab(kind)){ const q = picOf(kind); return q ? q.mips : null; }
   if (kind === 'orig' || kind === 'origclear' || kind === 'origwhite') return srcMips;
   if (kind === 'clear') return outMips || srcMips; // the film itself: the PNG's own colours
   if (kind === 'white') return viewMips || outMips || srcMips;
@@ -3247,8 +3270,18 @@ function levelsFor(kind){
 }
 const isVer = kind => /^ver\d$/.test(kind || ''); // another version of this design, as it last looked
 const verOf = kind => art && art.vers && isVer(kind) ? art.vers[+kind.slice(3)] : null;
-const isMask = kind => kind !== 'shirt' && kind !== 'orig' && !isVer(kind);
-const paneBg = kind => isMask(kind) ? '#1a1a1a' : isVer(kind) && verOf(kind) && verOf(kind).pic ? verOf(kind).pic.shirt : st.shirt;
+const isTab = kind => /^tab\d+$/.test(kind || ''); // another open design, as it last looked in its tab
+const tabOf = kind => isTab(kind) ? docs.find(d => d.id === +kind.slice(3) && d !== cur) || null : null;
+const picOf = kind => { const v = isVer(kind) ? verOf(kind) : tabOf(kind); return v && v.pic ? v.pic : null; };
+const isMask = kind => kind !== 'shirt' && kind !== 'orig' && !isVer(kind) && !isTab(kind);
+const paneBg = kind => isMask(kind) ? '#1a1a1a' : picOf(kind) ? picOf(kind).shirt : st.shirt;
+function docKeepPic(d){ // a picture of the design on screen, as it looks on the shirt, so another tab can show it beside its own
+  const lv = outReady ? (viewMips || outMips) : null; if (!d || !lv || !lv[0] || !lv[0].width) return;
+  const src = lv[0], k = Math.min(1, 1600/Math.max(src.width, src.height)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(src.width*k)); c.height = Math.max(1, Math.round(src.height*k));
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height);
+  const mips = buildMips(c); mips.scale = k; d.pic = {mips, shirt: st.shirt};
+}
 function verThumbLive(){ // the picture of the print as it stands: on the version showing, or on the design when it has one version
   const lv = viewMips || outMips; if (!art || !lv || !lv.length) return;
   const t = smallPic(lv[lv.length - 1], 80, st.shirt); if (!t) return;
@@ -3416,9 +3449,9 @@ function drawPane(p, dpr){
   vctx.save(); vctx.beginPath(); vctx.rect(X, Y, W, H); vctx.clip();
   vctx.fillStyle = paneBg(p.kind); vctx.fillRect(X, Y, W, H);
   const levels = levelsFor(p.kind);
-  if (!levels && isVer(p.kind)){ // nothing to show yet: this version has not been on screen this visit
+  if (!levels && (isVer(p.kind) || isTab(p.kind))){ // nothing to show yet: this version, or that tab, has not been on screen this visit
     const i = +p.kind.slice(3); vctx.fillStyle = '#e6e6e6'; vctx.textAlign = 'center'; vctx.textBaseline = 'middle'; vctx.font = `600 ${Math.round(14*dpr)}px Inter, Arial, sans-serif`;
-    vctx.fillText(`Click version ${verLetter(i)} once, then come back, to see it here.`, X + W/2, Y + H/2); vctx.textAlign = 'start'; vctx.textBaseline = 'alphabetic';
+    vctx.fillText(isTab(p.kind) ? 'Open that tab once, then come back, to see it here.' : `Click version ${verLetter(i)} once, then come back, to see it here.`, X + W/2, Y + H/2); vctx.textAlign = 'start'; vctx.textBaseline = 'alphabetic';
   }
   if (levels){
     const roomy = hasRoom() && outReady, inRoom = roomy && (levels === srcMips || levels === origMips); // the original, drawn where it sits in the bigger print
@@ -3598,14 +3631,16 @@ function syncLegend(){
 }
 function syncPaneOptions(){ // each side's button and menu
   const others = art && art.vers ? art.vers.map((v, i) => i === art.verOn ? null : ['ver' + i, 'ver', `Version ${verLetter(i)} · ${verStyle(v.snap)}`, v.pic ? 'This version as it last looked. Click it in Versions to change it.' : 'Click this version once in Versions and it can be compared here.', 'shirt']).filter(Boolean) : [];
-  const list = PANES.filter(([v]) => v !== 'sel' || rules.length).concat(others);
+  { const id = cur ? cur.id : 0; if (id !== lastCurId){ if (lastCurId && docs.some(d => d.id === lastCurId)) for (const k of ['paneA', 'paneB']) if (st[k] === 'tab' + id) st[k] = 'tab' + lastCurId; lastCurId = id; } } // a side that showed the tab now on screen shows the one just left
+  const tabsO = docs.filter(d => d !== cur && d.art && !d.art.isSample).map(d => ['tab' + d.id, 'tab', esc(d.art.name.length > 28 ? d.art.name.slice(0, 26) + '…' : d.art.name), d.pic ? 'That design as it last looked in its tab. Handy for matching colours between two logos.' : 'Open that tab once, then come back, and it shows here.', 'shirt']);
+  const list = PANES.filter(([v]) => v !== 'sel' || rules.length).concat(others, tabsO);
   for (const id of ['paneA', 'paneB']){
     if (!list.some(([v]) => v === st[id])) st[id] = 'shirt';
     const [, group, name0] = list.find(([v]) => v === st[id]), live = art && art.vers && st[id] === 'shirt' ? `Version ${verLetter(art.verOn)} · ` : '', name = live + name0;
-    $(id + 'Btn').innerHTML = `<span class="pp-tag ${group}">${group === 'before' ? 'Before' : group === 'ver' ? 'Version' : 'After'}</span><span>${name}</span><span class="pp-chev" aria-hidden="true"></span>`;
+    $(id + 'Btn').innerHTML = `<span class="pp-tag ${group}">${group === 'before' ? 'Before' : group === 'ver' ? 'Version' : group === 'tab' ? 'Tab' : 'After'}</span><span>${name}</span><span class="pp-chev" aria-hidden="true"></span>`;
     let html = '', last = '';
     for (const [v, g, n, d, pic] of list){
-      if (g !== last){ html += (last ? '</div>' : '') + `<div class="pp-col${g === 'ver' ? ' wide' : ''}"><div class="pp-group" role="presentation">${PANE_GROUPS[g]}</div>`; last = g; }
+      if (g !== last){ html += (last ? '</div>' : '') + `<div class="pp-col${g === 'ver' || g === 'tab' ? ' wide' : ''}"><div class="pp-group" role="presentation">${PANE_GROUPS[g]}</div>`; last = g; }
       const shirtPic = pic === 'shirt' ? ` style="background:radial-gradient(circle,#f7b500 0 30%,transparent 32%),${st.shirt}"` : '';
       html += `<button class="pp-opt" type="button" role="option" data-kind="${v}" aria-selected="${v === st[id]}" data-tip="${esc(d)}"><span class="pp-icon i-${pic}"${shirtPic}></span><span class="pp-n">${n}</span></button>`;
     }
@@ -3962,6 +3997,7 @@ view.addEventListener('pointerdown', e => {
   view.setPointerCapture(e.pointerId); stage.classList.add('panning');
 });
 view.addEventListener('pointermove', e => {
+  if (picking && pickFor === 'tray'){ trayHover(e); return; }
   if (turning) return;
   if (cropping){ cropMove(e); return; }
   if (selDraw){ selMove(e); return; }
@@ -3970,7 +4006,7 @@ view.addEventListener('pointermove', e => {
   if (!drag || !geo) return;
   st.cx = drag.cx - (e.clientX - drag.x)*geo.dpr/geo.k; st.cy = drag.cy - (e.clientY - drag.y)*geo.dpr/geo.k; render();
 });
-view.addEventListener('pointerleave', () => { if (brushAt && !stroke && !aStroke){ brushAt = null; drawBrush(); } });
+view.addEventListener('pointerleave', () => { $('pickLive').hidden = true; if (brushAt && !stroke && !aStroke){ brushAt = null; drawBrush(); } });
 const endDrag = () => { if (selDraw) selUp(); if (aStroke) areaUp(); if (stroke) brushUp(); drag = null; stage.classList.remove('panning'); if (cropping) cropping.drag = null; };
 view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag);
 view.addEventListener('wheel', e => {
@@ -4287,11 +4323,56 @@ function syncDrops(){ // the buttons say what is on, so nothing is hidden by bei
 function startPick(target){ // target: 'knock', or the number of the colour range being sampled
   endBrush();
   pickFor = target; picking = true; stage.classList.add('picking');
-  $('pickHint').textContent = target === 'strip' ? 'Click the part to test, such as a face · Esc to cancel' : target === 'knock' ? 'Click the colour to knock out · Esc to cancel' : target === 'bg' ? 'Click the background colour · Esc to cancel' : 'Click a colour in the art to add it to the selection · Esc to cancel';
+  $('pickHint').textContent = target === 'tray' ? 'Click any colour you can see to keep it · Esc to cancel' : target === 'strip' ? 'Click the part to test, such as a face · Esc to cancel' : target === 'knock' ? 'Click the colour to knock out · Esc to cancel' : target === 'bg' ? 'Click the background colour · Esc to cancel' : 'Click a colour in the art to add it to the selection · Esc to cancel';
   $('pickHint').hidden = false; syncPickChips();
 }
-function endPick(){ picking = false; pickFor = null; stage.classList.remove('picking'); $('pickHint').hidden = true; syncPickChips(); }
+function endPick(){ picking = false; pickFor = null; stage.classList.remove('picking'); $('pickHint').hidden = true; $('pickLive').hidden = true; syncPickChips(); colsSync(); }
+/* ---------- Colours (v135): any colour on screen, kept in a tray every tab shares, used in any colour square ---------- */
+const COLS_KEY = 'tsw-ge-colours', COLS_MAX = 12;
+try { const a = JSON.parse(localStorage.getItem(COLS_KEY) || '[]'); if (Array.isArray(a)) cols = a.filter(h => /^#[0-9a-f]{6}$/.test(h)).slice(0, COLS_MAX); } catch(e){}
+function colsSync(){
+  if (!$('colsList')) return;
+  $('colsList').innerHTML = cols.map(h => { const c = hexRgb(h);
+    return `<div class="col-row${h === colHeld ? ' held' : ''}"><button class="col-use" type="button" data-col="${h}" aria-pressed="${h === colHeld}" data-tip="${h === colHeld ? 'Ready to use. Click again to put it down.' : 'Makes this colour ready: then click any colour square to use it there. It is copied as well.'}"><i style="background:${h}"></i><span>${h.toUpperCase()}</span><small>R ${c[0]} · G ${c[1]} · B ${c[2]}</small></button><button class="col-x" type="button" data-coldel="${h}" aria-label="Remove ${h.toUpperCase()}">×</button></div>`; }).join('');
+  $('colsSay').textContent = colHeld ? `${colHeld.toUpperCase()} is ready. Click any colour square to use it there. It’s copied too, to paste where a colour is typed.`
+    : cols.length ? 'Click a kept colour, then click any colour square to use it there.' : 'No colours kept yet. Pick one from anything you can see: the art, the result, or another tab in Split view.';
+  $('colsDropVal').innerHTML = colHeld ? `<i class="cols-dot" style="background:${colHeld}"></i>${colHeld.toUpperCase()}` : '';
+  $('colsDropBtn').classList.toggle('has', !!colHeld);
+  $('colsPick').setAttribute('aria-pressed', String(picking && pickFor === 'tray'));
+}
+function colHold(h){ colHeld = h || null; if (colHeld){ try { if (navigator.clipboard) navigator.clipboard.writeText(colHeld.toUpperCase()).catch(() => {}); } catch(e){} } colsSync(); }
+function colAdd(h){ cols = [h, ...cols.filter(x => x !== h)].slice(0, COLS_MAX); try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); } catch(e){} colHold(h); }
+function viewHexAt(e){ // the colour on screen under the pointer, whatever is showing there
+  const r = view.getBoundingClientRect(), k = view.width/Math.max(1, r.width), x = Math.floor((e.clientX - r.left)*k), y = Math.floor((e.clientY - r.top)*k);
+  if (x < 0 || y < 0 || x >= view.width || y >= view.height) return null;
+  try { const q = vctx.getImageData(x, y, 1, 1).data; return rgbHex(q[0], q[1], q[2]); } catch(err){ return null; }
+}
+function trayHover(e){
+  const h = viewHexAt(e), el = $('pickLive'); if (!h){ el.hidden = true; return; }
+  const r = stage.getBoundingClientRect(); el.firstElementChild.style.background = h; el.lastElementChild.textContent = h.toUpperCase(); el.hidden = false;
+  const x = e.clientX - r.left + 18, y = e.clientY - r.top + 18;
+  el.style.left = Math.max(4, Math.min(r.width - el.offsetWidth - 4, x)) + 'px'; el.style.top = Math.max(4, Math.min(r.height - el.offsetHeight - 4, y)) + 'px';
+}
+$('colsPick').addEventListener('click', () => {
+  if (picking && pickFor === 'tray'){ endPick(); return; }
+  if (!art) return;
+  if (cropping) endCrop(false); if (turning) endTurn(false); if (picking) endPick(); selTool = null; selDraw = null;
+  startPick('tray'); dropClose(); colsSync();
+});
+$('colsList').addEventListener('click', e => {
+  const x = e.target.closest('[data-coldel]');
+  if (x){ const h = x.dataset.coldel; cols = cols.filter(c => c !== h); if (colHeld === h) colHeld = null; try { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); } catch(err){} colsSync(); return; }
+  const b = e.target.closest('[data-col]'); if (b) colHold(b.dataset.col === colHeld ? null : b.dataset.col);
+});
+document.addEventListener('click', e => { // a colour that is ready goes into the next colour square clicked, in place of the square's own picker
+  const t = e.target; if (!colHeld || !t || t.tagName !== 'INPUT' || t.type !== 'color' || t.disabled) return;
+  e.preventDefault(); e.stopPropagation();
+  const h = colHeld; t.value = h; t.dispatchEvent(new Event('input', {bubbles: true})); t.dispatchEvent(new Event('change', {bubbles: true}));
+  colHeld = null; colsSync(); toast(`${h.toUpperCase()} used. It stays in Colours to use again.`);
+}, true);
+colsSync();
 function pickAt(e){
+  if (pickFor === 'tray'){ const h = viewHexAt(e); if (!h) return; endPick(); colAdd(h); toast(`${h.toUpperCase()} kept. Click any colour square to use it there.`); return; }
   const r = view.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, g = geoAt(px, py);
   const x = Math.floor((px*g.dpr - g.dx)/g.k), y = Math.floor((py*g.dpr - g.dy)/g.k);
   if (x < 0 || y < 0 || x >= srcCanvas.width || y >= srcCanvas.height){ toast('Click on the art to pick a colour.'); return; }
@@ -4314,7 +4395,7 @@ function pickAt(e){
 $('pickBtn').addEventListener('click', () => picking ? endPick() : startPick('knock'));
 $('knockReset').addEventListener('click', () => { st.knock = null; syncKnock(); schedule(); });
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && picking) endPick();
+  if (e.key === 'Escape' && picking) endPick(); else if (e.key === 'Escape' && colHeld) colHold(null);
   if (cropping && (e.key === 'Escape' || e.key === 'Enter')){ e.preventDefault(); endCrop(e.key === 'Enter'); }
   else if (turning && (e.key === 'Escape' || (e.key === 'Enter' && !(e.target && e.target.tagName === 'BUTTON')))){ e.preventDefault(); endTurn(e.key === 'Enter'); }
 });
@@ -5341,7 +5422,7 @@ function syncFileInfo(){
 /* ---------- tabs: several designs open at once, like Photoshop ---------- */
 function stashDoc(){ // keeps everything about the design on screen in its tab
   if (!cur || !art) return;
-  commitStep();
+  commitStep(); if (!art.isSample) docKeepPic(cur);
   Object.assign(cur, {art, snap: snapshot(), activeRule, steps, stepPos, unsaved, zoom: st.zoom, cx: st.cx, cy: st.cy,
     suffix: $('nameSuffix').value, lab: $('labelFull').value, labShort: $('labelShort').value, done: [...document.querySelectorAll('.panel > .group.done')].map(g => g.id)});
 }
@@ -5413,6 +5494,11 @@ function artThumb(a){ // the file as it was opened, for its tab
 }
 function renderTabs(){
   persistSoon(); syncBatchNote(); setTimeout(syncSendBoard, 0);
+  { // the Split view menus list the other tabs; a side that showed the tab now on screen shows the one just left
+    const sig = docs.map(d => d.id + (d === cur ? '*' : '') + (d.pic ? 'p' : '') + (d.art ? d.art.name : '')).join('|');
+    if (sig !== paneTabsSig){ paneTabsSig = sig; const was = st.paneA + st.paneB;
+      syncPaneOptions(); if (st.paneA + st.paneB !== was && st.view === 'split' && art){ prepareViews(); render(); } }
+  }
   $('tabsActions').hidden = docs.filter(d => (d === cur ? art : d.art) && !(d === cur ? art : d.art).isSample).length < 2;
   $('tabsList').innerHTML = docs.map(d => {
     const a = d === cur ? art : d.art, name = a ? a.name : 'Opening…', dirty = (d === cur ? unsaved : d.unsaved) && a && !a.isSample;
