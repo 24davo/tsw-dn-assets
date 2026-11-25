@@ -1204,6 +1204,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
           <button class="choice" type="button" data-finish="prep" hidden><span class="choice-t">Prep only</span><span class="choice-d">Tidy up and save.</span></button>
           <button class="choice" type="button" data-finish="dots"><span class="choice-t">Halftone</span><span class="choice-d">Shading becomes dots.</span></button>
           <button class="choice" type="button" data-finish="flat"><span class="choice-t">Trace prep</span><span class="choice-d">Flat colours for tracing.</span></button>
+          <button class="choice wide" type="button" data-finish="asis"><span class="choice-t">As it is</span><span class="choice-d">Nothing changed. Soft edges and see-through parts stay. Edit from here.</span></button>
           <button class="choice wide" type="button" data-finish="dtg"><span class="choice-t">DTG</span><span class="choice-d">Solid background behind the art. Nothing removed, no dots.</span></button>
         </div>
         <p class="style-desc" id="finishNowD" aria-live="polite"></p>
@@ -2157,6 +2158,7 @@ function engine(){
     const clean = !!p.clean && !one && !p.cut && 0.299*p.knock[0] + 0.587*p.knock[1] + 0.114*p.knock[2] < 70; // clean colour dots: dark tees only
     const L2 = blk ? new Float32Array(256) : null;
     if (L2) for (let v = 0; v < 256; v++){ const u = v/255; L2[v] = u <= 0.04045 ? u/12.92 : Math.pow((u + 0.055)/1.055, 2.4); }
+    const raw = !!p.raw; // As it is: nothing made solid, removed or screened
     const cut = p.cut || 0; // clean cut: no screen, pixels at least this solid print solid, the rest is removed
     const hard = p.hard || 0; // hard edge (dots only): see-through pixels at least this solid become solid, the rest go, before any dots
     let lv = null, bcY = null; // Levels (like Photoshop's), applied to the colours before anything else; bcY: Brightness/Contrast on lightness only
@@ -2226,7 +2228,7 @@ function engine(){
     let amt = crisp ? new Uint8Array(w*h) : null, amn = null, amx = null;
     const nodr = rules.map((R, k) => R.action === 'nodots' ? k : -1).filter(k => k >= 0); // No dots ranges: these parts are a clean cut inside a halftone
     const inkr = rules.map((R, k) => R.action === 'ink' ? k : -1).filter(k => k >= 0), zn = inkr.length ? new Uint8Array(w*h) : null; // Solid colour parts: what prints here prints in the part's colour
-    const rampr = p.cut ? [] : rules.map((R, k) => R.action === 'ramp' ? k : -1).filter(k => k >= 0); // Own dots ranges: these parts have their own knock-out fade
+    const rampr = p.cut || p.raw ? [] : rules.map((R, k) => R.action === 'ramp' ? k : -1).filter(k => k >= 0); // Own dots ranges: these parts have their own knock-out fade
     let sel = selOut >= 0 && selOut < nr ? new Uint8Array(w*h) : null;
     let on = 0;
     const fade = p.fade && p.fade.px > 0 && !cut ? p.fade : null, fo = !!(fade && fade.out);
@@ -2337,6 +2339,16 @@ function engine(){
             else { c += ((a >= 128 ? 1 : 0) - c)*s; if (s >= 0.5) kept = true; } // keep solid: full ink wherever the art is at least half opaque
           }
           if (c <= 0){ cls[i >> 2] = 1; continue; }
+        }
+        if (raw){
+          let zv = 0;
+          if (zn){ const Lz = (0.299*r + 0.587*g + 0.114*b)/255; for (const k of inkr){ const s = wt(k, r, g, b, Lz, x, y); if (k === selOut) sel[i >> 2] = (s*255 + 0.5) | 0; if (s >= 0.5) zv = k + 1; } zn[i >> 2] = zv; }
+          const A8 = c >= 1 ? 255 : (c*255 + 0.5) | 0; if (!A8){ cls[i >> 2] = 1; continue; }
+          cls[i >> 2] = A8 === 255 ? 4 : 3;
+          if (zv){ const T = rules[zv - 1].to; out[i] = T[0]; out[i+1] = T[1]; out[i+2] = T[2]; }
+          else if (one){ out[i] = ir; out[i+1] = ig; out[i+2] = ib; }
+          else { out[i] = r; out[i+1] = g; out[i+2] = b; }
+          out[i+3] = A8; on++; continue;
         }
         if (blk && !kept){ // a part kept solid by hand stays as it is
           const R8 = r < 0 ? 0 : r > 255 ? 255 : r | 0, G8 = g < 0 ? 0 : g > 255 ? 255 : g | 0, B8 = b < 0 ? 0 : b > 255 ? 255 : b | 0;
@@ -2971,6 +2983,7 @@ function syncLookPics(){
 const FLAT_KEYS = {flat: false, flatN: 0, flatSnap: true, flatTidy: 0.5, flatSmooth: 4, flatDrop: '', flatClear: '', flatBg: 'auto', flatBgHex: '#000000'}; // Trace prep (flatClear: colours that save as clear): flat colours, how many (0 = found from the art), pure white and black, smallest detail (mm), colours left out
 const isFlat = () => st.finish === 'cut' && !!st.flat;
 const isDtg = () => st.finish === 'cut' && !!st.dtg && !st.flat; // DTG: a solid background, nothing removed
+const isAsis = () => st.finish === 'cut' && !!st.asis && !st.flat && !st.dtg; // As it is: nothing made solid, nothing removed
 const dtgColour = () => /^#[0-9a-f]{6}$/i.test(st.dtgHex || '') ? st.dtgHex : st.shirt;
 const blkOnNow = () => st.blkOn && !isDtg(); // the DTF black-ink limit and its simulation don't apply to DTG
 const routeOf = f => f === 'cut' ? 'cut' : 'dots';
@@ -3099,6 +3112,11 @@ const blkActs = () => blkOnNow() && linY(hexRgb(st.shirt)) < linY(hexRgb(blkHex(
 function hexRgb(h){ const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function rgbHex(r, g, b){ return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join(''); }
 function params(){
+  const P = paramsBase();
+  if (isAsis()) Object.assign(P, {raw: true, tone: false, cut: 0, gamma: 1, contrast: 1, drop: 0, solid: 1, hlv: null, rich: false, clean: false, crisp: 0, speck: false, speckT: 0, flat: null, inkBlack: null, backing: null, edge: 0, contract: 0, hard: 0, fade: null});
+  return P;
+}
+function paramsBase(){
   return {lpi: st.lpi, angle: st.angle, shape: st.shape, dpi: DPI,
           tone: knockLook(st.look), metric: st.look === 'full' ? 'lum' : 'max',
           k0: st.k0/100, k1: st.k1/100, ktol: st.ktol/100, knock: hexRgb(st.knock || st.shirt),
@@ -4725,7 +4743,7 @@ $('lookQuick').addEventListener('click', e => { const b = e.target.closest('[dat
   syncLookQuick(); syncQuick(); });
 var INK_NAMES = {art: 'Original colours', one: 'One solid colour', two: 'Two solid colours', three: 'Three solid colours'};
 function inkN(){ return st.ink === 'two' ? 2 : st.ink === 'three' ? 3 : 0; }
-function isMulti(){ return inkN() > 0 && st.finish === 'cut' && !st.flat && !st.dtg; } /* two or three solid colours: Clean cut only */
+function isMulti(){ return inkN() > 0 && st.finish === 'cut' && !st.flat && !st.dtg && !st.asis; } /* two or three solid colours: Clean cut only */
 function inkPairs(){ return (st.inks || '').split(',').map(x => x.split(':')).filter(a => a.length === 2 && /^#[0-9a-f]{6}$/.test(a[0]) && /^#[0-9a-f]{6}$/.test(a[1])); } /* "found colour:prints as" */
 function inkMap(){ return inkPairs().map(a => hexRgb(a[0]).concat(hexRgb(a[1]))); }
 function inkParts(){ let rs = []; try { rs = rules; } catch(e){} return rs.map((R, i) => [R, i]).filter(x => x[0].action === 'ink'); }
@@ -4834,15 +4852,16 @@ function syncLook(){ syncLookQuick(); syncLookPics(); syncQuick(); for (const r 
 function syncRouteSum(){ syncSums(); }
 $('finishChips').addEventListener('click', e => {
   const b = e.target.closest('[data-finish]'); if (!b) return;
-  const v = b.dataset.finish, wasPrep = isPrep(), wasFlat = isFlat(), wasDtg = isDtg();
-  if (v === (wasFlat ? 'flat' : wasDtg ? 'dtg' : st.finish)) return; // Clean cut is already on when its prep-only Quick start is
-  st.finish = v === 'prep' || v === 'flat' || v === 'dtg' ? 'cut' : v;
+  const v = b.dataset.finish, wasPrep = isPrep(), wasFlat = isFlat(), wasDtg = isDtg(), wasAsis = isAsis();
+  if (v === (wasFlat ? 'flat' : wasDtg ? 'dtg' : wasAsis ? 'asis' : st.finish)) return; // Clean cut is already on when its prep-only Quick start is
+  st.finish = v === 'prep' || v === 'flat' || v === 'dtg' || v === 'asis' ? 'cut' : v;
+  st.asis = v === 'asis'; // As it is: Prep only with nothing made solid or removed
   st.flat = v === 'flat'; // Trace prep is Prep only with the colours flattened
   st.dtg = v === 'dtg';   // DTG is Prep only on a solid background
   if (v === 'dtg') noteChange('DTG');
-  if (v === 'prep' || v === 'flat' || v === 'dtg' || (v === 'cut' && (wasPrep || wasFlat || wasDtg))){ // Prep only is Clean cut with the Clean up only start; Clean cut from there knocks the shirt colour out again
+  if (v === 'prep' || v === 'flat' || v === 'dtg' || v === 'asis' || (v === 'cut' && (wasPrep || wasFlat || wasDtg || wasAsis))){ // Prep only is Clean cut with the Clean up only start; Clean cut from there knocks the shirt colour out again
     if (st.look === 'shadows') dropShadowRule();
-    st.look = v === 'cut' ? 'knock' : 'edges'; Object.assign(st, LOOKS[st.look]); syncLook(); syncSliders(); updateNotes(); noteChange(v === 'prep' ? 'Prep only' : v === 'flat' ? 'Trace prep' : null);
+    st.look = v === 'cut' ? 'knock' : 'edges'; Object.assign(st, LOOKS[st.look]); syncLook(); syncSliders(); updateNotes(); noteChange(v === 'prep' ? 'Prep only' : v === 'flat' ? 'Trace prep' : v === 'asis' ? 'As it is' : null);
   }
   if (v === 'dots' && st.look !== 'deep'){ st.look = 'deep'; Object.assign(st, LOOKS.deep); syncLook(); syncSliders(); updateNotes(); } // Halftone starts at Shadows to dots
   // a Quick start the other style doesn't offer becomes its nearest one: Shadows to dots and Full halftone → Knock out
@@ -4850,8 +4869,8 @@ $('finishChips').addEventListener('click', e => {
   if (!ROUTE_LOOKS[routeOf(st.finish)].includes(st.look)){ if (st.look === 'shadows') dropShadowRule(); st.look = st.finish === 'cut' ? 'knock' : 'deep'; Object.assign(st, LOOKS[st.look]); syncLook(); syncSliders(); updateNotes(); }
   syncFinish(); syncRules(); remember(); schedule();
 });
-const isPrep = () => st.finish === 'cut' && st.look === 'edges' && !st.flat && !st.dtg;
-function syncFinChips(){ syncChips('finishChips', 'finish', isFlat() ? 'flat' : isDtg() ? 'dtg' : st.finish); syncDtg();
+const isPrep = () => st.finish === 'cut' && st.look === 'edges' && !st.flat && !st.dtg && !st.asis;
+function syncFinChips(){ syncChips('finishChips', 'finish', isFlat() ? 'flat' : isDtg() ? 'dtg' : isAsis() ? 'asis' : st.finish); syncDtg();
   const b = $('finishChips').querySelector('[aria-pressed="true"]'); if (b && $('finishNowD')) $('finishNowD').innerHTML = `<b>${esc(b.querySelector('.choice-t').textContent)}:</b> ${esc(b.querySelector('.choice-d').textContent)}`; }
 /* "Better as DTG?": measured on a small copy of the art as it sits on the shirt colour.
    glow = soft fades and glows as a share of the ink (hard to blend into the shirt with dots: the base ink lifts them).
@@ -4893,7 +4912,8 @@ $('dtgHintX').addEventListener('click', () => { if (art) art.dtgHintOff = true; 
 $('dtgHintBtn').addEventListener('click', () => { const b = $('finishChips').querySelector('[data-finish="dtg"]'); if (b) b.click(); $('dtgHint').hidden = true; });
 function syncDtg(){ // the background colour row, and the Quick start row it replaces
   const on = isDtg(); if (!$('dtgField')) return;
-  $('dtgField').hidden = !on; $('lookQuickBox').hidden = on; $('lookFold').hidden = on; if (on) $('lookBox').hidden = true; else $('lookBox').hidden = $('lookFold').getAttribute('aria-expanded') !== 'true';
+  const plain = on || isAsis(); // these two styles have no Quick starts to choose from
+  $('dtgField').hidden = !on; $('lookQuickBox').hidden = plain; $('lookFold').hidden = plain; if (plain) $('lookBox').hidden = true; else $('lookBox').hidden = $('lookFold').getAttribute('aria-expanded') !== 'true';
   if (!on) return;
   const own = /^#[0-9a-f]{6}$/i.test(st.dtgHex || '');
   for (const b of $('dtgChips').querySelectorAll('[data-dtg]')) b.setAttribute('aria-pressed', String(b.dataset.dtg === (own ? st.dtgHex.toLowerCase() : 'shirt')));
@@ -4964,8 +4984,8 @@ function syncFinish(){
   syncFinChips(); syncLookQuick();
   const cut = st.finish === 'cut', r = routeOf(st.finish), list = ROUTE_LOOKS[r];
   for (const el of document.querySelectorAll('.dotf, .dotk')) el.hidden = cut;
-  $('speckSizeBox').hidden = !cut;
-  $('cutField').hidden = !cut; $('ktolField').hidden = !cut; syncFlat();
+  $('speckSizeBox').hidden = !cut || isAsis();
+  $('cutField').hidden = !cut || isAsis(); $('ktolField').hidden = !cut || isAsis(); syncFlat();
   $('hardField').hidden = cut;
   $('toneGroup').hidden = cut; // Ink density: dots only
   for (const lab of $('looks').querySelectorAll('.look')){ // this style's Quick starts, in its order
@@ -4974,8 +4994,9 @@ function syncFinish(){
     if (i >= 0){ lab.querySelector('.look-t').textContent = LOOK_TEXT[r][v][0]; lab.querySelector('.look-d').textContent = LOOK_TEXT[r][v][1]; lab.dataset.tip = LOOK_TEXT[r][v][2]; }
   }
   syncLookPics();
-  nameGroup('finishGroup', isFlat() ? 'Flat colours' : cut ? 'Threshold' : 'Halftone dots',
+  nameGroup('finishGroup', isFlat() ? 'Flat colours' : isAsis() ? 'As it is' : cut ? 'Threshold' : 'Halftone dots',
     isFlat() ? 'How many flat colours the art is reduced to, and how small a detail is kept. For tracing in Illustrator.' :
+    isAsis() ? 'Nothing is made solid or removed here: the art keeps its own soft edges and see-through parts.' :
     cut ? 'How solid a pixel must be to print. Anything less solid is removed, so the film has no haze.'
         : 'How fine the dots are (lines per inch), their angle and their shape. 30 lpi suits most tees.');
   syncLegend(); updateChecks(); syncRouteSum();
@@ -5353,6 +5374,7 @@ function updateChecks(){
   if (st.sharp) rows.push(['info', '↗', `Sharpened ${st.sharp}% at ${(+st.sradius).toFixed(1)} px`, 'Unsharp mask on the art at print size, before the dots.']);
   if (st.clean && st.finish !== 'cut' && knockLook(st.look) && st.ink !== 'one' && linY(hexRgb(st.knock || st.shirt)) < linY([70, 70, 70]))
     rows.push(['info', '✦', 'Clean colour dots', 'The dots in fades print in the bright version of their colour, so the fade looks like the art without muddy dark ink.']);
+  if (isAsis()) rows.push(['info', '◇', 'As it is: nothing made solid or removed', 'The art keeps its own colours, soft edges and see-through parts. Size, crop, sharpen, brightness and levels, background removal, colour parts and touch-ups still work. The Edge tools, speck clean-up and the DTF black-ink limit are off in this style. For DTF film with no haze, choose Clean cut or Halftone.']);
   if (isDtg()) rows.push(['info', '▣', `DTG: solid ${dtgColour().toUpperCase()} background`, 'The whole print box is filled behind the art, nothing is removed, and the DTF black-ink limit is off. Your DTG software knocks the shirt colour out.']);
   if (blkOnNow()) rows.push(['info', '◐', `DTF black ink allowed for (${blkHex().toUpperCase()})`, blkActs() && st.ink !== 'one'
     ? 'On this tee, colours darker than the ink can print got fewer dots, so the tee’s black does the darkest parts. The views show ink no darker than this grey.'
@@ -5558,7 +5580,7 @@ function loadDoc(d){ // puts a tab's design on screen: its art, settings, histor
   restoring = true;
   const snap = d.snap;
   for (const k of PRESET_KEYS) if (k in snap.s) st[k] = snap.s[k]; // designs kept from an older version lack the newer settings
-  if (!('dtg' in snap.s)){ st.dtg = false; st.dtgHex = 'shirt'; } if (!('noise' in snap.s)) st.noise = 0; if (!('pale' in snap.s)) st.pale = 0; if (!('skin' in snap.s)) st.skin = 0;
+  if (!('asis' in snap.s)) st.asis = false; if (!('dtg' in snap.s)){ st.dtg = false; st.dtgHex = 'shirt'; } if (!('noise' in snap.s)) st.noise = 0; if (!('pale' in snap.s)) st.pale = 0; if (!('skin' in snap.s)) st.skin = 0;
   st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
   Object.assign(lv, LV0, snap.lv);
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(d.activeRule || 0, Math.max(0, rules.length - 1));
@@ -6016,6 +6038,7 @@ $('fileIn').addEventListener('change', e => { const list = [...e.target.files]; 
 const W_JOBS = [
   {k: 'one', t: 'Get one design ready', d: 'Set the size, pick a look, save a print-ready PNG.', pic: () => demoArt({glow: 'dots', name: 'AWESOME'})},
   {k: 'batch', t: 'Do a whole order', d: 'Lots of files at once, like names and numbers.', pic: () => `<span class="w-tiles">${['LEE', 'KAUR', 'JONES'].map(n => `<span>${n}</span>`).join('')}</span>`},
+  {k: 'asis', t: 'Open it as it is', d: 'Already finished? Nothing is changed. Resize, sharpen or fix colours only.', pic: () => demoArt({name: 'DONE'})},
   {k: 'tidy', t: 'Just tidy a file', d: 'Remove a background or flatten colours for tracing. No dots.', pic: () => demoArt({bg: '#ffffff', name: 'SWEET'})}
 ];
 let wFiles = [], wJob = '';
@@ -6051,6 +6074,7 @@ async function welcomeGo(job){
   await openFiles(fs);
   if (!art || art.isSample){ syncWelcome(); return; } // nothing opened: stay here
   if (job === 'tidy'){ const b = $('finishChips').querySelector('[data-finish="prep"]'); if (b) b.click(); }
+  if (job === 'asis'){ const b = $('finishChips').querySelector('[data-finish="asis"]'); if (b) b.click(); }
   showStep('sizeGroup');
 }
 $('wDrop').addEventListener('click', () => { wJob = ''; $('wIn').click(); });
@@ -6346,7 +6370,7 @@ async function sampleArt(){
 const SYNC_ADDRESS = 'https://script.google.com/macros/s/AKfycbw4YA5ar3izM4tCLJPsS8Ac67rNqvHTWuqGLqN7mCPy0iX_NQNZzwda5-wBRZZLgZMq/exec'; // the "DTF Halftone Presets" web app; '' keeps presets in this browser only
 const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
 const SYNC_URL = IN_CLAUDE ? '' : SYNC_ADDRESS; // pages inside claude.ai can't reach other sites, so presets stay in the browser there
-const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'speckMm', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'inks', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'pale', 'skin', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'dtg', 'dtgHex', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatClear', 'flatBg', 'flatBgHex'];
+const PRESET_KEYS = ['look', 'finish', 'cut', 'lpi', 'angle', 'shape', 'k0', 'k1', 'ktol', 'clean', 'rich', 'crisp', 'speck', 'speckMm', 'hb', 'hg', 'hw', 'hob', 'how', 'mid', 'con', 'drop', 'solid', 'ink', 'inkHex', 'inks', 'shirt', 'hard', 'edge', 'etol', 'emode', 'back', 'backHex', 'fade', 'fadeDir', 'sharp', 'sradius', 'noise', 'pale', 'skin', 'bgOn', 'bgTol', 'bgHex', 'thruOn', 'thruHex', 'thruFloor', 'dtg', 'dtgHex', 'asis', 'flat', 'flatN', 'flatSnap', 'flatTidy', 'flatSmooth', 'flatDrop', 'flatClear', 'flatBg', 'flatBgHex'];
 const readJSON = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? fallback : v; } catch(e){ return fallback; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } };
 const isPreset = x => { if (!(x && typeof x.name === 'string' && x.s && typeof x.s === 'object')) return false; cleanDeep(x.s); x.rules = cleanDeep(x.rules); x.levels = cleanDeep(x.levels); return true; };
@@ -6716,7 +6740,7 @@ $('themeBtn').addEventListener('click', () => setUiTheme(!document.documentEleme
 /* ---------- history: the last 40 changes to this design, to undo or go back to ---------- */
 const HIST_MAX = 40;
 const sign = v => (v > 0 ? '+' : '') + v;
-const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', flat: v => v ? 'Print style: Trace prep' : 'Trace prep off',
+const STEP_NAMES = {finish: v => v === 'cut' ? 'Print style: Clean cut' : 'Print style: Halftone', flat: v => v ? 'Print style: Trace prep' : 'Trace prep off', asis: v => v ? 'Print style: As it is' : 'As it is off',
   flatN: v => v ? `Flat colours: ${v}` : 'Flat colours: Auto', flatSnap: v => v ? 'Pure white and black on' : 'Pure white and black off', flatTidy: v => v ? `Tidy bits under ${(+v).toFixed(1)} mm` : 'Tidy off', flatSmooth: v => +v ? `Smooth edges ${+v}` : 'Smooth edges off', flatDrop: () => 'Flat colour left out or brought back', flatClear: () => 'Flat colour made clear or brought back', look: v => `Quick start: ${lookName(v)}`, cut: v => `Threshold ${v}%`, // the style first: switching it can move the Quick start too
   lpi: v => `${v} lpi`, angle: v => `Angle ${v}°`, shape: v => `Dot shape: ${v}`, k0: v => `Shirt shows through ${v}%`, k1: v => `Full ink from ${v}%`, clean: v => v ? 'Clean colour dots on' : 'Clean colour dots off', rich: v => v ? 'Rich fade dots on' : 'Rich fade dots off', crisp: v => v ? 'Crisp outlines on' : 'Crisp outlines off', speck: v => v ? 'Speck clean-up on' : 'Speck clean-up off', ktol: v => `Knock-out tolerance ${v}%`,
   hb: () => 'Halftone levels', hg: () => 'Halftone levels', hw: () => 'Halftone levels', hob: () => 'Halftone output levels', how: () => 'Halftone output levels',
@@ -6768,7 +6792,7 @@ function resetSteps(label){ clearTimeout(stepTimer); stepLabel = null; steps = [
 function applySnap(snap){
   restoring = true;
   for (const k of PRESET_KEYS) if (k in snap.s) st[k] = snap.s[k]; // designs kept from an older version lack the newer settings
-  if (!('dtg' in snap.s)){ st.dtg = false; st.dtgHex = 'shirt'; } if (!('noise' in snap.s)) st.noise = 0; if (!('pale' in snap.s)) st.pale = 0; if (!('skin' in snap.s)) st.skin = 0;
+  if (!('asis' in snap.s)) st.asis = false; if (!('dtg' in snap.s)){ st.dtg = false; st.dtgHex = 'shirt'; } if (!('noise' in snap.s)) st.noise = 0; if (!('pale' in snap.s)) st.pale = 0; if (!('skin' in snap.s)) st.skin = 0;
   st.knock = snap.s.knock; knockFrom = snap.s.knockFrom;
   Object.assign(lv, LV0, snap.lv);
   rules = snap.rules.map(R => ({...R, samples: [...R.samples]})); activeRule = Math.min(activeRule, Math.max(0, rules.length - 1));
@@ -6922,7 +6946,7 @@ var checkWarns = 0; // var: updateChecks can run before this line
 const SUMS = { // short, so a title stays on one line
   historyGroup: () => steps.length > 1 ? `${steps.length - 1} change${steps.length === 2 ? '' : 's'}` : 'Undo, go back',
   presetGroup: () => { const c = chosen(); return c ? c.p.name : 'Starters, saved'; },
-  routeGroup: () => isDtg() ? 'DTG · solid background' : isFlat() ? 'Trace prep · flat colours' : `${st.finish === 'cut' ? 'Clean cut' : 'Halftone'} · ${lookName()}`,
+  routeGroup: () => isAsis() ? 'As it is · nothing changed' : isDtg() ? 'DTG · solid background' : isFlat() ? 'Trace prep · flat colours' : `${st.finish === 'cut' ? 'Clean cut' : 'Halftone'} · ${lookName()}`,
   cropGroup: () => !art || (art.w === art.fullW && art.h === art.fullH) ? 'Whole file' : `${art.w} × ${art.h} px`,
   sizeGroup: () => art ? `${toMm(st.widthCm)} × ${toMm(st.widthCm*art.h/art.w)} mm` : '',
   finishGroup: () => isFlat() ? (lastFlat ? (n => `${n} colour${n === 1 ? '' : 's'}`)(lastFlat.pal.filter(c => !c[4] && !c[8]).length) : 'Flat colours') : st.finish === 'cut' ? `Solid from ${st.cut}%` : `${st.lpi} lpi · ${st.angle}° · ${st.shape}`,
@@ -7069,7 +7093,7 @@ function resetToDefaults(){ // every setting back to the start, the crop and siz
   if (picking) endPick();
   endBrush();
   noteChange('Reset to defaults');
-  const route = st.finish, wasFlat = st.flat, wasDtg = st.dtg, wasDtgHex = st.dtgHex; Object.assign(st, DEFAULTS, FLAT_KEYS); st.finish = route; st.flat = wasFlat; st.dtg = wasDtg; st.dtgHex = wasDtgHex; if (wasDtg) st.look = 'edges'; st.knock = null;
+  const route = st.finish, wasFlat = st.flat, wasDtg = st.dtg, wasDtgHex = st.dtgHex; Object.assign(st, DEFAULTS, FLAT_KEYS); st.finish = route; st.flat = wasFlat; st.dtg = wasDtg; st.dtgHex = wasDtgHex; if (wasDtg || st.asis) st.look = 'edges'; st.knock = null;
   if (routeOf(route) === 'dots') Object.assign(st, {look: 'deep'}, LOOKS.deep); // Halftone's own start
   if (!ROUTE_LOOKS[routeOf(route)].includes(st.look)) Object.assign(st, {look: 'knock'}, LOOKS.knock); knockFrom = 'shirt'; // the print style stays
   st.paneA = 'orig'; st.paneB = 'shirt'; syncPaneOptions(); if (st.view === 'split'){ prepareViews(); syncLegend(); }
@@ -8362,7 +8386,7 @@ const ge = {
   async show(i){ const d = docs[i]; if (!d) geFail('There is no tab ' + i + '.'); switchTo(d); await geSettle(); return geStatus(); },
   async close(){ geNeedArt(); if (art.isSample && docs.length < 2) return geStatus(); commitStep(); unsaved = false; const d = cur; closeDoc(d); await geWait(120); if (art) await geSettle(); return geStatus(); },
   async style(name){
-    geNeedArt(); const key = {'clean cut': 'cut', halftone: 'dots', dtg: 'dtg', 'trace prep': 'flat'}[String(name).toLowerCase()] || geFail('style() takes "clean cut", "halftone", "dtg" or "trace prep".');
+    geNeedArt(); const key = {'clean cut': 'cut', halftone: 'dots', dtg: 'dtg', 'trace prep': 'flat', 'as it is': 'asis'}[String(name).toLowerCase()] || geFail('style() takes "clean cut", "halftone", "dtg", "trace prep" or "as it is".');
     const b = $('finishChips').querySelector(`[data-finish="${key}"]`); if (!b) geFail('That style is not on this page.'); b.click(); await geSettle(); return geStatus();
   },
   async quickStart(name){
