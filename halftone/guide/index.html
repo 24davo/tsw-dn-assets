@@ -562,7 +562,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
       <div class="row"><span>Move ticked to a new group</span><span>Tick some files in a group and move them out to a group of their own. You can also drag a file from one group to another.</span></div>
       <div class="row"><span>Join ticked groups</span><span>Puts the files of every ticked group into one group.</span></div>
       <div class="row"><span>Lock</span><span>When a group is right, lock it. It folds to one line and can’t be changed by accident. It still saves with Process ticked groups.</span></div>
-      <div class="row"><span>Use for this file only</span><span>In the editor bar, when one file needs different settings from its group. The file moves to a group of its own.</span></div>
+      <div class="row"><span>Save for this file only</span><span>In the editor bar, when one file needs its own fix: different settings, a touch-up, a crop or straightening. The file stays in its group and saves with it, marked with a blue outline and <b>Own edit</b>. The group’s set-up does not change. If you changed its print size, crop or straightening it keeps its own size (<b>Own edit · own size</b>); if not, it still follows the group’s size. <span class="ui">Back to group</span> drops the own edit.</span></div>
       <div class="row"><span>Undo</span><span>Takes back the last change in Batch: a move, a join, a size, a removed file.</span></div>
       <div class="row"><span>Send ticked to a sheet</span><span>Works the groups out and puts the prints on a <a href="#sheet">gang sheet</a> instead of a zip.</span></div>
     </div>
@@ -572,7 +572,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
     <p>On the Workshop Board’s copy of the tool, the Batch bar has <span class="ui">Check with Claude</span>. It works out every ticked group, then has Claude look at each result and flag the ones that need a hand. Nothing is saved or changed by a check.</p>
     <ul>
       <li>The flagged designs come first, each with a reason and something to try.</li>
-      <li><span class="ui">Open in editor</span> opens that design. Fix it, then choose <b>Use for the group</b> or <b>Use for this file only</b>, and you land back on the check.</li>
+      <li><span class="ui">Open in editor</span> opens that design. Fix it, then choose <b>Use for the group</b> or <b>Save for this file only</b>, and you land back on the check.</li>
       <li>It opens even when all 16 tabs are in use, so there’s no need to close anything first. A design you only looked at closes by itself when you open the next one. A design you changed stays open in its tab until you choose one of the two <b>Use for</b> buttons, so nothing you did is lost.</li>
       <li><span class="ui">Fine as it is</span> marks a flag as looked at. <b>Flag it again</b> undoes that.</li>
       <li>A design you changed shows “Changed since this check”. <span class="ui">Check again</span> re-checks just that one.</li>
@@ -636,6 +636,8 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
   <div class="prose">
     <h3>Swap a colour</h3>
     <p>Each colour in the list has a <b>prints as</b> square. Click it to change that colour, for example an off-navy to our navy. Reset puts it back. The same list is in Fine-tune, where you can also click a colour to leave it out so its areas join the nearest colour left.</p>
+    <h3>Vector trace, here in the tool</h3>
+    <p>For simple logos you can skip Illustrator. Size the design up first (a bigger print size gives more detail), get the flat colours right, then click <span class="ui">Vector trace (SVG)</span> under the colour list. It turns the Trace prep result into smooth shapes, one layer for each colour. <b>Smoothness</b> trades sharp corners for smoother curves, <b>Show outlines</b> shows the traced lines, and zoom goes to 8×. <span class="ui">Save SVG</span> saves a file sized in mm that opens in Illustrator. Clear parts stay clear. Check corners and small lettering before you rely on it.</p>
     <h3>Make a colour clear</h3>
     <p>Trace prep is also handy for cleaning up a blurry solid-colour logo and printing the result. Each colour in the list has <span class="ui">Make clear</span>. Click it and that colour doesn’t print: its areas save as transparent, with a clean edge against the colours beside it. For example, trace a white logo on a black block, make the black clear, and the saved PNG holds only the white. <span class="ui">Bring back</span> prints it again. The tracing background switches itself off when you do this, and one colour always has to stay.</p>
     <h3>Why one more colour?</h3>
@@ -719,7 +721,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
   </div>
 </section>
 
-<footer>Written for Graphic Engine version 138, November 2026. Pictures show the tool’s own sample art and made-up test pictures. If a button here doesn’t match what you see, the tool has been updated: trust the tool, and let the owner know so the guide gets fixed.</footer>
+<footer>Written for Graphic Engine version 139, November 2026. Pictures show the tool’s own sample art and made-up test pictures. If a button here doesn’t match what you see, the tool has been updated: trust the tool, and let the owner know so the guide gets fixed.</footer>
 
 </div>
 
