@@ -1163,8 +1163,9 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
       <div class="pane-pick" id="paneA" hidden><button class="pp-btn" type="button" id="paneABtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Left side shows" data-tip="Choose what this side shows."></button><div class="pp-menu" id="paneAMenu" role="listbox" hidden></div></div>
       <div class="pane-pick" id="paneB" hidden><button class="pp-btn" type="button" id="paneBBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Right side shows" data-tip="Choose what this side shows."></button><div class="pp-menu" id="paneBMenu" role="listbox" hidden></div></div>
       <div class="busy" id="busy" hidden><span id="busyTxt">Updating…</span><button class="link" type="button" id="redrawBtn" hidden>Redraw</button></div>
-      <div class="tray crop-bar" id="cropBar" hidden><span id="cropTxt"></span><button class="btn small" type="button" id="cropCancel">Cancel</button><button class="btn small primary" type="button" id="cropApply">Apply crop</button></div>
+      <div class="tray crop-bar" id="cropBar" hidden><span id="cropTxt"></span><button class="btn small" type="button" id="cropBack" data-tip="The checks behind the art: light, grey or dark. Picked to suit the art; click to change. Only for looking, nothing is saved with it.">Backdrop: Light</button><button class="btn small" type="button" id="cropCancel">Cancel</button><button class="btn small primary" type="button" id="cropApply">Apply crop</button></div>
       <div class="tray crop-bar turn-bar" id="turnBar" hidden><span id="turnTxt" aria-live="polite"></span>
+        <button class="btn small" type="button" id="turnBack" data-tip="The checks behind the art: light, grey or dark. Picked to suit the art; click to change. Only for looking, nothing is saved with it.">Backdrop: Light</button>
         <button class="btn small" type="button" id="turnL" aria-label="Quarter turn anticlockwise" data-tip="A quarter turn anticlockwise.">90° left</button>
         <input type="range" id="turnRange" min="-15" max="15" step="0.1" value="0" aria-label="Straighten angle, in degrees">
         <button class="btn small" type="button" id="turnR" aria-label="Quarter turn clockwise" data-tip="A quarter turn clockwise.">90° right</button>
@@ -3492,7 +3493,7 @@ function paint(m){
   lastCls = new Uint8Array(m.cls); lastSel = m.sel ? new Uint8Array(m.sel) : null; paintN++;
   chist = m.ch ? new Uint32Array(m.ch) : null; drawHhisto();
   prepareViews();
-  outReady = true; lastOn = m.on; lastSpeck = [m.speck || 0, m.pin || 0]; syncSpeck(); dtgHintSoon(m.bg, m.on); lastFlat = m.flat || null; syncFlat(); syncInkSet();
+  outReady = true; koMeasure(); lastOn = m.on; lastSpeck = [m.speck || 0, m.pin || 0]; syncSpeck(); dtgHintSoon(m.bg, m.on); lastFlat = m.flat || null; syncFlat(); syncInkSet();
   $('saveBtn').disabled = false;
   render(); updateChecks(); syncLegend();
 }
@@ -3856,7 +3857,34 @@ $('sizeTrimBtn').addEventListener('click', () => trimToArt(!!art && art.sizeFrom
 $('cropReset').addEventListener('click', () => { if (!art) return; if (cropping) endCrop(false); if (turning) endTurn(false); noteChange('Reset crop'); setCrop({x: 0, y: 0, w: art.fullW, h: art.fullH}); });
 $('cropDraw').addEventListener('click', () => cropping ? endCrop(false) : startCrop());
 $('cropApply').addEventListener('click', () => endCrop(true));
+$('cropBack').addEventListener('click', () => { if (cropping) backNext(cropping); });
+$('turnBack').addEventListener('click', () => { if (turning) backNext(turning); });
 $('cropCancel').addEventListener('click', () => endCrop(false));
+/* The checks behind the art in Crop and Straighten: the tone the art stands out from best. */
+const BACK_TONES = {light: ['#ffffff', '#cccccc', 235, 'Light'], mid: ['#8e8e8e', '#7c7c7c', 133, 'Grey'], dark: ['#343434', '#272727', 46, 'Dark']};
+const backPats = {};
+function backFill(dpr, tone){
+  const key = tone + '@' + dpr; if (backPats[key]) return backPats[key];
+  const T = BACK_TONES[tone] || BACK_TONES.light, n = Math.max(1, Math.round(8*dpr)), c = document.createElement('canvas'); c.width = c.height = n*2;
+  const x = c.getContext('2d'); x.fillStyle = T[0]; x.fillRect(0, 0, n*2, n*2); x.fillStyle = T[1]; x.fillRect(0, 0, n, n); x.fillRect(n, n, n, n);
+  return backPats[key] = vctx.createPattern(c, 'repeat');
+}
+function backToneOf(prev){ // the tone that the fewest of the art's solid pixels sit close to; the file has no clear parts: light, as before
+  try {
+    const k = Math.min(1, 200/Math.max(prev.width, prev.height)), w = Math.max(1, Math.round(prev.width*k)), h = Math.max(1, Math.round(prev.height*k));
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(prev, 0, 0, w, h);
+    const d = x.getImageData(0, 0, w, h).data, near = {light: 0, mid: 0, dark: 0}; let solid = 0, clear = 0;
+    for (let i = 0; i < d.length; i += 4){
+      if (d[i + 3] < 128){ clear++; continue; }
+      solid++; const y = 0.299*d[i] + 0.587*d[i + 1] + 0.114*d[i + 2];
+      for (const t in near) if (Math.abs(y - BACK_TONES[t][2]) < 60) near[t]++;
+    }
+    if (!solid || clear < w*h*0.005) return 'light';
+    return ['light', 'dark', 'mid'].reduce((a, t) => near[t] < near[a] ? t : a, 'light');
+  } catch(e){ return 'light'; }
+}
+function backNext(mode){ const order = ['light', 'mid', 'dark']; mode.back = order[(order.indexOf(mode.back) + 1) % 3]; syncBack2(); render(); }
+function syncBack2(){ const m = cropping || turning, t = m && BACK_TONES[m.back]; for (const id of ['cropBack', 'turnBack']) if ($(id)) $(id).textContent = 'Backdrop: ' + (t ? t[3] : 'Light'); }
 function startCrop(){
   endBrush();
   if (!art) return;
@@ -3865,7 +3893,7 @@ function startCrop(){
   c.width = Math.max(1, Math.round(art.fullW*F)); c.height = Math.max(1, Math.round(art.fullH*F));
   const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(art.el, 0, 0, c.width, c.height);
   const k = art.crop;
-  cropping = {prev: c, F, rect: [k.x, k.y, k.x + k.w, k.y + k.h], drag: null, geo: null};
+  cropping = {prev: c, F, rect: [k.x, k.y, k.x + k.w, k.y + k.h], drag: null, geo: null, back: backToneOf(c)}; syncBack2();
   $('cropDraw').setAttribute('aria-pressed', 'true'); $('cropBar').hidden = false;
   stage.classList.add('cropping'); syncCropTxt(); render();
 }
@@ -3960,7 +3988,7 @@ function startTurn(){
   c.width = Math.max(1, Math.round(w0*F)); c.height = Math.max(1, Math.round(h0*F));
   const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(el0, 0, 0, c.width, c.height);
   const r = art.rot || 0, q = Math.round(r/90);
-  turning = {prev: c, w0, h0, q: ((q % 4) + 4) % 4, fine: Math.round((r - q*90)*10)/10, from: r};
+  turning = {prev: c, w0, h0, q: ((q % 4) + 4) % 4, fine: Math.round((r - q*90)*10)/10, from: r, back: backToneOf(c)}; syncBack2();
   $('cropTurn').setAttribute('aria-pressed', 'true'); $('turnBar').hidden = false; stage.classList.add('cropping', 'turning');
   const bv = $('brushView'); if (bv && bv.getContext) bv.getContext('2d').clearRect(0, 0, bv.width, bv.height);
   syncTurn(); render(); syncDrops();
@@ -3990,7 +4018,7 @@ function drawTurnView(r, dpr, cw, ch){
   vctx.fillStyle = '#1a1a1a'; vctx.fillRect(0, 0, cw, ch);
   const z = rotSize(P.width, P.height, d), bw = Math.max(40, r.width - side*2), bh = Math.max(40, r.height - top - bottom), sc = Math.min(bw/z.w, bh/z.h);
   const k = sc*dpr, W = z.w*k, H = z.h*k, dx = (side + (bw - z.w*sc)/2)*dpr, dy = (top + (bh - z.h*sc)/2)*dpr, cx = dx + W/2, cy = dy + H/2;
-  vctx.fillStyle = checker(dpr); vctx.fillRect(dx, dy, W, H);
+  vctx.fillStyle = backFill(dpr, turning.back); vctx.fillRect(dx, dy, W, H);
   vctx.save(); vctx.beginPath(); vctx.rect(dx, dy, W, H); vctx.clip();
   vctx.translate(cx, cy); vctx.rotate(d*Math.PI/180); vctx.imageSmoothingEnabled = true; vctx.imageSmoothingQuality = 'high';
   vctx.drawImage(P, -P.width*k/2, -P.height*k/2, P.width*k, P.height*k); vctx.restore();
@@ -4022,7 +4050,7 @@ function drawCropView(r, dpr, cw, ch){
   vctx.fillStyle = '#1a1a1a'; vctx.fillRect(0, 0, cw, ch);
   const bw = Math.max(40, r.width - side*2), bh = Math.max(40, r.height - top - bottom), s = Math.min(bw/P.width, bh/P.height);
   const k = s*dpr, dx = (side + (bw - P.width*s)/2)*dpr, dy = (top + (bh - P.height*s)/2)*dpr, W = P.width*k, H = P.height*k;
-  vctx.fillStyle = checker(dpr); vctx.fillRect(dx, dy, W, H);
+  vctx.fillStyle = backFill(dpr, cropping.back); vctx.fillRect(dx, dy, W, H);
   vctx.imageSmoothingEnabled = true; vctx.imageSmoothingQuality = 'high'; vctx.drawImage(P, dx, dy, W, H);
   const f = cropping.F*k, [x0, y0, x1, y1] = cropping.rect, X0 = dx + x0*f, Y0 = dy + y0*f, X1 = dx + x1*f, Y1 = dy + y1*f;
   vctx.fillStyle = 'rgba(0,0,0,0.62)'; // everything outside the crop is dimmed
@@ -4863,7 +4891,7 @@ $('looks').addEventListener('change', e => {
   if (e.target.name !== 'look') return;
   const was = st.look;
   const lvl = densLevel() || 'std';
-  st.look = e.target.value; Object.assign(st, LOOKS[st.look], densVals(lvl));
+  lookHomeDrop(); st.look = e.target.value; Object.assign(st, LOOKS[st.look], densVals(lvl));
   if (was === 'shadows' && st.look !== 'shadows') dropShadowRule(); // leaving Remove shadows takes its own range with it
   if (st.look === 'shadows') st.finish = 'cut'; else if (st.look === 'full' || st.look === 'deep') st.finish = 'dots'; // each is offered in one style only
   if (st.finish !== 'cut') st.flat = false;
@@ -4886,7 +4914,7 @@ $('finishChips').addEventListener('click', e => {
   const b = e.target.closest('[data-finish]'); if (!b) return;
   const v = b.dataset.finish, wasPrep = isPrep(), wasFlat = isFlat(), wasDtg = isDtg(), wasAsis = isAsis();
   if (v === (wasFlat ? 'flat' : wasDtg ? 'dtg' : wasAsis ? 'asis' : st.finish)) return; // Clean cut is already on when its prep-only Quick start is
-  st.finish = v === 'prep' || v === 'flat' || v === 'dtg' || v === 'asis' ? 'cut' : v;
+  lookHomeDrop(); st.finish = v === 'prep' || v === 'flat' || v === 'dtg' || v === 'asis' ? 'cut' : v;
   st.asis = v === 'asis'; // As it is: Prep only with nothing made solid or removed
   st.flat = v === 'flat'; // Trace prep is Prep only with the colours flattened
   st.dtg = v === 'dtg';   // DTG is Prep only on a solid background
@@ -5537,6 +5565,25 @@ function updateNotes(){
 // the clear gap left in a cell when its dot covers just under "Solid above", as a circle of the same area
 function minGapMm(){ const cellMm = 25.4/st.lpi; return st.solid < 100 ? cellMm*Math.sqrt(4*(1 - st.solid/100)/Math.PI) : 25.4/DPI; }
 function minDotMm(){ const cellMm = 25.4/st.lpi; return st.drop > 0 ? cellMm*Math.sqrt(4*(st.drop/100)/Math.PI) : 25.4/DPI; }
+/* Clean cut with the knock-out on: the share of the solid art it takes (measured on small copies of the art and the print).
+   Not measured while something else also removes art (background removal, parts picked by colour, an edge trim). */
+let koPc = null;
+function koMeasure(){
+  koPc = null;
+  try {
+    if (!art || st.finish !== 'cut' || st.look !== 'knock' || st.bgOn || st.edge || rules.length || art.sel) return;
+    const W = outCanvas.width, H = outCanvas.height; if (!W || W !== srcCanvas.width || H !== srcCanvas.height) return;
+    const k = Math.min(1, 400/Math.max(W, H)), w = Math.max(1, Math.round(W*k)), h = Math.max(1, Math.round(H*k));
+    const al = src => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(src, 0, 0, w, h); return x.getImageData(0, 0, w, h).data; };
+    const A = al(srcCanvas), B = al(outCanvas); let solid = 0, gone = 0;
+    for (let i = 3; i < A.length; i += 4) if (A[i] >= 200){ solid++; if (B[i] < 60) gone++; }
+    koPc = solid ? gone/solid*100 : null;
+  } catch(e){ koPc = null; }
+  if (koPc != null && koPc >= 1 && art.clearBg && !art.koTold && !restoringDocs && !batchBusy){
+    art.koTold = true;
+    toast(`The knock-out is taking ${Math.round(koPc)}% of this design: the parts close to ${(st.knock || st.shirt).toUpperCase()}. See Checks.`);
+  }
+}
 function updateChecks(){
   if (!art) return;
   const rows = [];
@@ -5550,6 +5597,8 @@ function updateChecks(){
     (softPct != null && softPct >= 1 ? `The art had ${softPct}% see-through pixels (glows, shadows, fades, soft edges). ` : '') + 'Every pixel is now solid ink or clear film, so the film has no haze.']);
   const md = minDotMm();
   if (st.finish === 'cut') rows.push(['good', '✓', 'Clean cut, no dots', `Pixels at least ${st.cut}% solid print fully solid. The rest is removed.`]);
+  if (koPc != null && koPc >= 1 && st.finish === 'cut' && st.look === 'knock') rows.push([art.clearBg ? 'warn' : 'info', '!', `The knock-out is taking ${Math.round(koPc)}% of the design`,
+    `Solid parts close to ${(st.knock || st.shirt).toUpperCase()} (${st.knock ? 'the knock-out colour' : 'the shirt colour'}) drop out and won’t print.` + (art.clearBg ? ' This file is already on a clear background: if those parts should print, choose “Nothing removed (prep only)” in Quick start.' : ' Right for a background in that colour. If parts of the design are going too, lower the Knock-out tolerance or use Background removal instead.')]);
   if (isMulti() && lastFlat){ const n = lastFlat.pal.filter(c => !c[4]).length;
     rows.push(['good', '✓', `${n} solid colour${n === 1 ? '' : 's'}`, 'Every part of the design prints in one flat colour, with a hard edge where two meet. Pick what each prints as in the Ink menu.']); }
   if (isFlat() && lastFlat){ const n = lastFlat.pal.filter(c => !c[4] && !c[8]).length, nc = lastFlat.pal.filter(c => !c[4] && c[8]).length;
@@ -5725,6 +5774,26 @@ $('fileInfo').addEventListener('click', e => {
 $('smoothBtn').addEventListener('change', e => { if (!art) return; art.smooth = e.target.checked; buildSrcSoon(); syncQuality(); updateChecks(); });
 
 /* ---------- opening art ---------- */
+/* Already on a clear background: a fair share of the file is see-through, or most of its corners are. Such a file needs
+   no knock-out, so it starts with nothing removed (owner, 27 Nov: the knock-out was taking parts of logos unnoticed). */
+function clearBgOf(el, w, h){
+  try {
+    const k = Math.min(1, 240/Math.max(w, h)), W = Math.max(1, Math.round(w*k)), H = Math.max(1, Math.round(h*k));
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(el, 0, 0, W, H);
+    const d = x.getImageData(0, 0, W, H).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] < 8) n++;
+    const corners = [0, W - 1, (H - 1)*W, H*W - 1].filter(q => d[q*4 + 3] < 8).length;
+    return n/(W*H) >= 0.03 || corners >= 3;
+  } catch(e){ return false; }
+}
+const LOOK_HOME = 'tsw-ge-look-home'; // the Quick start to go back to for the next file with a solid background
+const lookHomeDrop = () => { try { localStorage.removeItem(LOOK_HOME); } catch(e){} };
+function neutralStart(a){ // true when this file starts with nothing knocked out because of its clear background
+  let home = null; try { home = localStorage.getItem(LOOK_HOME); } catch(e){}
+  if (home === 'knock' && !a.clearBg && st.finish === 'cut' && st.look === 'edges' && !st.flat && !st.dtg && !st.asis){ st.look = 'knock'; lookHomeDrop(); return false; }
+  if (a.clearBg && st.finish === 'cut' && st.look === 'knock'){ st.look = 'edges'; try { localStorage.setItem(LOOK_HOME, 'knock'); } catch(e){} return true; }
+  return false;
+}
 function cleanStart(){ // a new design starts clean: fixes made for the last design don't follow it. The workshop's own settings stay
   // (print style, Quick start, lpi, angle, dot shape, dot limits, threshold, black ink, shirt colour).
   const L = LOOKS[st.look] || LOOKS.knock;
@@ -5740,6 +5809,8 @@ function setArt(el, w, h, name, isSample, dpi, kind){
   outReady = false; outMips = null; masks.base.mips = masks.map.mips = null; masks.base.key = masks.map.key = -1; lastCls = null; $('saveBtn').disabled = true;
   $('nameSuffix').value = ''; $('labelShort').value = ''; $('labelFull').value = ''; // these belong to one piece of art
   syncFileInfo();
+  art.clearBg = !isSample && clearBgOf(el, w, h);
+  const neutral = !restoringDocs && neutralStart(art);
   cleanStart();
   st.knock = null; knockFrom = 'shirt'; syncKnock();
   st.bgHex = null; bgFound = null; syncBg(); // the background colour belongs to one piece of art
@@ -5752,6 +5823,7 @@ function setArt(el, w, h, name, isSample, dpi, kind){
   if (cur) cur.art = art;
   renderTabs();
   const a = art; setTimeout(() => analyseArt(a), 30); // after the first paint
+  if (neutral) setTimeout(() => { if (art === a && st.finish === 'cut' && st.look === 'edges' && !batchBusy) toast('Already on a clear background, so nothing is knocked out. Quick start has the knock-out if you need it.'); }, 900);
 }
 function makeArt(el, w, h, name, isSample, dpi, kind){
   return {el, w, h, name, isSample, dpi, fullW: w, fullH: h, crop: {x: 0, y: 0, w, h}, // w and h follow the crop
@@ -6648,6 +6720,7 @@ function capturePreset(name, withSize){
   return p;
 }
 function applyPreset(p){
+  lookHomeDrop();
   if (p.trim && art){ const t = findTrim(); if (t && !(t.x === 0 && t.y === 0 && t.w >= art.fullW && t.h >= art.fullH)) trimToArt(art.sizeFrom === 'user'); }
   for (const k of PRESET_KEYS) if (k in p.s) st[k] = p.s[k]; else if (k in EDGE_KEYS) st[k] = EDGE_KEYS[k]; else if (k in SHARP_KEYS) st[k] = SHARP_KEYS[k]; else if (k in BG_KEYS) st[k] = BG_KEYS[k]; else if (k in FLAT_KEYS) st[k] = FLAT_KEYS[k]; // older presets: these steps off
   if ('edge' in p.s && !('emode' in p.s)){ st.emode = p.s.edge ? 'near' : 'any'; if (!p.s.edge && p.s.contract){ st.edge = p.s.contract; } } // the first Edge step had two sliders
@@ -6756,8 +6829,15 @@ function quickCut(){ // the everyday basic job: solid print with a hard edge, ba
   s.knock = null; s.knockFrom = 'shirt';
   return {name: 'Quick clean cut', desc: 'solid print with a hard edge, background removed, trimmed to the art. Check the print size', v: 1, s, levels: {}, rules: [], trim: true};
 }
+function cleanOnly(){ // the neutral start: clean cut with nothing knocked out and the background left as it is
+  const s = {}; for (const k of PRESET_KEYS) s[k] = ST0[k];
+  Object.assign(s, {finish: 'cut', look: 'edges', cut: 50, shirt: st.shirt}, LOOKS.edges, EDGE_KEYS, SHARP_KEYS, BG_KEYS, FLAT_KEYS);
+  s.knock = null; s.knockFrom = 'shirt';
+  return {name: 'Clean up only', desc: 'clean cut with nothing knocked out, for art already on a clear background. Check the print size', v: 1, s, levels: {}, rules: []};
+}
 const SPEED_BUILT = [
   {label: 'Quick clean cut', short: 'Solid ink, background off, trimmed', tip: 'Clean cut with a hard edge: the background is removed and the file is trimmed to the art. Then check the print size.', make: quickCut},
+  {label: 'Clean up only', short: 'Nothing knocked out, edges tidied', tip: 'For art already on a clear background. Clean cut with a tidy edge: no colour is knocked out and the background is left as it is. Then check the print size.', make: cleanOnly},
   {label: 'Black tee', short: 'Everyday prints on black', starter: 'Black tee · everyday'},
   {label: 'White tee', short: 'Everyday prints on white', starter: 'White tee · everyday'},
   {label: 'Coloured tee', swatch: 'multi', short: 'Everyday prints on a colour', starter: 'Coloured tee · everyday'},
@@ -7526,12 +7606,12 @@ const batchTrimOf = (el, w, h) => { try { const t = findTrim({el, fullW: w, full
 async function batchTrims(){ // files kept from before trims were found
   let any = false;
   for (const g of [...batchGroups]) for (const it of [...g.items]){
-    if (it.tb !== undefined) continue;
+    if (it.tb !== undefined && it.cb !== undefined) continue;
     const im = new Image(); im.decoding = 'async'; const url = URL.createObjectURL(it.file); im.src = url;
-    try { await im.decode(); it.tb = batchTrimOf(im, it.w, it.h); } catch(e){ it.tb = null; }
+    try { await im.decode(); if (it.tb === undefined) it.tb = batchTrimOf(im, it.w, it.h); it.cb = clearBgOf(im, it.w, it.h); } catch(e){ if (it.tb === undefined) it.tb = null; it.cb = false; }
     URL.revokeObjectURL(url); any = true;
   }
-  if (any){ batchKeepSoon(); renderBatch(); }
+  if (any){ for (const g of batchGroups) batchAutoStart(g); batchKeepSoon(); renderBatch(); }
 }
 /* Undo: the groups as they were before each change (which files sit where, ticks, set-up, size, lock). Kept for this
    visit only. A removed file comes back from memory and is stored again. */
@@ -7611,6 +7691,12 @@ function needOfArt(){ // for the design on screen: sent straight to a tab, or op
   for (const g of batchGroups){ const it = g.items.find(x => x.key === b.key); if (it) return it.prints || 0; }
   return 0;
 }
+function batchAutoStart(g){ // every file already on a clear background: the group starts on Clean up only, nothing knocked out
+  if (g.snap || g.locked || !g.items.length || !g.items.every(it => it.cb === true)) return false;
+  g.snap = presetSnap(cleanOnly(), 'l'); g.preset = null; g.quick = 'b:Clean up only';
+  g.desc = 'Clean up only · nothing knocked out';
+  return true;
+}
 async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; answers what happened
   const out = {count: 0, skipped: [], bad: 0};
   for (const x of list){
@@ -7624,10 +7710,10 @@ async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; ans
     if (!w || !h){ URL.revokeObjectURL(url); out.bad++; continue; }
     const k = Math.min(1, 220/Math.max(w, h)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w*k)); c.height = Math.max(1, Math.round(h*k));
     c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
-    const tb = batchTrimOf(im, w, h); URL.revokeObjectURL(url);
+    const tb = batchTrimOf(im, w, h), cb = clearBgOf(im, w, h); URL.revokeObjectURL(url);
     let thumb = ''; try { thumb = c.toDataURL('image/png'); } catch(e){}
     const mm = Math.round(+x.widthMm) || 0;
-    g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), lab: String(x.label || '').slice(0, 160), labShort: String(x.labelShort || '').slice(0, 60), w, h, tb, thumb, file, on: true, mm, kept: false, sig: await batchSig(file)});
+    g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), lab: String(x.label || '').slice(0, 160), labShort: String(x.labelShort || '').slice(0, 60), w, h, tb, cb, thumb, file, on: true, mm, kept: false, sig: await batchSig(file)});
     { const it = g.items[g.items.length - 1]; it.orders = artIds(x.orders); if (it.orders.length) artGot(it.orders, 'b:' + it.key); batchNeed(it, x); }
     out.count++;
   }
@@ -7636,6 +7722,7 @@ async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; ans
     if (g.widthMm > 0){ g.scale = g.widthMm/10/batchWidest(g); g.scaleFrom = 'board'; }
     else if (first){ g.scale = first.mm/10/first.w; g.scaleFrom = 'board'; }
   }
+  if (out.count) batchAutoStart(g);
   batchKeepSoon(); renderBatch();
   return out;
 }
@@ -8389,7 +8476,7 @@ async function batchKeepNow(){
     catch(e){ it.keepFailed = true; if (!batchKeepFailed){ batchKeepFailed = true; toast('This batch is too big to keep for a refresh on this computer. Save it before closing.'); } }
   }
   const list = batchGroups.map(g => ({name: g.name, note: g.note, order: g.order, orderNote: g.orderNote, on: g.on, preset: g.preset, snap: g.snap, scale: g.scale, scaleFrom: g.scaleFrom, desc: g.desc, widthMm: g.widthMm, locked: g.locked, open: g.open, fit: g.fit, fitMm: g.fitMm, trim: g.trim, quick: g.quick,
-    items: g.items.filter(it => it.kept).map(it => ({key: it.key, name: it.name, note: it.note, lab: it.lab, labShort: it.labShort, w: it.w, h: it.h, tb: it.tb === undefined ? undefined : it.tb, thumb: it.thumb, on: it.on, mm: it.mm, saved: !!it.saved, prints: it.prints || 0, uses: it.uses || 0, own: it.own || null}))}));
+    items: g.items.filter(it => it.kept).map(it => ({key: it.key, name: it.name, note: it.note, lab: it.lab, labShort: it.labShort, w: it.w, h: it.h, tb: it.tb === undefined ? undefined : it.tb, cb: it.cb, thumb: it.thumb, on: it.on, mm: it.mm, saved: !!it.saved, prints: it.prints || 0, uses: it.uses || 0, own: it.own || null}))}));
   try { const tx = db.transaction('meta', 'readwrite'); tx.objectStore('meta').put({groups: list}, 'batch'); await idbDone(tx); } catch(e){}
 }
 async function batchForget(items){
@@ -8406,7 +8493,7 @@ async function batchRestore(){
     for (const x of r.items){
       const file = await idbGet(db, 'files', 'b:' + x.key);
       if (!(file instanceof Blob) || !(x.w > 0) || !(x.h > 0)) continue;
-      g.items.push({key: String(x.key), name: String(x.name || 'artwork.png'), note: String(x.note || ''), lab: String(x.lab || '').slice(0, 160), labShort: String(x.labShort || '').slice(0, 60), w: x.w, h: x.h, tb: x.tb && x.tb.w > 0 && x.tb.h > 0 ? {x: +x.tb.x || 0, y: +x.tb.y || 0, w: +x.tb.w, h: +x.tb.h} : x.tb === null ? null : undefined, thumb: /^data:image\/png;base64,/.test(x.thumb || '') ? x.thumb : '', file, on: x.on !== false, mm: +x.mm || 0, kept: true, saved: !!x.saved, prints: needN(x.prints), uses: needN(x.uses), own: x.own && x.own.snap && x.own.snap.s && x.own.snap.lv && Array.isArray(x.own.snap.rules) && x.own.snap.crop && x.own.snap.w > 0 ? {...x.own, strokes: Array.isArray(x.own.strokes) ? x.own.strokes : [], thumb: /^data:image\/png;base64,/.test(x.own.thumb || '') ? x.own.thumb : '', desc: String(x.own.desc || '').slice(0, 120), sized: x.own.sized === true} : null});
+      g.items.push({key: String(x.key), name: String(x.name || 'artwork.png'), note: String(x.note || ''), lab: String(x.lab || '').slice(0, 160), labShort: String(x.labShort || '').slice(0, 60), w: x.w, h: x.h, tb: x.tb && x.tb.w > 0 && x.tb.h > 0 ? {x: +x.tb.x || 0, y: +x.tb.y || 0, w: +x.tb.w, h: +x.tb.h} : x.tb === null ? null : undefined, cb: x.cb === true ? true : x.cb === false ? false : undefined, thumb: /^data:image\/png;base64,/.test(x.thumb || '') ? x.thumb : '', file, on: x.on !== false, mm: +x.mm || 0, kept: true, saved: !!x.saved, prints: needN(x.prints), uses: needN(x.uses), own: x.own && x.own.snap && x.own.snap.s && x.own.snap.lv && Array.isArray(x.own.snap.rules) && x.own.snap.crop && x.own.snap.w > 0 ? {...x.own, strokes: Array.isArray(x.own.strokes) ? x.own.strokes : [], thumb: /^data:image\/png;base64,/.test(x.own.thumb || '') ? x.own.thumb : '', desc: String(x.own.desc || '').slice(0, 120), sized: x.own.sized === true} : null});
     }
   }
   renderBatch(); batchTrims(); batchSigs();
