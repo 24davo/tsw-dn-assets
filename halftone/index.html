@@ -747,6 +747,14 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .ink-c .ink-clear{margin-left:auto;white-space:nowrap}
 .ink-c .link{margin-left:auto;font-size:12px}
 .quick-flat{display:grid;gap:6px}
+.vec-go{display:grid;gap:6px;margin-top:6px}
+.vec-body{flex:1;min-height:0;overflow:auto;display:grid;place-items:center;padding:16px;background:#808080}
+.vec-body.dark{background:#161616}.vec-body.light{background:#f4f4f4}
+.vec-body img{display:block;max-width:none}
+.vec-tools{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;font-weight:600}
+.vec-tools label{display:flex;align-items:center;gap:8px}
+.vec-tools input[type="range"]{width:200px;max-width:40vw;height:36px;accent-color:var(--accent)}
+.vec-sum{color:var(--muted);font-weight:500}
 label.chip.sel-ink{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
 label.chip.sel-ink .colorbox{width:22px;height:22px}
 #inkChips .pick.na{opacity:.55}
@@ -782,6 +790,13 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
 .bi-dup{font-weight:700;color:var(--ink)}
 .bi-need,.bt-line.bt-needline{font-weight:700;color:var(--ink)}
 .bt-pic{position:relative}
+.bitem.own,.bitem.own.on{border-color:#2f8fff;box-shadow:inset 0 0 0 1.5px #2f8fff}
+.bi-note.bi-own{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;white-space:normal;overflow:visible;font-weight:700;color:var(--ink)}
+.bi-own::before{content:"";flex:none;width:10px;height:10px;border-radius:2px;background:#2f8fff}
+.bi-own .link{font-weight:600}
+.bi-own span{flex:1 1 auto}
+.bt-pic.own{outline:3px solid #2f8fff;outline-offset:-3px}
+.bt-own{position:absolute;left:4px;top:4px;padding:2px 7px;border-radius:4px;background:#2f8fff;color:#fff;font-size:12px;font-weight:800;font-style:normal;line-height:1.3}
 .bt-n{position:absolute;right:4px;bottom:4px;padding:2px 7px;border-radius:4px;background:#111;color:#fff;font-size:14px;font-weight:800;line-height:1.3}
 .batch.chk{z-index:16}
 #chkBody{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
@@ -1040,7 +1055,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
       <button class="btn primary" id="saveBtn" type="button" disabled>Save PNG</button>
     </div>
   </header>
-  <div class="batch-note" id="batchNote" hidden><span id="batchNoteTxt"></span><button class="btn" type="button" id="batchNoteBack">Back to Batch, no change</button><button class="btn" type="button" id="batchNoteOne" data-tip="Only this file takes these settings. It moves to a group of its own, right under its old group, and the other files stay as they are.">Use for this file only</button><button class="btn primary" type="button" id="batchNoteUse">Use for the group</button></div>
+  <div class="batch-note" id="batchNote" hidden><span id="batchNoteTxt"></span><button class="btn" type="button" id="batchNoteBack">Back to Batch, no change</button><button class="btn" type="button" id="batchNoteReset" hidden data-tip="Drops this file’s own edit. It goes back to the group’s set-up, like the other files.">Back to the group’s set-up</button><button class="btn" type="button" id="batchNoteOne" data-tip="Only this file takes these changes: settings, touch-ups, crop and straightening. It stays in its group, marked Own edit, and saves with the group. The group’s set-up does not change.">Save for this file only</button><button class="btn primary" type="button" id="batchNoteUse">Use for the group</button></div>
 
   <main class="work">
     <section class="welcome" id="welcome" aria-labelledby="wTitle" hidden>
@@ -1234,6 +1249,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
           <div class="chips" id="quickFlatChips" role="group" aria-label="How many colours"><button class="chip" type="button" data-flatn="0">Auto</button><button class="chip" type="button" data-flatn="1">1</button><button class="chip" type="button" data-flatn="2">2</button><button class="chip" type="button" data-flatn="3">3</button><button class="chip" type="button" data-flatn="4">4</button><button class="chip" type="button" data-flatn="5">5</button><button class="chip" type="button" data-flatn="6">6</button><button class="chip" type="button" data-flatn="8">8</button></div>
           <div class="lv-sub">Colours, and what each prints as</div>
           <div class="ink-set" id="quickFlatTo"></div>
+          <div class="vec-go"><button class="btn" type="button" id="vecBtn" data-tip="Turns these flat colours into smooth shapes and saves an SVG that opens in Illustrator. A bigger print size gives it more detail to work from.">Vector trace (SVG)</button></div>
         </div>
         <div class="quick-rows" id="quickRows"></div>
           <p class="f-note">Drag to balance the look. These are the same settings as in Fine-tune, where there are more.</p>
@@ -1755,6 +1771,22 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
     <p class="cal-text">Set it up again on each screen you use, and after changing the display's scaling setting.</p>
     <div class="cal-actions"><button class="btn" type="button" id="calCancel">Cancel</button><button class="btn primary" type="button" id="calSave">Save and show life size</button></div>
   </div>
+</div>
+<div class="batch" id="vec" role="dialog" aria-modal="true" aria-labelledby="vecTitle" hidden>
+  <div class="batch-bar">
+    <h2 id="vecTitle">Vector trace</h2>
+    <span class="batch-sub">The Trace prep result as smooth shapes, one layer for each colour. Clear parts stay clear.</span>
+    <button class="btn primary" type="button" id="vecSave" disabled>Save SVG</button>
+    <button class="btn" type="button" id="vecClose">Back to the editor</button>
+  </div>
+  <div class="vec-tools">
+    <label>Smoothness <input type="range" id="vecSmooth" min="0" max="100" step="5" value="40" aria-label="Smoothness of the traced curves"> <span id="vecSmoothVal">40</span></label>
+    <span class="chips" id="vecZoom" role="group" aria-label="Zoom"><button class="chip" type="button" data-vz="0" aria-pressed="true">Fit</button><button class="chip" type="button" data-vz="2">2×</button><button class="chip" type="button" data-vz="4">4×</button><button class="chip" type="button" data-vz="8">8×</button></span>
+    <span class="chips" id="vecBg" role="group" aria-label="Background behind the preview"><button class="chip" type="button" data-vb="" aria-pressed="true">Grey</button><button class="chip" type="button" data-vb="dark">Black</button><button class="chip" type="button" data-vb="light">White</button></span>
+    <label><input type="checkbox" id="vecLines"> Show outlines</label>
+    <span class="vec-sum" id="vecSum"></span>
+  </div>
+  <div class="vec-body" id="vecBody"><img id="vecImg" alt="The traced design"></div>
 </div>
 <div class="batch" id="gang" role="dialog" aria-modal="true" aria-labelledby="gangTitle" hidden>
   <div class="batch-bar">
@@ -4945,6 +4977,175 @@ function traceCanvas(){ // the print on its tracing background, with a small mar
   const x = c.getContext('2d'); x.fillStyle = hex; x.fillRect(0, 0, c.width, c.height); x.drawImage(outCanvas, m, m);
   return c;
 }
+function trBlur(F, W, H, sigma){
+  const R = Math.max(1, Math.ceil(sigma*2.5)), K = new Float32Array(2*R + 1); let ks = 0;
+  for (let i = -R; i <= R; i++){ K[i + R] = Math.exp(-i*i/(2*sigma*sigma)); ks += K[i + R]; }
+  for (let i = 0; i < K.length; i++) K[i] /= ks;
+  const T = new Float32Array(W*H);
+  for (let y = 0; y < H; y++){ const o = y*W; for (let x = 0; x < W; x++){ let s = 0; const lo = Math.max(0, x - R), hi = Math.min(W - 1, x + R); for (let t = lo; t <= hi; t++) s += K[t - x + R]*F[o + t]; T[o + x] = s; } }
+  for (let x = 0; x < W; x++) for (let y = 0; y < H; y++){ let s = 0; const lo = Math.max(0, y - R), hi = Math.min(H - 1, y + R); for (let t = lo; t <= hi; t++) s += K[t - y + R]*T[t*W + x]; F[y*W + x] = s; }
+}
+function trMarch(F, W, H, t){ // closed outlines where F crosses t, as flat [x, y, ...] lists
+  const pts = new Map(), segA = [], segB = [];
+  const pt = (e, x0, y0, v0, x1, y1, v1) => { if (!pts.has(e)){ const s = (t - v0)/(v1 - v0); pts.set(e, [x0 + (x1 - x0)*s, y0 + (y1 - y0)*s]); } return e; };
+  for (let y = 0; y < H - 1; y++) for (let x = 0; x < W - 1; x++){
+    const a = F[y*W + x], b = F[y*W + x + 1], c = F[(y + 1)*W + x + 1], d = F[(y + 1)*W + x];
+    const idx = (a > t ? 8 : 0) | (b > t ? 4 : 0) | (c > t ? 2 : 0) | (d > t ? 1 : 0);
+    if (idx === 0 || idx === 15) continue;
+    const top = () => pt((y*W + x)*2, x, y, a, x + 1, y, b), right = () => pt((y*W + x + 1)*2 + 1, x + 1, y, b, x + 1, y + 1, c);
+    const bottom = () => pt(((y + 1)*W + x)*2, x, y + 1, d, x + 1, y + 1, c), left = () => pt((y*W + x)*2 + 1, x, y, a, x, y + 1, d);
+    const seg = (p, q) => { segA.push(p); segB.push(q); };
+    switch (idx){
+      case 1: case 14: seg(left(), bottom()); break;
+      case 2: case 13: seg(bottom(), right()); break;
+      case 3: case 12: seg(left(), right()); break;
+      case 4: case 11: seg(top(), right()); break;
+      case 6: case 9: seg(top(), bottom()); break;
+      case 7: case 8: seg(left(), top()); break;
+      default: { const mid = (a + b + c + d)/4 > t; // the two saddles: the middle decides which corners join
+        if (idx === 5 ? mid : !mid){ seg(left(), top()); seg(bottom(), right()); } else { seg(left(), bottom()); seg(top(), right()); } }
+    }
+  }
+  const at = new Map(), add = (e, s) => { const l = at.get(e); if (l) l.push(s); else at.set(e, [s]); };
+  for (let s = 0; s < segA.length; s++){ add(segA[s], s); add(segB[s], s); }
+  const used = new Uint8Array(segA.length), loops = [];
+  for (let s0 = 0; s0 < segA.length; s0++){
+    if (used[s0]) continue;
+    const loop = [], start = segA[s0]; let s = s0, e = start;
+    for (;;){
+      used[s] = 1; const p = pts.get(e); loop.push(p[0], p[1]);
+      const ne = segA[s] === e ? segB[s] : segA[s];
+      if (ne === start) break;
+      const l = at.get(ne), nx = l[0] === s ? l[1] : l[0];
+      if (nx === undefined || used[nx]) break;
+      s = nx; e = ne;
+    }
+    if (loop.length >= 6) loops.push(loop);
+  }
+  return loops;
+}
+function trSimplify(p, eps){ // Douglas-Peucker on a closed outline
+  const n = p.length/2;
+  if (n < 5) return p;
+  let far = 0, fd = -1;
+  for (let i = 1; i < n; i++){ const dx = p[2*i] - p[0], dy = p[2*i+1] - p[1], d2 = dx*dx + dy*dy; if (d2 > fd){ fd = d2; far = i; } }
+  const keep = new Uint8Array(n); keep[0] = keep[far] = 1;
+  const X = i => p[2*(i % n)], Y = i => p[2*(i % n) + 1], stack = [[0, far], [far, n]];
+  while (stack.length){
+    const [a, b] = stack.pop(); if (b - a < 2) continue;
+    const ax = X(a), ay = Y(a), dx = X(b) - ax, dy = Y(b) - ay, len = Math.hypot(dx, dy);
+    let mi = -1, md = 0;
+    for (let i = a + 1; i < b; i++){ const d = len > 1e-9 ? Math.abs((X(i) - ax)*dy - (Y(i) - ay)*dx)/len : Math.hypot(X(i) - ax, Y(i) - ay); if (d > md){ md = d; mi = i; } }
+    if (md > eps){ keep[mi % n] = 1; stack.push([a, mi], [mi, b]); }
+  }
+  const out = []; for (let i = 0; i < n; i++) if (keep[i]) out.push(p[2*i], p[2*i+1]);
+  return out;
+}
+function trPath(p, cornerCos){ // a closed outline as curves; turns sharper than the corner angle stay sharp
+  const n = p.length/2;
+  if (n < 3) return '';
+  const X = i => p[2*((i % n + n) % n)], Y = i => p[2*((i % n + n) % n) + 1], f = v => Math.round(v*100)/100;
+  const corner = new Uint8Array(n);
+  for (let i = 0; i < n; i++){
+    const ux = X(i) - X(i - 1), uy = Y(i) - Y(i - 1), vx = X(i + 1) - X(i), vy = Y(i + 1) - Y(i), lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+    if (lu > 0 && lv > 0 && (ux*vx + uy*vy)/(lu*lv) < cornerCos) corner[i] = 1;
+  }
+  let s = `M${f(X(0))} ${f(Y(0))}`;
+  for (let i = 0; i < n; i++){
+    const j = (i + 1) % n;
+    if (corner[i] && corner[j]){ s += `L${f(X(i + 1))} ${f(Y(i + 1))}`; continue; }
+    const seg = Math.hypot(X(i + 1) - X(i), Y(i + 1) - Y(i))/3, hand = (dx, dy) => { const l = Math.hypot(dx, dy); return l > seg && l > 0 ? seg/l : 1; };
+    const t1x = (X(i + 1) - X(i - 1))/6, t1y = (Y(i + 1) - Y(i - 1))/6, k1 = hand(t1x, t1y), t2x = (X(i + 2) - X(i))/6, t2y = (Y(i + 2) - Y(i))/6, k2 = hand(t2x, t2y);
+    const c1x = corner[i] ? X(i) : X(i) + t1x*k1, c1y = corner[i] ? Y(i) : Y(i) + t1y*k1;
+    const c2x = corner[j] ? X(i + 1) : X(i + 1) - t2x*k2, c2y = corner[j] ? Y(i + 1) : Y(i + 1) - t2y*k2;
+    s += `C${f(c1x)} ${f(c1y)} ${f(c2x)} ${f(c2y)} ${f(X(i + 1))} ${f(Y(i + 1))}`;
+  }
+  return s + 'Z';
+}
+function trLayers(L, W, H, order, smooth, grow){ // order: colours bottom to top; grow: how much the file was enlarged to trace it. Answers [{c, d, loops, points}]
+  // a light softening only (so corners stay sharp); the curves do the smoothing. More smoothness: fewer points, fewer corners
+  const g = Math.max(1, grow || 1); // measured in the file's own pixels, so a small file's noise doesn't make wobbly edges
+  const sigma = smooth/100*1.2*g, eps = (0.45 + smooth/100*0.6)*g, cornerCos = Math.cos((50 + smooth/100*30)*Math.PI/180);
+  const rank = new Int16Array(256).fill(-1); order.forEach((c, i) => { rank[c] = i; });
+  const PW = W + 2, PH = H + 2, out = [];
+  for (let li = 0; li < order.length; li++){
+    const F = new Float32Array(PW*PH); // padded with an empty border, so every outline closes
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (rank[L[y*W + x]] >= li) F[(y + 1)*PW + x + 1] = 1;
+    if (sigma >= 0.3) trBlur(F, PW, PH, sigma);
+    const loops = trMarch(F, PW, PH, 0.5).map(l => trSimplify(l.map(v => v - 1), eps)).filter(l => l.length >= 6);
+    out.push({c: order[li], loops, d: loops.map(l => trPath(l, cornerCos)).join(''), points: loops.reduce((a, l) => a + l.length/2, 0)});
+  }
+  return out;
+}
+
+/* v139: Vector trace of the Trace prep result. The finished print (flat colours, clear where nothing prints) is read at
+   up to VEC_MAX pixels on its long side; each pixel is the palette colour nearest to it; colours are stacked biggest at
+   the bottom and outlined by trLayers. The SVG is sized in mm at the print size. */
+const VEC_MAX = 2600;
+let vecNow = null, vecTimer = 0, vecZoomV = 0;
+function vecLabels(){
+  const pal = flatUsed().map(c => [c[0], c[1], c[2]]); if (!pal.length || !outReady) return null;
+  const sw = outCanvas.width, sh = outCanvas.height, k = Math.min(1, VEC_MAX/Math.max(sw, sh)), W = Math.max(2, Math.round(sw*k)), H = Math.max(2, Math.round(sh*k));
+  const d = outCanvas.getContext('2d', {willReadFrequently: true}).getImageData(0, 0, sw, sh).data, L = new Uint8Array(W*H), area = new Array(pal.length).fill(0);
+  let last = -1, lastI = 0;
+  for (let y = 0; y < H; y++){ const sy = Math.min(sh - 1, Math.floor((y + 0.5)/k));
+    for (let x = 0; x < W; x++){ const o = (sy*sw + Math.min(sw - 1, Math.floor((x + 0.5)/k)))*4;
+      if (d[o + 3] < 128){ L[y*W + x] = 255; continue; }
+      const key = d[o] << 16 | d[o + 1] << 8 | d[o + 2]; let bi = lastI;
+      if (key !== last){ let bd = 1e9; for (let i = 0; i < pal.length; i++){ const dr = d[o] - pal[i][0], dg = d[o + 1] - pal[i][1], db = d[o + 2] - pal[i][2], q = dr*dr + dg*dg + db*db; if (q < bd){ bd = q; bi = i; } } last = key; lastI = bi; }
+      L[y*W + x] = bi; area[bi]++; } }
+  return {L, W, H, pal, area, sw, sh};
+}
+function vecMake(smooth, lines){
+  const q = vecLabels(); if (!q) return null;
+  const order = q.pal.map((c, i) => i).filter(i => q.area[i] > 0).sort((a, b) => q.area[b] - q.area[a]); if (!order.length) return null;
+  const grow = Math.max(1, Math.min(12, q.W/Math.max(1, art.w))); // how much the file was enlarged: its pixel steps are smoothed away, not traced
+  const layers = trLayers(q.L, q.W, q.H, order, smooth, grow), mmW = Math.round(q.sw/DPI*254)/10, mmH = Math.round(q.sh/DPI*254)/10;
+  const hex = i => rgbHex(q.pal[i][0], q.pal[i][1], q.pal[i][2]);
+  const body = layers.filter(l => l.d).map(l => `<path fill="${hex(l.c)}" fill-rule="evenodd" d="${l.d}"/>`).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${q.W} ${q.H}" width="${mmW}mm" height="${mmH}mm">${body}</svg>`;
+  const view = lines ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${q.W} ${q.H}">` + layers.filter(l => l.d).map(l => `<path fill="${hex(l.c)}" fill-opacity=".35" stroke="#ff2aa0" stroke-width="${Math.max(1, q.W/900)}" fill-rule="evenodd" d="${l.d}"/>`).join('') + '</svg>' : svg;
+  return {svg, view, W: q.W, H: q.H, mmW, mmH, colours: layers.filter(l => l.d).length, points: layers.reduce((n, l) => n + l.points, 0), kb: Math.round(svg.length/1024)};
+}
+function vecName(){ return fileName().replace(/(_trace|_flat)?\.png$/i, '') + '_vector.svg'; }
+function vecFit(){
+  const im = $('vecImg'), box = $('vecBody'); if (!vecNow) return;
+  const fit = Math.min((box.clientWidth - 32)/vecNow.W, (box.clientHeight - 32)/vecNow.H), z = vecZoomV ? fit*vecZoomV : fit;
+  im.style.width = Math.max(40, Math.round(vecNow.W*z)) + 'px'; im.style.height = 'auto';
+}
+function vecRun(){
+  clearTimeout(vecTimer); $('vecSum').textContent = 'Tracing…'; $('vecSave').disabled = true;
+  vecTimer = setTimeout(() => {
+    const t0 = performance.now(); let r = null; try { r = vecMake(+$('vecSmooth').value, $('vecLines').checked); } catch(e){}
+    vecNow = r;
+    if (!r){ $('vecSum').textContent = 'This design couldn’t be traced. Check Trace prep shows flat colours first.'; $('vecImg').removeAttribute('src'); return; }
+    $('vecImg').src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(r.view); vecFit();
+    $('vecSum').textContent = `${r.colours} colour${r.colours === 1 ? '' : 's'} · ${r.points.toLocaleString()} points · ${r.mmW} × ${r.mmH} mm · ${r.kb.toLocaleString()} KB · traced in ${(Math.round((performance.now() - t0)/100)/10).toFixed(1)} s`;
+    $('vecSave').disabled = false;
+  }, 40);
+}
+async function vecOpen(){
+  if (!art || !isFlat()){ toast('Choose the Trace prep print style first.'); return; }
+  for (let n = 0; n < 200 && !outReady; n++){ await idle(); if (!outReady) await new Promise(r => setTimeout(r, 25)); }
+  if (!outReady || !flatUsed().length){ toast('The design isn’t ready yet. Try again in a moment.'); return; }
+  try { const v = +localStorage.getItem('tsw-ge-vec-smooth'); if (v >= 0 && v <= 100 && localStorage.getItem('tsw-ge-vec-smooth') !== null) $('vecSmooth').value = v; } catch(e){}
+  $('vecSmoothVal').textContent = $('vecSmooth').value;
+  $('vec').hidden = false; vecRun(); $('vecClose').focus();
+}
+$('vecBtn').addEventListener('click', vecOpen);
+$('vecClose').addEventListener('click', () => { $('vec').hidden = true; vecNow = null; $('vecImg').removeAttribute('src'); });
+$('vecSmooth').addEventListener('input', e => { $('vecSmoothVal').textContent = e.target.value; });
+$('vecSmooth').addEventListener('change', e => { try { localStorage.setItem('tsw-ge-vec-smooth', e.target.value); } catch(err){} vecRun(); });
+$('vecLines').addEventListener('change', vecRun);
+$('vecZoom').addEventListener('click', e => { const b = e.target.closest('[data-vz]'); if (!b) return; vecZoomV = +b.dataset.vz; for (const x of $('vecZoom').children) x.setAttribute('aria-pressed', String(x === b)); vecFit(); });
+$('vecBg').addEventListener('click', e => { const b = e.target.closest('[data-vb]'); if (!b) return; $('vecBody').className = 'vec-body' + (b.dataset.vb ? ' ' + b.dataset.vb : ''); for (const x of $('vecBg').children) x.setAttribute('aria-pressed', String(x === b)); });
+$('vecSave').addEventListener('click', async () => {
+  if (!vecNow) return; let svg = vecNow.svg;
+  if ($('vecLines').checked){ const r = vecMake(+$('vecSmooth').value, false); if (r) svg = r.svg; }
+  await saveFile(new Blob([svg], {type: 'image/svg+xml'}), vecName());
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('vec').hidden) $('vecClose').click(); });
+window.addEventListener('resize', () => { if (!$('vec').hidden) vecFit(); });
 function syncFlatBg(){
   if (st.flatBg == null) st.flatBg = FLAT_KEYS.flatBg;
   syncChips('flatBgChips', 'flatbg', st.flatBg);
@@ -7278,6 +7479,36 @@ const batchWidestIt = g => g.items.reduce((m, it) => !m || batchBox(g, it).w > b
 const batchWidest = g => { const it = batchWidestIt(g); return it ? batchBox(g, it).w : 0; };
 const batchTooBig = (g, it) => batchSized(g) && batchCm(g, it) > maxWidthFor(batchBox(g, it)) + 0.001;
 const round1 = v => Math.round(v*10)/10;
+/* v139: a file's own edit (it.own). It stays in its group and saves with it, with its own settings, touch-ups, hand-drawn
+   areas, crop and straighten. With own.sized it also keeps its own print size; without, it follows the group's size. */
+const batchOwnFixed = it => !!(it.own && it.own.sized);
+const batchBigIt = (g, it) => !batchOwnFixed(it) && batchTooBig(g, it);
+const batchItReady = (g, it) => (it.own ? it.own.sized || batchSized(g) : !!(g.snap && batchSized(g))) && !batchBigIt(g, it);
+const batchPic = it => (it.own && it.own.thumb) || it.thumb;
+function batchSizeTxt(g, it){
+  if (batchOwnFixed(it)){ const q = it.own.snap; return `${toMm(q.w)} × ${toMm(q.w*q.crop.h/q.crop.w)} mm`; }
+  const b = batchBox(g, it); if (!batchSized(g)) return `${b.w} × ${b.h} px`;
+  const cm = batchCm(g, it); return `${toMm(cm)} × ${toMm(cm*b.h/b.w)} mm`;
+}
+function batchOwnArt(a, own){ // puts the own edit's straighten and touch-ups on freshly opened art; false when it can't be turned again
+  if (own.rot && own.srcW && own.srcH){
+    const el0 = a.el, bg = rotBg(el0, own.srcW, own.srcH), b = rotBake(el0, own.srcW, own.srcH, own.rot, bg);
+    if (!b) return false;
+    Object.assign(a, {el0, srcW: own.srcW, srcH: own.srcH, rot: own.rot, rotBg: bg, el: b.el, fullW: b.w, fullH: b.h, w: b.w, h: b.h, crop: {x: 0, y: 0, w: b.w, h: b.h}});
+    a.id = ++artSeq; a.thumb = undefined; a.trim = null; a.q = null;
+  }
+  a.strokes = (own.strokes || []).map(k => ({...k})); a.strokesN = Math.min(own.strokesN || 0, a.strokes.length); a.eraseL = a.paintL = null;
+  if (a.strokesN) rebuildEdits(a);
+  return true;
+}
+function batchOwnSnap(g, it, a, spareCm){ // the own edit's settings for the art; spareCm: the width to use while the group has no size
+  const o = it.own, q = o.snap;
+  if (o.sized && q.crop){ const c = {x: Math.max(0, Math.min(q.crop.x, a.fullW - 1)), y: Math.max(0, Math.min(q.crop.y, a.fullH - 1))}; c.w = Math.max(1, Math.min(q.crop.w, a.fullW - c.x)); c.h = Math.max(1, Math.min(q.crop.h, a.fullH - c.y)); a.crop = c; a.w = c.w; a.h = c.h; }
+  else batchCropArt(g, it, a);
+  const w = o.sized ? q.w : batchSized(g) ? batchCm(g, it) : spareCm || q.w;
+  return {s: {...q.s}, lv: {...q.lv}, rules: q.rules.map(R => ({...R, samples: [...R.samples]})), w: Math.max(0.5, Math.min(w, maxWidthFor(a))), crop: {...a.crop}, n: a.strokesN};
+}
+function batchThumbOf(c){ const k = Math.min(1, 220/Math.max(c.width, c.height)), t = document.createElement('canvas'); t.width = Math.max(1, Math.round(c.width*k)); t.height = Math.max(1, Math.round(c.height*k)); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/png'); }
 function batchFit(g, fit){ // changing how the group is sized keeps the widest file as it prints now
   if (!['s', 'w', 'h'].includes(fit) || fit === g.fit) return;
   const W = batchWidestIt(g), cm = W && batchSized(g) ? batchCm(g, W) : 0, b = W && batchBox(g, W);
@@ -7306,7 +7537,7 @@ async function batchTrims(){ // files kept from before trims were found
    visit only. A removed file comes back from memory and is stored again. */
 let batchUndos = [];
 function batchMark(label){
-  batchUndos.push({label, groups: batchGroups.map(g => ({g, f: {...g}, items: g.items.map(it => ({it, on: it.on, saved: it.saved}))}))});
+  batchUndos.push({label, groups: batchGroups.map(g => ({g, f: {...g}, items: g.items.map(it => ({it, on: it.on, saved: it.saved, own: it.own || null}))}))});
   if (batchUndos.length > 30) batchUndos.shift();
   syncBatchTools();
 }
@@ -7341,7 +7572,7 @@ function batchUndoGo(){
   const before = new Set(batchGroups.flatMap(g => g.items));
   batchGroups = u.groups.map(r => {
     Object.assign(r.g, r.f);
-    r.g.items = r.items.map(x => { x.it.on = x.on; x.it.saved = x.saved; if (!before.has(x.it)){ x.it.kept = false; x.it.keepFailed = false; } return x.it; });
+    r.g.items = r.items.map(x => { x.it.on = x.on; x.it.saved = x.saved; x.it.own = x.own || null; if (!before.has(x.it)){ x.it.kept = false; x.it.keepFailed = false; } return x.it; });
     return r.g;
   });
   const after = new Set(batchGroups.flatMap(g => g.items)), gone = [...before].filter(it => !after.has(it));
@@ -7522,7 +7753,7 @@ function batchUsePreset(g, key){
   for (const it of g.items) it.saved = false;
 }
 const batchOrderList = () => [...new Set(batchGroups.map(g => g.order))];
-const batchReady = g => !!(g.snap && batchSized(g) && g.items.some(it => it.on && !batchTooBig(g, it)));
+const batchReady = g => g.items.some(it => it.on && batchItReady(g, it));
 /* The Speed buttons on a group: the built-in ones and Ours, as in the editor. One with "trim" turns the group's trim on. */
 function batchQuicks(){
   return SPEED_BUILT.map((B, i) => ({q: 'b' + i, label: B.label, tip: B.tip || ((B.starter && STARTERS.find(x => x.name === B.starter)) || {}).desc || ''}))
@@ -7644,28 +7875,28 @@ function renderBatch(){
   }
   const quicks = batchQuicks(), picked = batchPicked(), dup = batchDupes();
   const card = g => {
-    const L = g.locked, sized = batchSized(g), on = g.items.filter(it => it.on), ready = on.filter(it => !batchTooBig(g, it)), W = batchWidestIt(g), some = on.length > 0 && on.length < g.items.length;
+    const L = g.locked, sized = batchSized(g), on = g.items.filter(it => it.on), ready = on.filter(it => batchItReady(g, it)), ownN = g.items.filter(it => it.own).length, W = batchWidestIt(g), some = on.length > 0 && on.length < g.items.length;
     const set = g.snap ? `<b>${esc(g.desc || 'Set up')}</b>` : '<b>Not set up yet.</b>' + (L ? '' : ' Pick a preset or a Speed button, or set it up on a file.');
     const sizeTxt = !sized ? 'no print size yet' : g.fit === 'w' ? `every file ${round1(g.fitMm)} mm wide` : g.fit === 'h' ? `every file ${round1(g.fitMm)} mm tall` : `one scale, widest file ${toMm(batchCm(g, W))} mm wide`;
-    const save = `<button class="btn" type="button" data-act="save"${g.snap && sized && ready.length ? '' : ' disabled'}>Save ${ready.length || ''} PNG${ready.length === 1 ? '' : 's'} as a zip</button>`;
+    const save = `<button class="btn" type="button" data-act="save"${ready.length ? '' : ' disabled'}>Save ${ready.length || ''} PNG${ready.length === 1 ? '' : 's'} as a zip</button>`;
     const grid = L && !g.open ? '' : `<div class="bg-grid">${g.items.map(it => {
-        const big = batchTooBig(g, it), cm = sized ? batchCm(g, it) : 0, b = batchBox(g, it);
-        return `<div class="bitem${it.on ? ' on' : ''}${big ? ' big' : ''}${batchLand.has(it.key) ? ' land' : ''}" data-k="${esc(it.key)}"${L ? '' : ' draggable="true"'}>
-          <div class="bi-pic"${L ? '' : ' data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up."'}>${it.thumb ? `<img src="${it.thumb}" alt="" draggable="false">` : ''}</div>
+        const big = batchBigIt(g, it);
+        return `<div class="bitem${it.on ? ' on' : ''}${it.own ? ' own' : ''}${big ? ' big' : ''}${batchLand.has(it.key) ? ' land' : ''}" data-k="${esc(it.key)}"${L ? '' : ' draggable="true"'}>
+          <div class="bi-pic"${L ? '' : ` data-act="open" data-tip="${it.own ? 'Open this file with its own edit, to check or change it.' : 'Open this file in the editor with the group’s set-up, to check it or change the set-up.'}"`}>${batchPic(it) ? `<img src="${batchPic(it)}" alt="" draggable="false">` : ''}</div>
           <input class="bi-tick" type="checkbox" ${it.on ? 'checked' : ''}${L ? ' disabled' : ''} aria-label="Include ${esc(it.name)}">
           ${L ? '' : `<button class="bi-x" type="button" data-act="drop" aria-label="Remove ${esc(it.name)}">×</button>`}
-          <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${dup.has(it) ? `<div class="bi-note bi-dup" title="The same file as ${esc(dup.get(it).name)}">Same file as ${esc(dup.get(it).name)}</div>` : ''}${needTxt(it) ? `<div class="bi-note bi-need" title="From the Workboard: how many prints this design needs.">${needTxt(it)}</div>` : ''}${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}
-          <div class="bi-row">${big ? '<span class="bi-warn">Over 400 × 500 mm</span>' : `<span>${sized ? `${toMm(cm)} × ${toMm(cm*b.h/b.w)} mm` : `${b.w} × ${b.h} px`}</span>`}${it.saved ? '<span>Saved</span>' : ''}</div></div>`;
+          <div class="bi-name" title="${esc(it.name)}">${esc(it.name)}</div>${dup.has(it) ? `<div class="bi-note bi-dup" title="The same file as ${esc(dup.get(it).name)}">Same file as ${esc(dup.get(it).name)}</div>` : ''}${needTxt(it) ? `<div class="bi-note bi-need" title="From the Workboard: how many prints this design needs.">${needTxt(it)}</div>` : ''}${it.note ? `<div class="bi-note" title="${esc(it.note)}">${esc(it.note)}</div>` : ''}${it.own ? `<div class="bi-note bi-own" title="${esc('This file has its own edit' + (it.own.desc ? ': ' + it.own.desc : '') + '. It saves with the group. The group’s set-up does not change it.' + (it.own.sized ? ' It keeps its own print size too.' : ' It still follows the group’s print size.'))}"><span>Own edit${it.own.sized ? ' · own size' : ''}</span>${L ? '' : '<button class="link" type="button" data-act="unown" data-tip="Drops this file’s own edit. It goes back to the group’s set-up.">Back to group</button>'}</div>` : ''}
+          <div class="bi-row">${big ? '<span class="bi-warn">Over 400 × 500 mm</span>' : `<span>${batchSizeTxt(g, it)}</span>`}${it.saved ? '<span>Saved</span>' : ''}</div></div>`;
       }).join('')}</div>`;
     const tick = `<input class="bg-tick" type="checkbox" ${g.on ? 'checked' : ''} aria-label="Include the group ${esc(g.name)} in Process ticked groups" data-tip="Ticked groups are worked out together by Process ticked groups.">`;
     if (batchAsTile(g)){ // v130: the group as a small card
       const pics = g.items.length > 4 ? g.items.slice(0, 3) : g.items.slice(0, 4), cls = g.items.length === 1 ? 'n1' : g.items.length === 2 ? 'n2' : 'n4';
-      const allSaved = on.length > 0 && on.every(it => it.saved), big = on.some(it => batchTooBig(g, it));
-      const sizeShort = !sized ? 'no print size yet' : g.items.length === 1 ? `${toMm(batchCm(g, g.items[0]))} × ${toMm(batchCm(g, g.items[0])*batchBox(g, g.items[0]).h/batchBox(g, g.items[0]).w)} mm` : sizeTxt;
+      const allSaved = on.length > 0 && on.every(it => it.saved), big = on.some(it => batchBigIt(g, it));
+      const sizeShort = g.items.length === 1 && (sized || batchOwnFixed(g.items[0])) ? batchSizeTxt(g, g.items[0]) : !sized ? 'no print size yet' : sizeTxt;
       return `<section class="bgroup tile${g.on ? ' on' : ' off'}${L ? ' locked' : ''}" data-g="${g.id}">
         <div class="bt-head">${tick}<span class="bt-name" title="${esc(g.name)}">${esc(g.name)}</span>${L ? '<span class="bg-lock"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg> Locked</span>' : ''}</div>
-        <div class="bt-pics ${cls}">${pics.map(it => `<div class="bt-pic" data-k="${esc(it.key)}"${L ? '' : ' data-act="open" data-tip="Open this file in the editor with the group’s set-up, to check it or change the set-up."'} title="${esc(it.name)}">${it.thumb ? `<img src="${it.thumb}" alt="${esc(it.name)}" draggable="false">` : ''}${it.prints ? `<b class="bt-n" title="${it.prints} print${it.prints === 1 ? '' : 's'} needed">×${it.prints}</b>` : ''}</div>`).join('')}${g.items.length > 4 ? `<div class="bt-more">+${g.items.length - 3}</div>` : ''}</div>
-        <div class="bt-line">${g.items.length} file${g.items.length === 1 ? '' : 's'}${on.length < g.items.length ? ` · ${on.length} ticked` : ''} · ${big ? '<span class="bi-warn">over 400 × 500 mm</span>' : sizeShort}${allSaved ? ' · <span class="bt-ok">✓ saved</span>' : ''}</div>
+        <div class="bt-pics ${cls}">${pics.map(it => `<div class="bt-pic${it.own ? ' own' : ''}" data-k="${esc(it.key)}"${L ? '' : ` data-act="open" data-tip="${it.own ? 'Open this file with its own edit, to check or change it.' : 'Open this file in the editor with the group’s set-up, to check it or change the set-up.'}"`} title="${esc(it.name)}">${batchPic(it) ? `<img src="${batchPic(it)}" alt="${esc(it.name)}" draggable="false">` : ''}${it.own ? '<i class="bt-own">Own edit</i>' : ''}${it.prints ? `<b class="bt-n" title="${it.prints} print${it.prints === 1 ? '' : 's'} needed">×${it.prints}</b>` : ''}</div>`).join('')}${g.items.length > 4 ? `<div class="bt-more">+${g.items.length - 3}</div>` : ''}</div>
+        <div class="bt-line">${g.items.length} file${g.items.length === 1 ? '' : 's'}${on.length < g.items.length ? ` · ${on.length} ticked` : ''} · ${big ? '<span class="bi-warn">over 400 × 500 mm</span>' : sizeShort}${ownN ? ` · ${ownN} own edit${ownN === 1 ? '' : 's'}` : ''}${allSaved ? ' · <span class="bt-ok">✓ saved</span>' : ''}</div>
         ${g.items.some(it => needTxt(it)) ? `<div class="bt-line bt-needline" title="From the Workboard: how many prints are needed.">${g.items.length === 1 ? needTxt(g.items[0]) : (n => n ? `${n} prints needed in all` : 'Used on several items')(g.items.reduce((n, it) => n + (it.prints || 0), 0))}</div>` : ''}
         ${L ? '' : `<label class="bg-w bt-w" data-tip="${g.fit === 's' ? (g.items.length > 1 ? 'The widest file prints this wide and the others follow at the same scale.' : 'How wide this design prints.') : g.fit === 'w' ? 'Every file in the group is made this wide.' : 'Every file in the group is made this tall.'} Details has the other ways to size a group."><span>Print size</span><input type="number" inputmode="decimal" min="5" max="500" step="1" data-w value="${!sized ? '' : g.fit === 's' ? toMm(batchCm(g, W)) : round1(g.fitMm)}" placeholder="mm" aria-label="Print size of the group ${esc(g.name)} in mm"> mm ${g.fit === 'h' ? 'tall' : 'wide'}</label>`}
         <div class="bt-set${g.snap ? '' : ' todo'}" title="${esc(g.snap ? g.desc || 'Set up' : 'Not set up yet')}">${g.snap ? esc(g.desc || 'Set up') : 'Not set up yet'}</div>
@@ -7734,9 +7965,9 @@ $('batchBody').addEventListener('click', e => {
   if (act === 'full' || act === 'tile'){ g.full = act === 'full'; renderBatch(); const el = $('batchBody').querySelector(`.bgroup[data-g="${g.id}"]`); if (el) el.scrollIntoView({block: 'nearest'}); return; }
   if (g.locked && !['lock', 'files', 'save'].includes(act)) return;
   const what = {lock: `${g.locked ? 'unlocked' : 'locked'} “${g.name}”`, quick: `the Speed button on “${g.name}”`, split: `moved ticked files out of “${g.name}”`, all: `ticked all files in “${g.name}”`,
-    none: `unticked all files in “${g.name}”`, del: `removed the group “${g.name}”`, drop: it ? `removed ${it.name}` : ''}[act];
+    none: `unticked all files in “${g.name}”`, del: `removed the group “${g.name}”`, drop: it ? `removed ${it.name}` : '', unown: it ? `the own edit of ${it.name}` : ''}[act];
   if (what) batchMark(what);
-  const said = {lock: g.locked ? `“${g.name}” is unlocked.` : `“${g.name}” is locked. It won’t change by accident.`, del: `Removed the group “${g.name}”.`, drop: it ? `Removed ${it.name}.` : ''}[act];
+  const said = {lock: g.locked ? `“${g.name}” is unlocked.` : `“${g.name}” is locked. It won’t change by accident.`, del: `Removed the group “${g.name}”.`, drop: it ? `Removed ${it.name}.` : '', unown: it ? `${it.name} is back on the group’s set-up.` : ''}[act];
   if (said) batchBar(said);
   if (act === 'movehere'){ batchMove(batchPicked(), g); return; }
   if (act === 'lock'){ g.locked = !g.locked; g.open = false; }
@@ -7754,8 +7985,9 @@ $('batchBody').addEventListener('click', e => {
   else if (act === 'add'){ batchAddTo = g; $('batchIn').click(); return; }
   else if (act === 'del'){ batchForget(g.items); batchGroups.splice(batchGroups.indexOf(g), 1); }
   else if (act === 'drop' && it){ batchForget([it]); g.items.splice(g.items.indexOf(it), 1); }
+  else if (act === 'unown' && it){ it.own = null; it.saved = false; }
   else if (act === 'open' && it){ batchSetup(g, it); return; }
-  else if (act === 'setup'){ const first = g.items.find(x => x.on) || g.items[0]; if (first) batchSetup(g, first); return; }
+  else if (act === 'setup'){ const first = g.items.find(x => x.on && !x.own) || g.items.find(x => !x.own) || g.items.find(x => x.on) || g.items[0]; if (first) batchSetup(g, first); return; }
   else if (act === 'save'){ batchSave([g], false); return; }
   batchKeepSoon(); renderBatch();
 });
@@ -7842,6 +8074,17 @@ async function batchSetup(g, it){
   let ok = false; try { ok = !!(await openFile(it.file)); } catch(e){}
   if (!ok || !cur){ batchShow(); return; }
   cur.batch = {g: g.id, key: it.key};
+  if (it.own){
+    const perPx = st.widthCm/art.w, a = art;
+    if (batchOwnArt(art, it.own)){
+      art.sizeFrom = 'user';
+      const snap = batchOwnSnap(g, it, art, 0); if (!it.own.sized && !batchSized(g)) snap.w = Math.max(0.5, Math.min(perPx*art.w, maxWidthFor(art)));
+      stashDoc();
+      cur.snap = snap; cur.steps = [{snap, label: `Own edit of ${it.name}`, at: Date.now()}]; cur.stepPos = 0; cur.unsaved = false;
+      loadDoc(cur);
+      if (a.rot) setTimeout(() => analyseArt(a), 30);
+    } else toast('This file’s straighten couldn’t be done again here. It opened as the file is.');
+  } else
   if (g.snap && batchSized(g)){
     art.sizeFrom = 'user'; batchCropArt(g, it, art); stashDoc();
     const snap = batchSnapFor(g, it, art);
@@ -7852,13 +8095,17 @@ async function batchSetup(g, it){
   $('labelFull').value = it.lab || ''; $('labelShort').value = it.labShort || '';
   if (it.note) $('nameSuffix').value = it.note.slice(0, 40);
   syncFileName();
+  cur.batch.w0 = st.widthCm; cur.batch.crop0 = JSON.stringify(art.crop); // to tell later whether the size or crop was changed here
   syncBatchNote();
 }
 function syncBatchNote(){
   const b = cur && cur.batch, g = b && batchGroups.find(g => g.id === b.g);
-  $('batchNote').hidden = !g; $('batchNoteOne').hidden = !g || g.items.length < 2 || g.locked;
+  const own = g && (g.items.find(x => x.key === b.key) || {}).own;
+  $('batchNote').hidden = !g; $('batchNoteOne').hidden = !g || g.locked; $('batchNoteReset').hidden = !own || g.locked;
   $('batchNoteBack').textContent = g && b.fromChk ? 'Back to Claude’s check, no change' : 'Back to Batch, no change';
   if (g && b.fromChk){ const it = g.items.find(x => x.key === b.key); $('batchNoteTxt').textContent = `From Claude’s check: ${it ? it.name : 'this design'}, in the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Change it here, then choose whether the change is for this file only or the whole group.`; }
+  else if (g && own) $('batchNoteTxt').textContent = `${(g.items.find(x => x.key === b.key) || {}).name || 'This file'} has its own edit, in the group “${g.name}”. Change it and choose Save for this file only. The group’s set-up stays as it is.`;
+  else if (g && g.snap) $('batchNoteTxt').textContent = `From the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Use for the group: every file gets these settings. Save for this file only: just this file changes, and it stays in the group.`;
   else if (g) $('batchNoteTxt').textContent = `Setting up the group “${g.name}” (${g.items.length} file${g.items.length === 1 ? '' : 's'}). Choose the preset or settings and the print size on this file. Every ticked file gets the same settings, sized the way the group is set.`;
 }
 function batchLeaveTab(){ // closes the set-up tab without questions and goes back to the Batch screen
@@ -7873,32 +8120,49 @@ function batchLeaveTab(){ // closes the set-up tab without questions and goes ba
 }
 $('batchNoteBack').addEventListener('click', batchLeaveTab);
 $('batchNoteUse').addEventListener('click', () => batchNoteApply(false));
-$('batchNoteOne').addEventListener('click', () => batchNoteApply(true));
+$('batchNoteOne').addEventListener('click', () => batchOwnSave());
+$('batchNoteReset').addEventListener('click', () => {
+  const b = cur && cur.batch, g = b && batchGroups.find(g => g.id === b.g), it = g && g.items.find(x => x.key === b.key); if (!g || !it || !it.own || g.locked) return;
+  batchMark(`the own edit of ${it.name}`); it.own = null; it.saved = false;
+  batchKeepSoon(); batchLeaveTab(); toast(`${it.name} is back on the group’s set-up.`);
+});
+let batchOwnBusy = false;
+async function batchOwnSave(){ // v139: the design on screen becomes this file's own edit; the file stays in its group
+  const b = cur && cur.batch, d = cur, g = b && batchGroups.find(g => g.id === b.g), it = g && g.items.find(x => x.key === b.key);
+  if (!g || !it || !art || g.locked || batchOwnBusy || batchBusy) return;
+  batchOwnBusy = true; let thumb = '';
+  try {
+    commitStep();
+    for (let n = 0; n < 80 && !outReady; n++){ await idle(); if (!outReady) await new Promise(r => setTimeout(r, 25)); }
+    if (outReady) thumb = batchThumbOf(traceCanvas() || outCanvas);
+  } catch(e){}
+  batchOwnBusy = false;
+  if (cur !== d || cur.batch !== b || !art || !g.items.includes(it)) return; // the tab changed while the picture was worked out
+  const src = snapshot(), opt = $('presetSel').selectedOptions[0];
+  const sized = !!(it.own && it.own.sized) || !!art.rot || JSON.stringify(art.crop) !== b.crop0 || Math.abs(st.widthCm - (b.w0 || 0)) > 0.005;
+  batchMark(`the own edit of ${it.name}`);
+  it.own = {snap: src, strokes: art.strokes.slice(0, art.strokesN).map(k => ({...k})), strokesN: art.strokesN, rot: art.rot || 0, srcW: art.srcW || 0, srcH: art.srcH || 0, sized, thumb,
+    desc: (opt && $('presetSel').value ? opt.textContent.trim() + ' · ' : '') + (isAsis() ? 'As it is' : lookName() + (st.finish === 'cut' ? ' · clean cut' : ` · ${st.lpi} lpi`))};
+  it.saved = false;
+  batchKeepSoon(); batchLeaveTab();
+  toast(`${it.name} has its own edit. It stays in “${g.name}” and saves with it.`);
+}
 function batchNoteApply(one){
   const b = cur && cur.batch; let g = b && batchGroups.find(g => g.id === b.g); if (!g || !art) return;
   commitStep();
-  if (one){ // this file leaves for a group of its own, right under its old one, at the same size
-    const it0 = g.items.find(x => x.key === b.key);
-    if (it0 && g.items.length > 1 && !g.locked){
-      batchMark(`set up ${it0.name} on its own`);
-      const ng = batchGroup(`${g.name.slice(0, 36)} · ${it0.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 20)}`, '', g.order, g.orderNote);
-      batchGroups.pop(); batchGroups.splice(batchGroups.indexOf(g) + 1, 0, ng);
-      Object.assign(ng, {scale: g.scale, scaleFrom: g.scale ? 'user' : '', fit: g.fit, fitMm: g.fitMm, trim: g.trim, on: g.on});
-      if (g.scale) g.scaleFrom = 'user';
-      g.items.splice(g.items.indexOf(it0), 1); ng.items.push(it0); it0.on = true; b.g = ng.id; g = ng;
-    }
-  }
   const src = snapshot(), opt = $('presetSel').selectedOptions[0];
   g.snap = {s: src.s, lv: src.lv, rules: src.rules.filter(R => !R.area)};
   const it = g.items.find(x => x.key === b.key), f = it ? it.w/(art.srcW || art.fullW) : 1, full = art.crop.x === 0 && art.crop.y === 0 && art.crop.w >= art.fullW && art.crop.h >= art.fullH;
   batchMark(`the set-up of “${g.name}”`);
+  const lost = !!(art.strokesN || art.rot || src.rules.some(R => R.area));
+  if (it && it.own) it.own = null; // this file's settings are the group's now
   if (!full) g.trim = true; else if (it && it.tb && (it.tb.w < it.w || it.tb.h < it.h)) g.trim = false; // cropped in here: the group trims; the whole file: it doesn't
   if (g.fit === 'w') g.fitMm = round1(st.widthCm*10); else if (g.fit === 'h') g.fitMm = round1(st.widthCm*10*art.h/art.w); else g.scale = st.widthCm/(art.w*f);
   g.scaleFrom = 'user'; g.preset = null; g.quick = '';
   g.desc = (opt && $('presetSel').value ? opt.textContent.trim() + ' · ' : '') + lookName() + (st.finish === 'cut' ? ' · clean cut' : ` · ${st.lpi} lpi`);
   for (const it of g.items) it.saved = false;
   batchKeepSoon(); batchLeaveTab();
-  toast(one ? `“${g.name}” has its own set-up now.` : `“${g.name}” is set up. Tick the files and save.`);
+  toast(lost ? `“${g.name}” is set up. Touch-ups, hand-drawn areas and straightening belong to one file: open it and choose Save for this file only to keep them.` : `“${g.name}” is set up. Tick the files and save.`);
 }
 
 // a zip with the files stored as they are (PNGs are already packed)
@@ -7924,10 +8188,10 @@ async function makeZip(files){
    ticked group in one zip, a folder for each group, named after the order when they share one. */
 async function batchSave(groups, whole, toSheet, only){ // toSheet: the finished prints go to the gang sheet, not a zip; only: just these files (a Set of keys)
   if (batchBusy || saving) return;
-  const notSet = groups.filter(g => g.items.some(it => it.on) && !(g.snap && batchSized(g))).length;
-  groups = groups.filter(g => g.snap && batchSized(g));
+  const can = (g, it) => it.own ? it.own.sized || batchSized(g) : !!(g.snap && batchSized(g));
+  const notSet = groups.filter(g => g.items.some(it => it.on && !can(g, it))).length;
   const jobs = []; let left = 0;
-  for (const g of groups) for (const it of g.items) if (it.on && (!only || only.has(it.key))){ if (batchTooBig(g, it)) left++; else jobs.push({g, it}); }
+  for (const g of groups) for (const it of g.items) if (it.on && can(g, it) && (!only || only.has(it.key))){ if (batchBigIt(g, it)) left++; else jobs.push({g, it}); }
   if (!jobs.length){ if (only) toast('That file isn’t ticked or set up in the batch any more.'); return; }
   batchBusy = true; batchStopped = false; saving = true; $('saveBtn').disabled = true;
   $('batchBusyTxt').textContent = `Working out 1 of ${jobs.length}…`; $('batchBusy').hidden = false;
@@ -7943,14 +8207,15 @@ async function batchSave(groups, whole, toSheet, only){ // toSheet: the finished
         await im.decode();
         const a = makeArt(im, im.naturalWidth, im.naturalHeight, it.name, false, null, {vector: /svg/i.test(it.file.type) || /\.svg$/i.test(it.name)});
         Object.assign(a, {quiet: true, sizeFrom: 'user'});
-        batchCropArt(g, it, a);
-        const snap = batchSnapFor(g, it, a);
+        let snap;
+        if (it.own){ if (!batchOwnArt(a, it.own)) throw new Error('turn'); snap = batchOwnSnap(g, it, a, 0); }
+        else { batchCropArt(g, it, a); snap = batchSnapFor(g, it, a); }
         cur = null;
         loadDoc({id: ++docSeq, key: '', art: a, snap, activeRule: 0, steps: [{snap, label: 'Batch', at: Date.now()}], stepPos: 0, unsaved: false, zoom: 'fit', cx: 0, cy: 0, suffix: (it.note || '').slice(0, 40), lab: it.lab || '', labShort: it.labShort || '', done: []});
         await new Promise(r => setTimeout(r, 30));
         for (let n = 0; n < 400; n++){ await idle(); if (outReady) break; await new Promise(r => setTimeout(r, 25)); }
         if (!outReady) throw new Error('not ready');
-        if (toSheet === 'check'){ await new Promise(r => setTimeout(r, 90)); files.push({name: fileName(), blob: null, it, g, check: {...chkCapture(), stamp: chkStamp(g)}}); URL.revokeObjectURL(url); continue; }
+        if (toSheet === 'check'){ await new Promise(r => setTimeout(r, 90)); files.push({name: fileName(), blob: null, it, g, check: {...chkCapture(), stamp: chkStamp(g, it)}}); URL.revokeObjectURL(url); continue; }
         if (toSheet){ if (!await gangAdd(labelled(traceCanvas() || outCanvas), {name: fileName().replace(/\.png$/i, ''), order: g.order || '', orders: it.orders || null, artKey: 'b:' + it.key, qty: it.prints})) throw new Error('empty'); files.push({name: fileName(), blob: null, it, g}); URL.revokeObjectURL(url); continue; }
         const raw = await new Promise((res, rej) => labelled(traceCanvas() || outCanvas).toBlob(b => b ? res(b) : rej(new Error('no png')), 'image/png'));
         const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', settingsText()], ['TSW-Recipe', recipeText()]]);
@@ -8124,7 +8389,7 @@ async function batchKeepNow(){
     catch(e){ it.keepFailed = true; if (!batchKeepFailed){ batchKeepFailed = true; toast('This batch is too big to keep for a refresh on this computer. Save it before closing.'); } }
   }
   const list = batchGroups.map(g => ({name: g.name, note: g.note, order: g.order, orderNote: g.orderNote, on: g.on, preset: g.preset, snap: g.snap, scale: g.scale, scaleFrom: g.scaleFrom, desc: g.desc, widthMm: g.widthMm, locked: g.locked, open: g.open, fit: g.fit, fitMm: g.fitMm, trim: g.trim, quick: g.quick,
-    items: g.items.filter(it => it.kept).map(it => ({key: it.key, name: it.name, note: it.note, lab: it.lab, labShort: it.labShort, w: it.w, h: it.h, tb: it.tb === undefined ? undefined : it.tb, thumb: it.thumb, on: it.on, mm: it.mm, saved: !!it.saved, prints: it.prints || 0, uses: it.uses || 0}))}));
+    items: g.items.filter(it => it.kept).map(it => ({key: it.key, name: it.name, note: it.note, lab: it.lab, labShort: it.labShort, w: it.w, h: it.h, tb: it.tb === undefined ? undefined : it.tb, thumb: it.thumb, on: it.on, mm: it.mm, saved: !!it.saved, prints: it.prints || 0, uses: it.uses || 0, own: it.own || null}))}));
   try { const tx = db.transaction('meta', 'readwrite'); tx.objectStore('meta').put({groups: list}, 'batch'); await idbDone(tx); } catch(e){}
 }
 async function batchForget(items){
@@ -8141,7 +8406,7 @@ async function batchRestore(){
     for (const x of r.items){
       const file = await idbGet(db, 'files', 'b:' + x.key);
       if (!(file instanceof Blob) || !(x.w > 0) || !(x.h > 0)) continue;
-      g.items.push({key: String(x.key), name: String(x.name || 'artwork.png'), note: String(x.note || ''), lab: String(x.lab || '').slice(0, 160), labShort: String(x.labShort || '').slice(0, 60), w: x.w, h: x.h, tb: x.tb && x.tb.w > 0 && x.tb.h > 0 ? {x: +x.tb.x || 0, y: +x.tb.y || 0, w: +x.tb.w, h: +x.tb.h} : x.tb === null ? null : undefined, thumb: /^data:image\/png;base64,/.test(x.thumb || '') ? x.thumb : '', file, on: x.on !== false, mm: +x.mm || 0, kept: true, saved: !!x.saved, prints: needN(x.prints), uses: needN(x.uses)});
+      g.items.push({key: String(x.key), name: String(x.name || 'artwork.png'), note: String(x.note || ''), lab: String(x.lab || '').slice(0, 160), labShort: String(x.labShort || '').slice(0, 60), w: x.w, h: x.h, tb: x.tb && x.tb.w > 0 && x.tb.h > 0 ? {x: +x.tb.x || 0, y: +x.tb.y || 0, w: +x.tb.w, h: +x.tb.h} : x.tb === null ? null : undefined, thumb: /^data:image\/png;base64,/.test(x.thumb || '') ? x.thumb : '', file, on: x.on !== false, mm: +x.mm || 0, kept: true, saved: !!x.saved, prints: needN(x.prints), uses: needN(x.uses), own: x.own && x.own.snap && x.own.snap.s && x.own.snap.lv && Array.isArray(x.own.snap.rules) && x.own.snap.crop && x.own.snap.w > 0 ? {...x.own, strokes: Array.isArray(x.own.strokes) ? x.own.strokes : [], thumb: /^data:image\/png;base64,/.test(x.own.thumb || '') ? x.own.thumb : '', desc: String(x.own.desc || '').slice(0, 120), sized: x.own.sized === true} : null});
     }
   }
   renderBatch(); batchTrims(); batchSigs();
@@ -8172,9 +8437,9 @@ function chkCapture(){ // the design on screen: a small before | after picture o
     softGlow: box && box.dataset.glow && !isDtg() ? +box.dataset.glow : null, specks: lastSpeck ? lastSpeck[0] : 0, dpi: Math.round(art.w/(wMm/25.4)),
     style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: (lookQuickNow() === 'bg' ? QS_BG[0] : lookName()).slice(0, 60), shirt: st.shirt, settings: settingsText().slice(0, 600)}};
 }
-const chkStamp = g => JSON.stringify([g.snap, g.fit, g.fitMm, g.scale, g.trim]); // the set-up a design is worked out with
+const chkStamp = (g, it) => JSON.stringify(it && it.own ? [it.own.snap, it.own.strokesN, it.own.rot, it.own.sized ? 0 : [g.fit, g.fitMm, g.scale, g.trim]] : [g.snap, g.fit, g.fitMm, g.scale, g.trim]); // the set-up a design is worked out with
 function chkFind(c){ for (const g of batchGroups){ const it = g.items.find(x => x.key === c.key); if (it) return {g, it}; } return {}; }
-const chkChanged = c => { const {g} = chkFind(c); return !!g && c.verdict !== 'wait' && chkStamp(g) !== c.stamp; };
+const chkChanged = c => { const {g, it} = chkFind(c); return !!g && c.verdict !== 'wait' && chkStamp(g, it) !== c.stamp; };
 const chkFlag = c => (c.verdict === 'problem' || c.verdict === 'look') && !c.ignored;
 function chkOpen(){ $('toast').hidden = true; $('chk').hidden = false; chkRender(); $('chkClose').focus(); }
 function chkRender(){
