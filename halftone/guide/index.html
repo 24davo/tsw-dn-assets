@@ -242,7 +242,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
       <h3>Then a Quick start</h3>
       <p>Under the print styles is a Quick start. Pick the closest one and watch the After side.</p>
       <div class="rows">
-        <div class="row"><span>Clean cut</span><span><b>Remove shadows:</b> a quick clean-up for dark shirts. Shadows drop out and the rest prints solid.<br><b>Knock out the shirt colour:</b> colours close to the shirt colour drop out. This is the one the tool starts on.<br><b>Remove the background:</b> for art on a plain backdrop, like a JPG logo on white.<br><b>Nothing removed (prep only):</b> for art that is already print-ready and only needs sizing or a tidy.</span></div>
+        <div class="row"><span>Clean cut</span><span><b>Remove shadows:</b> a quick clean-up for dark shirts. Shadows drop out and the rest prints solid.<br><b>Knock out the shirt colour:</b> colours close to the shirt colour drop out. A file with a solid background starts on this one. If it takes solid parts of the design, a message and a line in Checks say how much.<br><b>Nothing removed (prep only):</b> only the edge is tidied. A file already on a clear background starts on this one, so black parts stay on a black shirt and white parts stay on a white one.<br><b>Remove the background:</b> for art on a plain backdrop, like a JPG logo on white.<br><b>Nothing removed (prep only):</b> for art that is already print-ready and only needs sizing or a tidy.</span></div>
         <div class="row"><span>Halftone</span><span><b>Shadows to dots:</b> only the deepest shadows turn into dots. Colours stay strong.<br><b>Fix soft edges:</b> only glows, soft shadows and fades turn into dots. Solid parts stay solid.<br><b>Shirt shows through:</b> colours close to the shirt drop out, and shading turns into dots. Lighter to wear.<br><b>Full halftone:</b> the whole design becomes dots, for a soft vintage look.</span></div>
       </div>
       <h3>Then Quick adjust</h3>
@@ -279,10 +279,11 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
     <h3>Speed buttons</h3>
     <p>They sit under the three steps, on two tabs.</p>
     <div class="rows">
-      <div class="row"><span>Built in</span><span>Quick clean cut, Black tee, White tee, Coloured tee, Dark photo on black, Glows &amp; soft shadows. The same on every computer.</span></div>
+      <div class="row"><span>Built in</span><span>Quick clean cut, Clean up only, Black tee, White tee, Coloured tee, Dark photo on black, Glows &amp; soft shadows. The same on every computer.</span></div>
       <div class="row"><span>Ours</span><span>Six spaces for the workshop’s own buttons. Set a job up the way you like, then click <span class="ui">+ Add</span> on an empty one and name it.</span></div>
     </div>
     <p><b>Quick clean cut</b> does three jobs at once: Clean cut with a hard edge, the background removed, and the file trimmed to the art. It’s the fastest way to prep a logo.</p>
+    <p><b>Clean up only</b> is for art already on a clear background: Clean cut with a tidy edge, no colour knocked out and the background left as it is.</p>
     <h3>Presets</h3>
     <p>Open <b>Presets</b>, near the bottom of the panel, and choose from the list. To keep a set-up you like, click <span class="ui">Save new</span> and name it. <span class="ui">Share with all computers</span> sends it to the others. Sharing asks for the team code once on each computer. It’s in the Settings tab of the “DTF Halftone Presets” Google Sheet.</p>
     <p class="muted">The list only shows presets for the print style you’re in. The built-in Starters and the Claude recipes are Halftone set-ups, so they show when Halftone is chosen.</p>
@@ -412,7 +413,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
   </div>
   <div class="prose">
     <h3>Crop</h3>
-    <p>Open <span class="ui">Crop</span>. <span class="ui">Trim to the art</span> cuts away the empty margin. <span class="ui">Draw a crop</span> lets you drag your own: Enter applies it, Esc cancels.</p>
+    <p>Open <span class="ui">Crop</span>. <span class="ui">Trim to the art</span> cuts away the empty margin. <span class="ui">Draw a crop</span> lets you drag your own: Enter applies it, Esc cancels. The checks behind the art are picked so the art stands out (dark behind white art, light behind black art, grey for both). Click <span class="ui">Backdrop</span> in the bar to change them. Straighten has the same button.</p>
     <h3>Straighten</h3>
     <p>For art saved at a slight angle, like a design placed on a sleeve mockup. Open <span class="ui">Crop</span> and choose <span class="ui">Straighten</span>. Pink level lines appear over the art. Drag the slider, or type an angle, until the art sits level with the lines, then click <span class="ui">Apply</span>. <span class="ui">90° left</span> and <span class="ui">90° right</span> are for art saved on its side.</p>
     <p>Your crop, touch-ups, selection and part areas turn with the picture, and the print keeps its scale. A turn leaves empty corners, so use <span class="ui">Trim to the art</span> afterwards. Undo doesn’t take a turn back: open Straighten again and choose <span class="ui">0°</span>. Straighten works on the design in the editor. Batch still works from the file as it arrived, so save a straightened design from its tab.</p>
@@ -543,7 +544,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
     <h3>The usual run</h3>
     <ol>
       <li><b>Get the files in.</b> An order sent from the Workshop Board arrives already in its groups. For anything else, click <span class="ui">New group</span> and add files, or drop files or a zip. A zip with folders makes a group for each folder.</li>
-      <li><b>Set each group up.</b> Use the <b>All ticked groups</b> box, or click <b>Details</b> on a tile for a Speed button or Preset on that group alone. Or click <span class="ui">Open in editor</span> on the tile (<b>Check or change on a file</b> when the group is opened out): one file opens in the editor, you set it up as usual, then click <span class="ui">Use for the group</span> in the bar at the top.</li>
+      <li><b>Set each group up.</b> A group whose files are all on a clear background arrives already set up as <b>Clean up only · nothing knocked out</b>: check the size and it is ready to save. Change it the same way as any other group. Use the <b>All ticked groups</b> box, or click <b>Details</b> on a tile for a Speed button or Preset on that group alone. Or click <span class="ui">Open in editor</span> on the tile (<b>Check or change on a file</b> when the group is opened out): one file opens in the editor, you set it up as usual, then click <span class="ui">Use for the group</span> in the bar at the top.</li>
       <li><b>Set the print size.</b> In <b>All ticked groups</b> or a group’s <b>Details</b>, choose how the group is sized, type the mm, and tick <b>Trim each file to its art</b> for names and logos.</li>
       <li><b>Process.</b> Tick the groups and click <span class="ui">Process ticked groups</span>. You get one zip with a folder for each group.</li>
     </ol>
@@ -721,7 +722,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
   </div>
 </section>
 
-<footer>Written for Graphic Engine version 139, November 2026. Pictures show the tool’s own sample art and made-up test pictures. If a button here doesn’t match what you see, the tool has been updated: trust the tool, and let the owner know so the guide gets fixed.</footer>
+<footer>Written for Graphic Engine version 140, November 2026. Pictures show the tool’s own sample art and made-up test pictures. If a button here doesn’t match what you see, the tool has been updated: trust the tool, and let the owner know so the guide gets fixed.</footer>
 
 </div>
 
