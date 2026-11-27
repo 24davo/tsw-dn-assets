@@ -6413,23 +6413,28 @@ async function openFile(f){
 if (/^https?:$/.test(location.protocol) && location.pathname.startsWith('/engine/')) for (const a of document.querySelectorAll('a[href^="https://24davo.github.io/tsw-dn-assets/halftone/"]')) a.setAttribute('href', a.getAttribute('href').replace('https://24davo.github.io/tsw-dn-assets/halftone/', '/engine/'));
 const HANDOVER_FROM = [...new Set(['https://board.tshirtworkshop.com.au', location.origin])].filter(o => /^https?:/.test(o));
 let handoverUp = false;
-function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 4, batch: true, labels: true, orders: true, artReady: 'ask', counts: true}, o); } catch(e){} } }
+function handoverReady(to){ if (!to || to === window || !handoverUp) return; for (const o of HANDOVER_FROM){ try { to.postMessage({tsw: 'ge-ready', v: 4, batch: true, labels: true, orders: true, artReady: 'ask', artPlaces: true, counts: true}, o); } catch(e){} } }
 /* ---------- Art ready: an offer to tick the job's step on the Workboard once its print files are saved ---------- */
 const ART_BOARD = 'https://board.tshirtworkshop.com.au', artOn = location.origin === ART_BOARD;
-const artJobs = new Map(); // job id -> {got: designs received for it in this tab, saved: those saved, ticked, hidden}
+const artJobs = new Map(); // job id -> {got: designs received for it in this tab, saved: those saved, places: each design's print area, sent: designs already told to the board, ticked, hidden}
+// the print area a file from the Workboard is for, as the board names it: the last part of its short label ("TWD123 · 1 · Full front"), else the end of its note ("123 item 1, full front")
+function artPlace(x){ const a = String(x && x.labelShort || '').split(' · '); if (a.length >= 3) return a.slice(2).join(' · ').trim().slice(0, 60);
+  const n = String(x && x.note || ''), i = n.lastIndexOf(', '); return i < 0 ? '' : n.slice(i + 2).trim().slice(0, 60); }
+const artPlacesOf = j => [...new Set([...j.saved].filter(k => !j.sent.has(k)).map(k => j.places.get(k)).filter(Boolean))];
 const artIds = list => [...new Set((Array.isArray(list) ? list : []).map(x => String(x == null ? '' : x)).filter(x => /^[A-Z]{2,5}\d+$/.test(x)))].slice(0, 8);
-function artGot(ids, key){ for (const id of ids || []){ let j = artJobs.get(id); if (!j) artJobs.set(id, j = {got: new Set(), saved: new Set(), ticked: false, hidden: false}); j.got.add(key); } }
+function artGot(ids, key, place){ for (const id of ids || []){ let j = artJobs.get(id); if (!j) artJobs.set(id, j = {got: new Set(), saved: new Set(), places: new Map(), sent: new Set(), ticked: false, hidden: false}); j.got.add(key); if (place) j.places.set(key, place); } }
 function artSaved(ids, key){
   if (!artOn) return;
   let any = false;
   for (const id of ids || []){ const j = artJobs.get(id); if (!j || !j.got.has(key)) continue; j.saved.add(key); j.hidden = false; any = true; }
   if (any) syncArtBar();
 }
-const artReadyJobs = () => [...artJobs].filter(([, j]) => !j.ticked && !j.hidden && j.got.size && [...j.got].every(k => j.saved.has(k))).map(([id]) => id);
+const artReadyJobs = () => [...artJobs].filter(([, j]) => !j.ticked && !j.hidden && j.got.size && [...j.got].every(k => j.saved.has(k)) && [...j.saved].some(k => !j.sent.has(k))).map(([id]) => id);
 function syncArtBar(){
   const ids = artOn ? artReadyJobs() : [];
   $('artBar').hidden = !ids.length; if (!ids.length) return;
-  $('artBarTxt').textContent = `All the print files for ${ids.join(', ')} are saved.`;
+  const areas = ids.length === 1 ? artPlacesOf(artJobs.get(ids[0])) : [];
+  $('artBarTxt').textContent = areas.length ? `Print files saved for ${ids[0]}: ${areas.join(', ')}.` : `All the print files for ${ids.join(', ')} are saved.`;
   $('artBarYes').textContent = ids.length > 1 ? `Mark ${ids.length} jobs Art ready on the board` : 'Mark Art ready on the board';
   $('artBarYes').disabled = false;
 }
@@ -6440,10 +6445,14 @@ async function artTick(){
   for (const id of ids){
     const j = artJobs.get(id);
     try {
-      const r = await fetch('/api/orders/' + encodeURIComponent(id) + '/art-ready', {method: 'POST', credentials: 'same-origin'});
+      const places = artPlacesOf(j), keys = [...j.saved]; // the areas saved here; with none known the board ticks the whole job, as before
+      const r = await fetch('/api/orders/' + encodeURIComponent(id) + '/art-ready', places.length ? {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({places})} : {method: 'POST', credentials: 'same-origin'});
       if (r.status === 401){ notes.push('Sign in to the Workboard, then try again.'); break; }
       const a = r.ok ? await r.json().catch(() => null) : null;
       if (a && a.ok && a.ticked){ j.ticked = true; ticked.push(id); }
+      else if (a && a.ok && a.why === 'part'){ for (const k of keys) j.sent.add(k); // these areas are ticked; the job waits for the rest, and the offer comes back when another of its files is saved here
+        const left = (Array.isArray(a.left) ? a.left : []).map(x => String(x).slice(0, 60)).filter(Boolean).slice(0, 12);
+        notes.push(`${id}: ${places.join(', ')} ready` + (left.length ? `; ${left.join(', ')} still to do.` : '; other areas still to do.')); }
       else if (a && a.ok){ j.ticked = true; notes.push(a.why === 'started' ? `${id} is already at a step on the board.` : a.why === 'done' ? `${id} is already produced or sent.` : a.why === 'no art step' ? `${id} has no art step on the board.` : `${id} was left as it is on the board.`); }
       else notes.push(r.status === 404 ? `${id} isn’t on the board.` : `The board couldn’t be reached for ${id}. Tick Art ready on the board instead.`);
     } catch(err){ notes.push(`The board couldn’t be reached for ${id}. Tick Art ready on the board instead.`); }
@@ -6485,7 +6494,7 @@ window.addEventListener('message', async e => {
     if (!batchBusy){ $('batch').hidden = true; $('chk').hidden = true; } // the design just sent is what staff came to see
     toast(`Opened from the Workboard: ${name}`);
     if (art && needN(m.prints)) art.prints = needN(m.prints);
-    const ids = artIds(m.orders); if (ids.length && art){ art.orders = ids; art.artKey = 'd:' + (cur ? cur.id : name); artGot(ids, art.artKey); }
+    const ids = artIds(m.orders); if (ids.length && art){ art.orders = ids; art.artKey = 'd:' + (cur ? cur.id : name); artGot(ids, art.artKey, artPlace(m)); }
     syncSendBoard();
   }
   const room = Math.max(0, MAX_DOCS - docs.length + (art && art.isSample ? 1 : 0));
@@ -7936,7 +7945,7 @@ async function batchAdd(g, list){ // list: {file, name, note, key, widthMm}; ans
     let thumb = ''; try { thumb = c.toDataURL('image/png'); } catch(e){}
     const mm = Math.round(+x.widthMm) || 0;
     g.items.push({key: x.key ? String(x.key).slice(0, 80) : newKey(), name, note: String(x.note || '').slice(0, 80), lab: String(x.label || '').slice(0, 160), labShort: String(x.labelShort || '').slice(0, 60), w, h, tb, cb, thumb, file, on: true, mm, kept: false, sig: await batchSig(file)});
-    { const it = g.items[g.items.length - 1]; it.orders = artIds(x.orders); if (it.orders.length) artGot(it.orders, 'b:' + it.key); batchNeed(it, x); }
+    { const it = g.items[g.items.length - 1]; it.orders = artIds(x.orders); if (it.orders.length) artGot(it.orders, 'b:' + it.key, artPlace(x)); batchNeed(it, x); }
     out.count++;
   }
   if (g.scaleFrom !== 'user' && g.items.length){ // the Workboard's width: the widest file prints that wide; or the first file that came with a width
