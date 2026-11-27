@@ -227,6 +227,8 @@ h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1.
 .group.folded .sec-toggle::before{transform:rotate(-45deg);margin-bottom:0}
 .g-actions{display:flex;gap:16px}
 .levels{display:grid;gap:4px}
+.ca-col{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px;font-weight:600}
+.ca-col input[type=color]{width:48px;height:34px;padding:2px;border:1.5px solid var(--line-strong);border-radius:var(--r);background:none;cursor:pointer}
 #histo,#hhisto{display:block;width:100%;height:84px;background:var(--soft);border:1px solid var(--line);border-radius:var(--r);color:var(--muted)}
 .lv-track{position:relative;height:16px}
 .lv-h{position:absolute;top:0;width:16px;height:15px;margin-left:-8px;padding:0;border:0;background:none;cursor:ew-resize;touch-action:none}
@@ -1442,7 +1444,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
       </section>
 
       <section class="group tune" id="levelsGroup">
-        <div class="g-head"><h2>Brightness &amp; levels</h2><div class="g-actions"><button class="link" type="button" id="lvAuto">Auto</button><button class="link" type="button" id="lvReset" hidden>Reset</button></div></div>
+        <div class="g-head"><h2>Colour &amp; brightness</h2><div class="g-actions"><button class="link" type="button" id="lvAuto">Auto</button><button class="link" type="button" id="lvReset" hidden>Reset</button></div></div>
         <div class="field">
           <div class="f-head"><label for="bri">Brightness</label><output id="briOut" for="bri">0</output></div>
           <input type="range" id="bri" min="-100" max="100" step="1" value="0">
@@ -1453,6 +1455,29 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
         </div>
         <label class="check-row" data-tip="Like using Brightness/Contrast in Luminosity blend mode in Photoshop: lighter or darker, with colours as strong as before."><input type="checkbox" id="bcLum"> Keep colour strength</label>
         <p class="f-note"><span>Lighter or darker, and more or less contrast, before the dots.</span><span class="more-x" hidden> Like Photoshop’s Brightness/Contrast. Brightness lifts or darkens the midtones and keeps pure black and white; Contrast pushes them apart (or together). They work on each colour channel, as Photoshop does. Tick Keep colour strength to change only lightness, so colours don’t turn grey or pastel. Double-click a slider to put it back to 0.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        <div class="lv-sub">Colour</div>
+        <div class="chips" id="caChips" role="group" aria-label="Colour quick changes">
+          <button class="chip" type="button" id="caBw" aria-pressed="false" data-tip="Takes all the colour out: Saturation at −100. Click again to bring the colour back.">Black &amp; white</button>
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="csat">Saturation</label><output id="csatOut" for="csat">0</output></div>
+          <input type="range" id="csat" min="-100" max="100" step="1" value="0">
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="chue">Hue</label><output id="chueOut" for="chue">0°</output></div>
+          <input type="range" id="chue" min="-180" max="180" step="1" value="0">
+        </div>
+        <div class="field">
+          <div class="f-head"><label for="cwarm">Warmth</label><output id="cwarmOut" for="cwarm">0</output></div>
+          <input type="range" id="cwarm" min="-100" max="100" step="1" value="0">
+        </div>
+        <label class="check-row" data-tip="Like Colorize in Photoshop’s Hue/Saturation: the whole design takes one colour, and keeps its light and dark."><input type="checkbox" id="ctintOn"> Recolour to one colour</label>
+        <div class="field" id="ctintField" hidden>
+          <div class="ca-col"><input type="color" id="ctintHex" value="#e6007e" aria-label="Colour to recolour to"><span id="ctintTxt">#E6007E</span></div>
+          <div class="f-head"><label for="ctintAmt">Strength</label><output id="ctintAmtOut" for="ctintAmt">100%</output></div>
+          <input type="range" id="ctintAmt" min="0" max="100" step="1" value="100">
+        </div>
+        <p class="f-note"><span>Changes the colour of the whole design, before the dots.</span><span class="more-x" hidden> Like Photoshop’s Hue/Saturation. Saturation makes colours stronger or greyer (−100 is black and white). Hue turns every colour around the colour wheel. Warmth leans the design toward orange or blue. Each keeps how light or dark the art is. Recolour gives the whole design one colour. These run first, then Brightness, Contrast and Levels. Hold: Original shows the art as it came in. Double-click a slider to put it back to 0.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <div class="lv-sub">Deepen pale colours</div>
         <div class="chips" id="paleChips" role="group" aria-label="Deepen pale colours">
           <button class="chip" type="button" data-pale="0" aria-pressed="true">Off</button>
@@ -2224,7 +2249,37 @@ function engine(){
     // one pixel through Brightness/Contrast (lightness only, as Photoshop's Luminosity blend: shift, then pull back into range
     // keeping the lightness) and then Levels; the result goes in px3
     const px3 = new Float32Array(3);
+    const caMake = L => { const sat = L.sat || 0, hue = L.hue || 0, warm = L.warm || 0, on = !!(L.tintOn && L.tintAmt); if (!sat && !hue && !warm && !on) return null;
+      const o = {s: sat < 0 ? 1 + sat/100 : 1 + sat/100*1.5, m: null, warm: !!warm, wr: 1 + warm/100*0.25, wb: 1 - warm/100*0.25, t: null, ta: 0, lt: 0};
+      if (hue){ const a = hue*Math.PI/180, c = Math.cos(a), n = Math.sin(a); // the standard hue-rotate matrix
+        o.m = [0.213 + 0.787*c - 0.213*n, 0.715 - 0.715*c - 0.715*n, 0.072 - 0.072*c + 0.928*n,
+               0.213 - 0.213*c + 0.143*n, 0.715 + 0.285*c + 0.140*n, 0.072 - 0.072*c - 0.283*n,
+               0.213 - 0.213*c - 0.787*n, 0.715 - 0.715*c + 0.715*n, 0.072 + 0.928*c + 0.072*n]; }
+      if (on){ const h = /^#?([0-9a-f]{6})$/i.exec(L.tint || ''), v = h ? parseInt(h[1], 16) : 0xe6007e; o.t = [v >> 16 & 255, v >> 8 & 255, v & 255]; o.lt = 0.3*o.t[0] + 0.59*o.t[1] + 0.11*o.t[2]; o.ta = Math.min(1, L.tintAmt/100); }
+      return o; };
+    const ca3 = new Float32Array(3);
+    // one pixel through Hue, Warmth and Saturation (each keeps the pixel's lightness), then Recolour (the chosen colour, as light or dark as the pixel was)
+    const caApply = (o, r, g, b) => {
+      const L0 = 0.3*r + 0.59*g + 0.11*b;
+      if (o.m){ const m = o.m, R = m[0]*r + m[1]*g + m[2]*b, G = m[3]*r + m[4]*g + m[5]*b, B = m[6]*r + m[7]*g + m[8]*b; r = R; g = G; b = B; }
+      if (o.warm){ r *= o.wr; b *= o.wb; }
+      if (o.m || o.warm){ const d = L0 - (0.3*r + 0.59*g + 0.11*b); r += d; g += d; b += d; }
+      if (o.s !== 1){ let k = o.s;
+        if (k > 1){ const lo = r < g ? (r < b ? r : b) : (g < b ? g : b), hi = r > g ? (r > b ? r : b) : (g > b ? g : b); // stronger, but never past pure colour: a colour already at full strength stays as it is
+          if (lo < L0) k = Math.min(k, L0/(L0 - lo)); if (hi > L0) k = Math.min(k, (255 - L0)/(hi - L0)); if (k < 1) k = 1; }
+        r = L0 + (r - L0)*k; g = L0 + (g - L0)*k; b = L0 + (b - L0)*k; }
+      const n = r < g ? (r < b ? r : b) : (g < b ? g : b), x = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      if (n < 0){ const f = L0/(L0 - n || 1); r = L0 + (r - L0)*f; g = L0 + (g - L0)*f; b = L0 + (b - L0)*f; }
+      if (x > 255){ const f = (255 - L0)/(x - L0 || 1); r = L0 + (r - L0)*f; g = L0 + (g - L0)*f; b = L0 + (b - L0)*f; }
+      if (o.t){ const t = o.t; let cr, cg, cb;
+        if (L0 <= o.lt){ const f = o.lt ? L0/o.lt : 0; cr = t[0]*f; cg = t[1]*f; cb = t[2]*f; }
+        else { const f = (L0 - o.lt)/(255 - o.lt || 1); cr = t[0] + (255 - t[0])*f; cg = t[1] + (255 - t[1])*f; cb = t[2] + (255 - t[2])*f; }
+        r += (cr - r)*o.ta; g += (cg - g)*o.ta; b += (cb - b)*o.ta; }
+      ca3[0] = r < 0 ? 0 : r > 255 ? 255 : r; ca3[1] = g < 0 ? 0 : g > 255 ? 255 : g; ca3[2] = b < 0 ? 0 : b > 255 ? 255 : b;
+    };
+    const ca = p.levels ? caMake(p.levels) : null; // Colour: runs first, then Brightness/Contrast and Levels
     const tone3 = (r, g, b) => {
+      if (ca){ caApply(ca, r, g, b); r = ca3[0]; g = ca3[1]; b = ca3[2]; }
       if (bcY){
         const L = 0.3*r + 0.59*g + 0.11*b, L2 = bcY[(L + 0.5) | 0], dl = L2 - L;
         r += dl; g += dl; b += dl;
@@ -5495,13 +5550,43 @@ rulesBox.addEventListener('click', e => {
 });
 
 /* ---------- Levels: like Photoshop's, applied to the art's colours before everything else ---------- */
-const LV0 = {b: 0, g: 1, w: 255, ob: 0, ow: 255, bri: 0, bc: 0, lum: false}; // bri, bc: Brightness and Contrast; lum: they keep colour strength (off unless ticked)
+const LV0 = {b: 0, g: 1, w: 255, ob: 0, ow: 255, bri: 0, bc: 0, lum: false, sat: 0, hue: 0, warm: 0, tintOn: false, tint: '#e6007e', tintAmt: 100}; // bri, bc: Brightness and Contrast; lum: they keep colour strength (off unless ticked)
 const lv = {...LV0};
 let hist = null;
 const levelsOnlyIdentity = () => lv.b === 0 && lv.g === 1 && lv.w === 255 && lv.ob === 0 && lv.ow === 255;
-const lvIdentity = () => levelsOnlyIdentity() && !lv.bri && !lv.bc;
+const caOn = () => !!(lv.sat || lv.hue || lv.warm || (lv.tintOn && lv.tintAmt)); // Colour: saturation, hue, warmth, recolour
+const lvIdentity = () => levelsOnlyIdentity() && !lv.bri && !lv.bc && !caOn();
+    const caMake = L => { const sat = L.sat || 0, hue = L.hue || 0, warm = L.warm || 0, on = !!(L.tintOn && L.tintAmt); if (!sat && !hue && !warm && !on) return null;
+      const o = {s: sat < 0 ? 1 + sat/100 : 1 + sat/100*1.5, m: null, warm: !!warm, wr: 1 + warm/100*0.25, wb: 1 - warm/100*0.25, t: null, ta: 0, lt: 0};
+      if (hue){ const a = hue*Math.PI/180, c = Math.cos(a), n = Math.sin(a); // the standard hue-rotate matrix
+        o.m = [0.213 + 0.787*c - 0.213*n, 0.715 - 0.715*c - 0.715*n, 0.072 - 0.072*c + 0.928*n,
+               0.213 - 0.213*c + 0.143*n, 0.715 + 0.285*c + 0.140*n, 0.072 - 0.072*c - 0.283*n,
+               0.213 - 0.213*c - 0.787*n, 0.715 - 0.715*c + 0.715*n, 0.072 + 0.928*c + 0.072*n]; }
+      if (on){ const h = /^#?([0-9a-f]{6})$/i.exec(L.tint || ''), v = h ? parseInt(h[1], 16) : 0xe6007e; o.t = [v >> 16 & 255, v >> 8 & 255, v & 255]; o.lt = 0.3*o.t[0] + 0.59*o.t[1] + 0.11*o.t[2]; o.ta = Math.min(1, L.tintAmt/100); }
+      return o; };
+    const ca3 = new Float32Array(3);
+    // one pixel through Hue, Warmth and Saturation (each keeps the pixel's lightness), then Recolour (the chosen colour, as light or dark as the pixel was)
+    const caApply = (o, r, g, b) => {
+      const L0 = 0.3*r + 0.59*g + 0.11*b;
+      if (o.m){ const m = o.m, R = m[0]*r + m[1]*g + m[2]*b, G = m[3]*r + m[4]*g + m[5]*b, B = m[6]*r + m[7]*g + m[8]*b; r = R; g = G; b = B; }
+      if (o.warm){ r *= o.wr; b *= o.wb; }
+      if (o.m || o.warm){ const d = L0 - (0.3*r + 0.59*g + 0.11*b); r += d; g += d; b += d; }
+      if (o.s !== 1){ let k = o.s;
+        if (k > 1){ const lo = r < g ? (r < b ? r : b) : (g < b ? g : b), hi = r > g ? (r > b ? r : b) : (g > b ? g : b); // stronger, but never past pure colour: a colour already at full strength stays as it is
+          if (lo < L0) k = Math.min(k, L0/(L0 - lo)); if (hi > L0) k = Math.min(k, (255 - L0)/(hi - L0)); if (k < 1) k = 1; }
+        r = L0 + (r - L0)*k; g = L0 + (g - L0)*k; b = L0 + (b - L0)*k; }
+      const n = r < g ? (r < b ? r : b) : (g < b ? g : b), x = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      if (n < 0){ const f = L0/(L0 - n || 1); r = L0 + (r - L0)*f; g = L0 + (g - L0)*f; b = L0 + (b - L0)*f; }
+      if (x > 255){ const f = (255 - L0)/(x - L0 || 1); r = L0 + (r - L0)*f; g = L0 + (g - L0)*f; b = L0 + (b - L0)*f; }
+      if (o.t){ const t = o.t; let cr, cg, cb;
+        if (L0 <= o.lt){ const f = o.lt ? L0/o.lt : 0; cr = t[0]*f; cg = t[1]*f; cb = t[2]*f; }
+        else { const f = (L0 - o.lt)/(255 - o.lt || 1); cr = t[0] + (255 - t[0])*f; cg = t[1] + (255 - t[1])*f; cb = t[2] + (255 - t[2])*f; }
+        r += (cr - r)*o.ta; g += (cg - g)*o.ta; b += (cb - b)*o.ta; }
+      ca3[0] = r < 0 ? 0 : r > 255 ? 255 : r; ca3[1] = g < 0 ? 0 : g > 255 ? 255 : g; ca3[2] = b < 0 ? 0 : b > 255 ? 255 : b;
+    };
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-function levelsColour(r, g, b){ // one colour as Brightness/Contrast and Levels make it, the same as the engine
+function levelsColour(r, g, b){ // one colour as Colour, Brightness/Contrast and Levels make it, the same as the engine
+  const o = caMake(lv); if (o){ caApply(o, r, g, b); r = Math.round(ca3[0]); g = Math.round(ca3[1]); b = Math.round(ca3[2]); }
   const keep = lv.lum !== false && (lv.bri || lv.bc), t = levelsLut(!keep);
   if (keep){
     const bg = Math.pow(2, -(lv.bri || 0)/100), bf = Math.pow(2, (lv.bc || 0)/100);
@@ -5541,7 +5626,24 @@ function syncLevels(){
   $('bri').value = lv.bri || 0; $('briOut').textContent = sgn(lv.bri || 0);
   $('bcon').value = lv.bc || 0; $('bconOut').textContent = sgn(lv.bc || 0);
   $('bcLum').checked = lv.lum !== false;
+  $('csat').value = lv.sat || 0; $('csatOut').textContent = lv.sat === -100 ? 'Black & white' : sgn(lv.sat || 0);
+  $('chue').value = lv.hue || 0; $('chueOut').textContent = sgn(lv.hue || 0) + '°';
+  $('cwarm').value = lv.warm || 0; $('cwarmOut').textContent = lv.warm ? (lv.warm > 0 ? `Warmer ${lv.warm}` : `Cooler ${-lv.warm}`) : '0';
+  $('caBw').setAttribute('aria-pressed', String(lv.sat === -100));
+  $('ctintOn').checked = !!lv.tintOn; $('ctintField').hidden = !lv.tintOn;
+  const th = /^#[0-9a-f]{6}$/i.test(lv.tint || '') ? lv.tint.toLowerCase() : '#e6007e';
+  if ($('ctintHex').value !== th) $('ctintHex').value = th; $('ctintTxt').textContent = th.toUpperCase();
+  $('ctintAmt').value = lv.tintAmt; $('ctintAmtOut').textContent = `${lv.tintAmt}%`;
 }
+for (const [id, k] of [['csat', 'sat'], ['chue', 'hue'], ['cwarm', 'warm']]){
+  $(id).addEventListener('input', e => { lv[k] = +e.target.value; syncLevels(); schedule(); });
+  $(id).addEventListener('dblclick', () => { lv[k] = 0; syncLevels(); schedule(); }); // double-click: back to 0
+}
+let satWas = 0; // what Saturation was before Black & white, to go back to
+$('caBw').addEventListener('click', () => { if (lv.sat === -100) lv.sat = satWas; else { satWas = lv.sat || 0; lv.sat = -100; } syncLevels(); schedule(); });
+$('ctintOn').addEventListener('change', e => { lv.tintOn = e.target.checked; if (lv.tintOn && !lv.tintAmt) lv.tintAmt = 100; syncLevels(); schedule(); });
+$('ctintHex').addEventListener('input', e => { lv.tint = e.target.value; syncLevels(); schedule(); });
+$('ctintAmt').addEventListener('input', e => { lv.tintAmt = +e.target.value; syncLevels(); schedule(); });
 $('bcLum').addEventListener('change', e => { lv.lum = e.target.checked; syncLevels(); schedule(); });
 for (const [id, k] of [['bri', 'bri'], ['bcon', 'bc']]){
   $(id).addEventListener('input', e => { lv[k] = +e.target.value; syncLevels(); schedule(); });
@@ -6589,7 +6691,8 @@ function settingsText(){
   const finish = st.finish === 'cut' ? `clean cut at ${st.cut}%` + (st.flat ? `; flat colours (${st.flatN || 'auto'}${lastFlat ? ': ' + lastFlat.pal.filter(c => !c[4]).map(c => rgbHex(c[0], c[1], c[2]).toUpperCase()).join(' ') : ''}); tidy under ${st.flatTidy} mm; smooth edges ${st.flatSmooth == null ? 4 : st.flatSmooth}` + (traceBgHex() ? `; tracing background ${traceBgHex().toUpperCase()}` : '') : '') : `${st.lpi} lpi; ${st.angle} deg; ${st.shape} dots; drop under ${st.drop}%; solid above ${st.solid}%`;
   const ruleText = (R, i) => `range ${i + 1}: ${R.type === 'sample' ? 'colours ' + R.samples.join(' ').toUpperCase() : R.type + ' ' + R.range + '%'}` +
     ` fuzziness ${R.fuzz}%${R.invert ? ' inverted' : ''} -> ${R.action}${R.action === 'fade' ? ' ' + R.keep + '%' : ''}${R.action === 'ramp' ? ` ${R.k0 == null ? 10 : R.k0}-${R.k1 == null ? 30 : R.k1}%` : ''}${R.action === 'nodots' ? ' at ' + (R.cut == null ? 50 : R.cut) + '%' : ''}${R.action === 'recolour' ? ' ' + (R.to || '#ffffff').toUpperCase() : ''}`;
-  const levels = (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') + ((lv.bri || lv.bc) && lv.lum !== false ? ' (colour strength kept)' : '') +
+  const levels = (lv.sat ? (lv.sat === -100 ? '; black and white' : `; saturation ${lv.sat > 0 ? '+' : ''}${lv.sat}`) : '') + (lv.hue ? `; hue ${lv.hue > 0 ? '+' : ''}${lv.hue}°` : '') + (lv.warm ? `; ${lv.warm > 0 ? 'warmer' : 'cooler'} ${Math.abs(lv.warm)}` : '') + (lv.tintOn && lv.tintAmt ? `; recoloured ${String(lv.tint).toUpperCase()} ${lv.tintAmt}%` : '') +
+    (lv.bri ? `; brightness ${lv.bri > 0 ? '+' : ''}${lv.bri}` : '') + (lv.bc ? `; contrast ${lv.bc > 0 ? '+' : ''}${lv.bc}` : '') + ((lv.bri || lv.bc) && lv.lum !== false ? ' (colour strength kept)' : '') +
     (levelsOnlyIdentity() ? '' : `; levels ${lv.b} ${lv.g.toFixed(2)} ${lv.w} output ${lv.ob}-${lv.ow}`);
   return `${look}${levels}; ${finish}` + (rules.length ? '; ' + rules.map(ruleText).join('; ') : '') +
          (knockLook(st.look) && shirtKnown() ? `; knock out ${(st.knock || st.shirt).toUpperCase()} ` + (st.finish === 'cut' ? `within ${st.ktol}%` : `${st.k0}-${st.k1}%`) : '') +
@@ -7160,6 +7263,11 @@ function describeStep(a, b){ // a short name for what changed from a to b
   if (Math.abs(a.w - b.w) > 1e-6) return `Print size ${toMm(b.w)} mm wide`;
   for (const k of Object.keys(STEP_NAMES)) if (a.s[k] !== b.s[k]) return STEP_NAMES[k](b.s[k]);
   if (JSON.stringify(a.lv) !== JSON.stringify(b.lv)){
+    if ((a.lv.sat || 0) !== (b.lv.sat || 0)) return b.lv.sat === -100 ? 'Black & white' : `Saturation ${sign(b.lv.sat || 0)}`;
+    if ((a.lv.hue || 0) !== (b.lv.hue || 0)) return `Hue ${sign(b.lv.hue || 0)}°`;
+    if ((a.lv.warm || 0) !== (b.lv.warm || 0)) return `Warmth ${sign(b.lv.warm || 0)}`;
+    if (!!a.lv.tintOn !== !!b.lv.tintOn) return b.lv.tintOn ? 'Recolour on' : 'Recolour off';
+    if (b.lv.tintOn && (a.lv.tint !== b.lv.tint || a.lv.tintAmt !== b.lv.tintAmt)) return `Recolour ${String(b.lv.tint).toUpperCase()} ${b.lv.tintAmt}%`;
     if ((a.lv.bri || 0) !== (b.lv.bri || 0)) return `Brightness ${sign(b.lv.bri || 0)}`;
     if ((a.lv.bc || 0) !== (b.lv.bc || 0)) return `Contrast ${sign(b.lv.bc || 0)}`;
     if ((a.lv.lum !== false) !== (b.lv.lum !== false)) return b.lv.lum !== false ? 'Keep colour strength on' : 'Keep colour strength off';
@@ -7391,7 +7499,7 @@ const SECTION_TIPS = {
   sizeGroup: 'How wide the print is. The art is resized to this at 300 dpi before anything else, so the dots are true to the print.',
   bgGroup: 'Clear a plain background (a JPG’s white, a screenshot’s colour) only where it joins the outside edge, so the same colour inside the design stays. Or give see-through art a backing colour, so it prints solid.',
   sharpGroup: 'Unsharp mask on the art at print size: crisper edges and detail before the dots. Light or Medium suits most soft files.',
-  levelsGroup: 'Brightness/Contrast and Levels, like Photoshop’s, on the art’s colours before anything else. Move the black point right so more of the art counts as shadow.',
+  levelsGroup: 'Saturation, Hue, Warmth and Recolour, then Brightness/Contrast and Levels, like Photoshop’s, on the art’s colours before anything else. Move the black point right so more of the art counts as shadow.',
   knockGroup: 'Colours close to the shirt (or the colour you set) drop out so the shirt shows through.',
   rangeGroup: 'Parts of the design with their own treatment: pick shadows, midtones, highlights, greys or colours, or paint an area, then remove, fade, give it its own dots or brightness, keep it solid or free of dots, or recolour it.',
   toneGroup: 'The dot controls: Dot limits (Fine, Standard, Extra safe), Drop dots under and Solid above. Then Ink amount and contrast.',
@@ -8826,7 +8934,7 @@ const GE_HELP = {
   style: 'style(name): the print style, as the five buttons do it. name is "clean cut", "halftone", "dtg" or "trace prep".',
   quickStart: 'quickStart(name): presses a Quick start button. name is "knock", "shadows", "edges" (clean up only) or "bg" (remove the background); halftone has "deep", "knock", "full" and "edges".',
   settings: 'All the settings as they are now, the list of setting names, and the words the worded ones take.',
-  set: 'set({name: value, …}): changes settings. Also takes widthMm, and levels: {bri, bc}. Parts and marked areas stay as they are.',
+  set: 'set({name: value, …}): changes settings. Also takes widthMm, and levels: {bri, bc, sat, hue, warm, tintOn, tint, tintAmt}. Parts and marked areas stay as they are.',
   size: 'size(widthMm): the print width in mm (the height follows).',
   recipe: 'The whole set-up as one block of data (settings, levels, parts, print size), to use on other designs with apply().',
   apply: 'apply(recipe, {size: false}): puts a recipe on the design on screen. With size: false the print size is left alone.',
