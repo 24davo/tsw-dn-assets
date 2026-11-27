@@ -372,7 +372,11 @@ input[type="range"]{width:100%;margin:0;accent-color:var(--ink);height:22px}
 .qpill.bad{color:var(--bad);background:var(--bad-bg)}
 details summary{cursor:pointer;font-weight:600;font-size:13px}
 details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px;color:var(--muted)}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:calc(100% - 32px);padding:10px 16px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;z-index:20}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:calc(100% - 32px);padding:10px 16px;background:var(--toast);color:var(--toast-ink);border-radius:var(--r);font-size:13px;font-weight:600;z-index:20;display:flex;align-items:center;gap:10px}
+.toast[hidden]{display:none}
+.toast .toast-x{flex:none;width:28px;height:28px;margin:-4px -8px -4px 0;padding:0;border:1.5px solid transparent;border-radius:var(--r);background:none;color:inherit;font:inherit;font-size:18px;line-height:1;cursor:pointer;opacity:.75}
+.toast .toast-x::before{content:"\00d7"}
+.toast .toast-x:hover,.toast .toast-x:focus-visible{opacity:1;border-color:currentColor}
 
 @media (max-width:880px){
   .app{height:auto}
@@ -1910,7 +1914,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
   <div class="cc-acts"><button class="btn small" type="button" id="ccPick" aria-pressed="false" data-tip="Then click any colour you can see.">Pick from the screen</button></div>
   <div class="cc-acts end"><button class="btn small" type="button" id="ccCancel">Cancel</button><button class="btn small primary" type="button" id="ccDone">Done</button></div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toastMsg"></span><button class="toast-x" type="button" id="toastX" aria-label="Close this message"></button></div>
 
 <script>
 (() => {
@@ -6707,7 +6711,13 @@ async function saveFile(blob, name){
 }
 
 let toastTimer = 0;
-function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3600); }
+function toast(msg){ const t = $('toast'); $('toastMsg').textContent = msg; toastPlace(); t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3600); }
+// on desktop the message sits just above the bottom controls (Fit, Life size, the hold buttons), centred on the picture
+function toastPlace(){ const t = $('toast'), ob = $('oBottom'), sr = stage.getBoundingClientRect(), r = ob.getBoundingClientRect();
+  const ok = window.innerWidth > 880 && sr.width > 200 && r.height > 0 && r.top > 80 && r.top < window.innerHeight && $('welcome').hidden !== false;
+  t.style.bottom = ok ? Math.round(window.innerHeight - r.top + 10) + 'px' : ''; t.style.left = ok ? Math.round(sr.left + sr.width/2) + 'px' : ''; t.style.maxWidth = ok ? Math.round(sr.width - 32) + 'px' : ''; }
+$('toastX').addEventListener('click', () => { clearTimeout(toastTimer); $('toast').hidden = true; });
+window.addEventListener('resize', () => { if (!$('toast').hidden) toastPlace(); });
 
 /* ---------- sample art: glow, gradient sun, waves and a soft shadow, so every look has something to show ---------- */
 async function sampleArt(){
