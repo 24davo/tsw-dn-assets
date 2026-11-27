@@ -851,7 +851,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
 .tdrop-pop #zoomTray [data-zoom="life"]{grid-column:1}
 .tdrop-pop #zoomTray #lifeSetup{grid-column:2;text-align:center}
 .zoom-bar #zoomRange{width:110px}
-#holdClear{display:none}
+#holdTray .chip.is-same{opacity:.45}
 .mv-menu #edgeBtn{margin-top:4px}
 .tdrop-pop #inkQuick{display:grid;grid-template-columns:1fr;gap:8px;min-width:320px;align-items:stretch}
 .tdrop-pop #inkQuick > #blkQuick{grid-column:auto;grid-row:auto;width:100%;min-height:40px;padding:6px 12px}
@@ -1166,7 +1166,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
           </div>
           <div class="tray" role="group" aria-label="Press and hold to compare" id="holdTray">
             <button class="chip" type="button" id="holdOrig" data-hold="orig" aria-pressed="false">Hold: Original</button>
-            <button class="chip" type="button" id="holdClear" data-hold="clear" aria-pressed="false">Transparent</button>
+            <button class="chip" type="button" id="holdClear" data-hold="clear" aria-pressed="false">Hold: Transparent</button>
           </div>
         </div>
       </div>
@@ -3737,6 +3737,7 @@ function setView(v){
   prepareViews(); syncLegend(); render();
 }
 function syncLegend(){
+  holdDim();
   const items = [], seen = new Set();
   for (const k of kindsShown()){
     const list = k === 'origbase' ? ORIG_LEGEND : k === 'sel' ? selLegend() : k === 'clear' ? clearLegend() : k === 'origclear' ? ORIGCLEAR_LEGEND : k === 'white' ? WHITE_LEGEND : k === 'origwhite' ? ORIGWHITE_LEGEND : VIEWS[k] ? VIEWS[k].legend : [];
@@ -4175,7 +4176,9 @@ view.addEventListener('dblclick', e => {
 
 // Hold Original / Hold Transparent: the view swaps while a button (or O / T) is held, in the same place, so you can flick
 const cmpOn = mode => { if (compare !== mode){ compare = mode; syncHold(); syncLegend(); render(); } }, cmpOff = () => { if (compare){ compare = false; syncHold(); syncLegend(); render(); } };
-function syncHold(){ for (const b of $('holdTray').querySelectorAll('[data-hold]')) b.setAttribute('aria-pressed', String(compare === b.dataset.hold)); }
+function syncHold(){ for (const b of $('holdTray').querySelectorAll('[data-hold]')) b.setAttribute('aria-pressed', String(compare === b.dataset.hold)); holdDim(); }
+function holdDim(){ const was = compare; compare = false; let same = true; try { same = kindsShown().every(k => toClear(k) === k); } catch(e){ same = false; } compare = was;
+  $('holdClear').classList.toggle('is-same', same && was !== 'clear'); }
 for (const b of $('holdTray').querySelectorAll('[data-hold]')){
   b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch(err){} cmpOn(b.dataset.hold); }); // captured: the hold lasts until the button is let go
   b.addEventListener('pointerup', cmpOff); b.addEventListener('pointercancel', cmpOff); b.addEventListener('lostpointercapture', cmpOff);
@@ -7559,7 +7562,7 @@ const TIPS = [
   ['#nameSuffix', 'Added to the end of the saved name, e.g. an order number or the print area.'],
   ['#foldAll', 'Open or close every section.'],
   ['#holdOrig', 'Press and hold (or hold O) to see the art before halftoning, in the same place. Let go to come back.'],
-  ['#holdClear', 'Press and hold to see the print on transparent checks: the checks are clear film. In Split, holding T does the same.'],
+  ['#holdClear', 'Press and hold to see the print on transparent checks: the checks are clear film. Let go to come back. In Split, holding T does the same. Dimmed while the view is already transparent.'],
   ['#lifeSetup', 'Set up Life size: measure this screen with a bank card. Do it again on a different monitor, or after changing the display scaling.'],
   ['#resetAll', 'Put every setting back to the tool’s defaults and remove the crop. Undo brings them back.'],
   ['#revertBtn', 'Back to this design as it was opened: its settings, crop, size and touch-ups. Undo brings your changes back.'],
