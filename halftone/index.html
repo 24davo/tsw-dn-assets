@@ -1054,6 +1054,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
       <div class="menu-h" id="testsHead">Print tests</div>
       <a class="btn" id="testChart" href="https://24davo.github.io/tsw-dn-assets/halftone/test-chart.png" target="_blank" rel="noopener" style="text-decoration:none" data-tip="One sheet, 190 × 270 mm, to print at 100%: fades at 25 to 45 lpi, tints, and dots, gaps and lines from 0.08 to 0.85 mm. Print it once for each printer, film or powder.">Test chart: dots and lines</a>
+      <button class="btn" type="button" id="testGain" data-tip="Makes one sheet, 190 × 270 mm, to print at 100%: flat tints from 5% to 100% in cyan, magenta, yellow, black, red, green, blue and white, at 25, 30, 35 and 45 lpi. Where a tint looks solid before 100%, the dots are spreading (dot gain).">Test chart: dot gain in colour</button>
       <button class="btn" type="button" data-strip="lpi" data-tip="Halftone only. Click a part of the open design: the same 60 mm patch is saved at 25, 30, 35 and 45 lpi, labelled, to print and compare.">Test strip: dot sizes</button>
       <button class="btn" type="button" data-strip="pale" data-tip="Click a part of the open design: the same 60 mm patch is saved with Deepen pale colours at Off, A little and More.">Test strip: pale colours</button>
       <button class="btn" type="button" data-strip="skin" data-tip="Click a part of the open design, such as a face: the same 60 mm patch is saved with Calm skin tones at Off, A little and More.">Test strip: skin tones</button>
@@ -4377,6 +4378,53 @@ window.addEventListener('keyup', e => { if (e.key === ' ' && spaceDown){ spaceDo
 /* ---------- test strip: one 60 mm patch of the print, saved at Off / A little / More, to print before committing ---------- */
 const STRIPS = {skin: 'Skin tones', pale: 'Pale colours', lpi: 'Dot sizes'};
 const STRIP_LPI = [25, 30, 35, 45];
+/* The colour dot gain chart. Layout in mm (GAIN), drawn straight into pixels so nothing is half see-through. A tint of t
+   is round dots of area t in each cell up to 50%, then round holes of area 1 - t, on the screen angle GE uses. */
+const GAIN = {w: 190, h: 270, x0: 30, pitch: 14, pw: 13, top: 22, block: 60.4, head: 6, row: 6.8, ph: 6, steps: [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+  cols: [['Cyan', [0, 174, 239]], ['Magenta', [236, 0, 140]], ['Yellow', [255, 242, 0]], ['Black', [0, 0, 0]], ['Red', [237, 28, 36]], ['Green', [0, 166, 81]], ['Blue', [46, 49, 146]], ['White', [255, 255, 255]]]};
+function gainChartCanvas(){
+  const px = v => Math.round(v/25.4*DPI), W = px(GAIN.w), H = px(GAIN.h), d = new Uint8ClampedArray(W*H*4);
+  const cs = Math.cos(22.5*Math.PI/180), sn = Math.sin(22.5*Math.PI/180);
+  STRIP_LPI.forEach((lpi, b) => { const cell = DPI/lpi;
+    GAIN.cols.forEach(([, rgb], r) => { const y0 = px(GAIN.top + b*GAIN.block + GAIN.head + r*GAIN.row), y1 = y0 + px(GAIN.ph);
+      GAIN.steps.forEach((pc, i) => { const t = pc/100, x0 = px(GAIN.x0 + i*GAIN.pitch), x1 = x0 + px(GAIN.pw), dot = t <= 0.5, r2 = (dot ? t : 1 - t)/Math.PI;
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++){
+          let on = true;
+          if (t < 1){ const u = (x*cs + y*sn)/cell, v = (y*cs - x*sn)/cell; let fu = u - Math.floor(u) - 0.5, fv = v - Math.floor(v) - 0.5;
+            if (!dot){ fu = fu > 0 ? fu - 0.5 : fu + 0.5; fv = fv > 0 ? fv - 0.5 : fv + 0.5; }
+            const inside = fu*fu + fv*fv <= r2; on = dot ? inside : !inside; }
+          if (on){ const k = (y*W + x)*4; d[k] = rgb[0]; d[k + 1] = rgb[1]; d[k + 2] = rgb[2]; d[k + 3] = 255; }
+        } }); }); });
+  // the words: drawn on their own canvas, then every pixel made fully solid or clear
+  const tc = document.createElement('canvas'); tc.width = W; tc.height = H; const tx = tc.getContext('2d', {willReadFrequently: true});
+  tx.fillStyle = '#000'; tx.textBaseline = 'middle'; const font = (mm, wt) => { tx.font = `${wt || 700} ${px(mm)}px Inter, Arial, sans-serif`; };
+  font(4.6, 800); tx.fillText('DOT GAIN TEST', px(6), px(7));
+  font(2.9, 600); tx.fillText('Graphic Engine · 190 × 270 mm · print at 100%, no scaling · tints in round dots at 22.5°', px(52), px(7.2));
+  font(2.6, 500); tx.fillText('Each patch is a flat tint. Read along a row: the patch where the gaps close and it looks solid shows the dot gain. Solid before 90% = too much gain at that lpi.', px(6), px(13), px(178));
+  tx.fillText('The 5% and 10% patches show the smallest dot that holds. Pick the highest lpi where 5% still prints and 80% still shows gaps.', px(6), px(17), px(178));
+  STRIP_LPI.forEach((lpi, b) => { const y = GAIN.top + b*GAIN.block;
+    font(3.6, 800); tx.fillText(`${lpi} lpi`, px(6), px(y + 3));
+    font(2.4, 600); tx.textAlign = 'center'; GAIN.steps.forEach((pc, i) => tx.fillText(pc + '%', px(GAIN.x0 + i*GAIN.pitch + GAIN.pw/2), px(y + 3.4))); tx.textAlign = 'left';
+    font(2.8, 700); GAIN.cols.forEach(([name], r) => tx.fillText(name, px(6), px(y + GAIN.head + r*GAIN.row + GAIN.ph/2))); });
+  const t = tx.getImageData(0, 0, W, H).data;
+  for (let k = 3; k < t.length; k += 4) if (t[k] >= 128){ d[k - 3] = 236; d[k - 2] = 0; d[k - 1] = 140; d[k] = 255; }
+  const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d').putImageData(new ImageData(d, W, H), 0, 0);
+  return c;
+}
+let gainBusy = false;
+async function gainChartSave(){
+  if (gainBusy) return; gainBusy = true;
+  try {
+    toast('Making the dot gain chart…'); await new Promise(r => setTimeout(r, 40));
+    try { await document.fonts.load('700 30px Inter'); } catch(e){}
+    const c = gainChartCanvas();
+    const raw = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('The browser could not make the chart.')), 'image/png'));
+    const png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', 'Dot gain test chart, 190 x 270 mm at 300 dpi: 25, 30, 35 and 45 lpi in eight colours']]);
+    if (await saveFile(png, 'GE dot gain chart 190x270mm.png')) toast('Dot gain chart saved. Print it at 100%, with no scaling.');
+  } catch(err){ toast(err && err.message ? err.message : 'The chart didn’t work.'); }
+  finally { gainBusy = false; }
+}
+$('testGain').addEventListener('click', gainChartSave);
 let stripKey = '', stripBusy = false;
 function stripStart(key){
   if (stripBusy || !(key in STRIPS)) return;
@@ -8568,14 +8616,14 @@ async function chkStatus(){ // is the feature there, and switched on? Asked once
 }
 function chkCapture(){ // the design on screen: a small before | after picture on the shirt colour, and its measurements. No names
   const size = 778 /* two panes and the gap come to 1568 px at most, the largest Claude reads without shrinking */, one = src => { const k = Math.min(1, size/Math.max(src.width, src.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(src.width*k)); c.height = Math.max(1, Math.round(src.height*k));
-    const x = c.getContext('2d'); x.fillStyle = st.shirt; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); return c; };
+    const x = c.getContext('2d'); x.fillStyle = st.shirtOff ? '#808080' : st.shirt; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); return c; };
   const a = one(srcCanvas), b = one(outCanvas), c = document.createElement('canvas'), gap = 12; c.width = a.width + gap + b.width; c.height = Math.max(a.height, b.height);
   const x = c.getContext('2d'); x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height); x.drawImage(a, 0, 0); x.drawImage(b, a.width + gap, 0);
   const box = $('dtgHint'), wMm = st.widthCm*10, hMm = wMm*art.h/art.w, ink = (lastOn || 0)/((DPI/2.54)**2);
   let pic = c.toDataURL('image/jpeg', 0.84); for (const q of [0.7, 0.55, 0.4]){ if (pic.length <= 560000) break; pic = c.toDataURL('image/jpeg', q); } /* the board takes up to 560,000 characters */
   return {pic, facts: {widthMm: +wMm.toFixed(1), heightMm: +hMm.toFixed(1), inkCm2: Math.round(ink), inkShare: +(ink/(wMm*hMm/100)*100).toFixed(1),
     softGlow: box && box.dataset.glow && !isDtg() ? +box.dataset.glow : null, specks: lastSpeck ? lastSpeck[0] : 0, dpi: Math.round(art.w/(wMm/25.4)),
-    style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: (lookQuickNow() === 'bg' ? QS_BG[0] : lookName()).slice(0, 60), shirt: st.shirt, settings: settingsText().slice(0, 600)}};
+    style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: (lookQuickNow() === 'bg' ? QS_BG[0] : lookName()).slice(0, 60), shirt: st.shirtOff ? 'not chosen yet (shown on mid grey)' : st.shirt, settings: settingsText().slice(0, 600)}};
 }
 const chkStamp = (g, it) => JSON.stringify(it && it.own ? [it.own.snap, it.own.strokesN, it.own.rot, it.own.sized ? 0 : [g.fit, g.fitMm, g.scale, g.trim]] : [g.snap, g.fit, g.fitMm, g.scale, g.trim]); // the set-up a design is worked out with
 function chkFind(c){ for (const g of batchGroups){ const it = g.items.find(x => x.key === c.key); if (it) return {g, it}; } return {}; }
@@ -8701,7 +8749,7 @@ const geTabs = () => docs.map((d, i) => { const a = d === cur ? art : d.art; ret
 function geStatus(){
   if (!art) return {ready: true, design: null, tabs: geTabs()};
   return {ready: outReady && !running && !pending, design: {name: art.name, sample: !!art.isSample, filePx: [art.w, art.h], widthMm: +(st.widthCm*10).toFixed(1), heightMm: +(st.widthCm*10*art.h/art.w).toFixed(1),
-    style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: lookQuickNow() === 'bg' ? QS_BG[0] : lookName(), shirt: st.shirt, saveAs: fileName(), orders: art.orders || null}, tabs: geTabs()};
+    style: st.dtg ? 'dtg' : st.finish === 'cut' ? (st.flat ? 'trace prep' : 'clean cut') : 'halftone', quickStart: lookQuickNow() === 'bg' ? QS_BG[0] : lookName(), shirt: st.shirtOff ? null : st.shirt, saveAs: fileName(), orders: art.orders || null}, tabs: geTabs()};
 }
 async function geFile(src, name){
   if (src instanceof File) return src;
