@@ -393,6 +393,8 @@ details ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13px
 .tune-n{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted)}
 .panel.tune-closed > .group.tune{display:none}
 .size-ask{margin:0;padding:9px 10px;border-radius:var(--r);background:var(--warn-bg);color:var(--warn);font-size:13px;font-weight:600}
+.size-over{display:grid;gap:8px;justify-items:start;font-weight:500}
+.size-over .btn{font-weight:700}
 .size-trim{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 #sizeChips{display:grid;grid-template-columns:repeat(4,1fr)}
 #sizeChips .chip{padding:0 4px}
@@ -726,6 +728,8 @@ body:has(#toast:not([hidden])) .batch-bar2{bottom:calc(76px + env(safe-area-inse
 .tdrop-pop.menu .btn{justify-content:flex-start;width:100%;height:44px;border:0;border-radius:0;background:none}
 .tdrop-pop.menu .btn:hover{background:var(--soft)}
 .tdrop-pop.menu .btn + .btn{border-top:1px solid var(--line)}
+.tdrop-pop.menu .menu-h{padding:12px 16px 4px;border-top:1px solid var(--line-strong);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tdrop-pop.menu .menu-h + .btn{border-top:0}
 .mv-menu{min-width:190px}
 .tab-ok{flex:none;color:var(--good);font-size:13px;font-weight:800;line-height:1}
 .tabs-t span b.tabs-ok{display:inline;font-size:13px;font-weight:700;color:var(--good);text-decoration:none}
@@ -1048,6 +1052,11 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
       <button class="btn" id="fullBtn" type="button" aria-pressed="false" hidden data-tip="Fills the whole screen with Graphic Engine. The browser’s bars and the taskbar hide until you leave it. Esc leaves.">Full screen</button>
       <button class="btn" id="installBtn" type="button" hidden data-tip="Puts this in its own window, like a program: no browser tabs or address bar, its own icon on the taskbar, and the taskbar stays in view.">Install app</button>
       <button class="btn" id="themeBtn" type="button" aria-pressed="false">Light mode</button>
+      <div class="menu-h" id="testsHead">Print tests</div>
+      <a class="btn" id="testChart" href="https://24davo.github.io/tsw-dn-assets/halftone/test-chart.png" target="_blank" rel="noopener" style="text-decoration:none" data-tip="One sheet, 190 × 270 mm, to print at 100%: fades at 25 to 45 lpi, tints, and dots, gaps and lines from 0.08 to 0.85 mm. Print it once for each printer, film or powder.">Test chart: dots and lines</a>
+      <button class="btn" type="button" data-strip="lpi" data-tip="Halftone only. Click a part of the open design: the same 60 mm patch is saved at 25, 30, 35 and 45 lpi, labelled, to print and compare.">Test strip: dot sizes</button>
+      <button class="btn" type="button" data-strip="pale" data-tip="Click a part of the open design: the same 60 mm patch is saved with Deepen pale colours at Off, A little and More.">Test strip: pale colours</button>
+      <button class="btn" type="button" data-strip="skin" data-tip="Click a part of the open design, such as a face: the same 60 mm patch is saved with Calm skin tones at Off, A little and More.">Test strip: skin tones</button>
       </div></div>
       <button class="btn" type="button" id="openBtn">Open art</button>
       <input type="file" id="fileIn" multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
@@ -1190,6 +1199,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
       <section class="group step" id="sizeGroup">
         <h2>Print size</h2>
         <p class="size-ask" id="sizeAsk" hidden>No size is saved in this file. Choose the print width.</p>
+        <div class="size-ask size-over" id="sizeOver" hidden><span id="sizeOverTxt"></span><button class="btn small" type="button" id="sizeFit" data-tip="Shrinks the print to the largest size that fits inside 400 × 500 mm, keeping its shape. Undo takes it back.">Fit inside 400 × 500 mm</button></div>
         <div class="chips" id="sizeChips">
           <button class="chip" type="button" data-w="90" data-tip="90 mm wide: a chest logo.">Chest 90</button>
           <button class="chip" type="button" data-w="280" data-tip="280 mm wide: a full front print.">Front 280</button>
@@ -1209,7 +1219,7 @@ label.chip.sel-ink .colorbox{width:22px;height:22px}
         <div class="size-trim" id="sizeTrim" hidden><span>There’s empty space around the art.</span><button class="chip" type="button" id="sizeTrimBtn">Trim to the art</button></div>
         <div class="check q-note" id="qualityNote" hidden></div>
         <label class="check-row" id="smoothRow" hidden data-tip="Redraws the art from its real pixels with smooth edges, so the blocks don’t print as steps. Leave it off for pixel-art designs."><input type="checkbox" id="smoothBtn"> Smooth the enlarged pixels</label>
-        <p class="f-note"><span id="sizeNote">Saved at 300 dpi.</span><span class="more-x" hidden> Type either box and the other follows. Largest print is 400 × 500 mm either way round. The art is resized to this first, then everything else is worked out at this size, so the dots are true to the print.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
+        <p class="f-note"><span id="sizeNote">Saved at 300 dpi.</span><span class="more-x" hidden> Type either box and the other follows. A garment print fits inside 400 × 500 mm either way round; bigger sizes are fine for editing and sheets, and Print size then offers a Fit button. The art is resized to this first, then everything else is worked out at this size, so the dots are true to the print.</span> <button class="link more-btn" type="button" aria-expanded="false">More</button></p>
         <p class="f-note" id="lifeNote"></p>
       </section>
 
@@ -3219,6 +3229,17 @@ function schedule(){
 /* ---------- sizes ---------- */
 function maxWidthFor(a){ const r = a.h/a.w; return a.w >= a.h ? Math.min(MAX_LONG, MAX_SHORT/r) : Math.min(MAX_SHORT, MAX_LONG/r); }
 function maxWidthCm(){ return art ? maxWidthFor(art) : MAX_SHORT; }
+/* The largest size the editor holds, set by what a browser can work on: BIG_SIDE pixels on the long side and BIG_AREA
+   pixels in all, at 300 dpi. The largest print (maxWidthFor) is advice here, with a Fit button in Print size. */
+const BIG_SIDE = 16000, BIG_AREA = 80e6;
+function bigWidthFor(a){ const r = a.h/a.w, px = Math.min(a.w >= a.h ? BIG_SIDE : BIG_SIDE/r, Math.sqrt(BIG_AREA/r)); return Math.max(maxWidthFor(a), px/DPI*2.54); }
+function bigWidthCm(){ return art ? bigWidthFor(art) : MAX_SHORT; }
+const overPrint = () => !!art && st.widthCm > maxWidthCm() + 0.001;
+function syncSizeOver(){
+  const el = $('sizeOver'); if (!el || !art) return; const over = overPrint(); el.hidden = !over; if (!over) return;
+  const m = maxWidthCm();
+  $('sizeOverTxt').textContent = `${toMm(st.widthCm).toLocaleString()} × ${toMm(st.widthCm*art.h/art.w).toLocaleString()} mm is bigger than the largest print, 400 × 500 mm. Fine for editing, cropping or a sheet. To print it on a garment, fit it inside ${toMm(m)} × ${toMm(m*art.h/art.w)} mm.`;
+}
 function outW(){ return Math.max(1, Math.round(st.widthCm/2.54*DPI)); }
 const toMm = cm => Math.round(cm*10); // sizes are kept in cm, and shown and typed in mm
 function outH(){ return Math.max(1, Math.round(outW()*art.h/art.w)); }
@@ -3230,16 +3251,16 @@ function syncSizeText(){ // the print's size; an outward fade can add room round
   if ($('fileSize')) $('fileSize').textContent = mm + (room ? ' with the fade' : '');
 }
 function setWidth(cm, quiet, typing){
-  const max = maxWidthCm(), w = Math.max(0.5, Math.min(cm || 1, max)), h = w*art.h/art.w;
-  if (!quiet && cm > max + 0.001) toast(`Largest print is 400 × 500 mm, so it’s set to ${toMm(w)} × ${toMm(h)} mm.`);
+  const max = bigWidthCm(), w = Math.max(0.5, Math.min(cm || 1, max)), h = w*art.h/art.w;
+  if (!quiet && cm > max + 0.001) toast(`That is more than this browser can work on, so it’s set to ${toMm(w).toLocaleString()} × ${toMm(h).toLocaleString()} mm.`);
   st.widthCm = w;
   if (typing !== $('wcm')) $('wcm').value = toMm(w);
-  $('wRange').max = toMm(max); $('wRange').value = toMm(w);
+  $('wRange').max = Math.max(toMm(maxWidthCm()), toMm(w)); $('wRange').value = toMm(w); // the slider covers print sizes; a bigger file stretches it to itself
   if (typing !== $('hcm')) $('hcm').value = toMm(h);
   syncSizeText();
   syncSums();
   syncQuality();
-  syncSizeAsk();
+  syncSizeAsk(); syncSizeOver();
   if (resetsReady) syncResets();
 }
 // A file with no size saved in it opens at a guess (its pixels at 300 dpi). art.sizeFrom: 'file' (the size is the file's own, or the
@@ -3824,7 +3845,7 @@ function setCrop(c){ // c in file pixels; keeps the cm-per-pixel scale
   art.crop = {x: Math.max(0, Math.round(c.x)), y: Math.max(0, Math.round(c.y)), w: Math.max(1, Math.round(c.w)), h: Math.max(1, Math.round(c.h))};
   art.crop.w = Math.min(art.crop.w, art.fullW - art.crop.x); art.crop.h = Math.min(art.crop.h, art.fullH - art.crop.y);
   art.w = art.crop.w; art.h = art.crop.h;
-  setWidth(st.widthCm*art.w/before, false);
+  setWidth(art.scale0 && art.sizeFrom !== 'user' ? art.scale0*art.w : st.widthCm*art.w/before, false); // nobody chose a size: the file's own scale
   syncCrop(); buildSrc(); setZoom('fit'); updateChecks();
 }
 function findTrim(A = art){ // the art's own edges: clear margins, or margins the colour of the top-left corner (a JPG's background)
@@ -4041,7 +4062,7 @@ $('turnZero').addEventListener('click', () => turnSet(0, 0));
 $('turnApply').addEventListener('click', () => endTurn(true));
 $('turnCancel').addEventListener('click', () => endTurn(false));
 function syncCropTxt(){
-  const [x0, y0, x1, y1] = cropping.rect, cmPerPx = st.widthCm/art.w;
+  const [x0, y0, x1, y1] = cropping.rect, cmPerPx = art.scale0 && art.sizeFrom !== 'user' ? art.scale0 : st.widthCm/art.w;
   $('cropTxt').textContent = `${Math.round(x1 - x0)} × ${Math.round(y1 - y0)} px · ${toMm((x1 - x0)*cmPerPx)} × ${toMm((y1 - y0)*cmPerPx)} mm. Drag the corners or edges, or inside to move.`;
 }
 const cropHandles = (X0, Y0, X1, Y1) => { const mx = (X0 + X1)/2, my = (Y0 + Y1)/2; return [[X0, Y0, 'nw'], [mx, Y0, 'n'], [X1, Y0, 'ne'], [X1, my, 'e'], [X1, Y1, 'se'], [mx, Y1, 's'], [X0, Y1, 'sw'], [X0, my, 'w']]; };
@@ -4353,35 +4374,43 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { if (e.key === ' ' && spaceDown){ spaceDown = false; stage.classList.remove('space'); drawBrush(); } });
 
 /* ---------- test strip: one 60 mm patch of the print, saved at Off / A little / More, to print before committing ---------- */
-const STRIPS = {skin: 'Skin tones', pale: 'Pale colours'};
+const STRIPS = {skin: 'Skin tones', pale: 'Pale colours', lpi: 'Dot sizes'};
+const STRIP_LPI = [25, 30, 35, 45];
 let stripKey = '', stripBusy = false;
-function stripStart(key){ if (!art || stripBusy || !(key in STRIPS)) return; stripKey = key; startPick('strip'); }
+function stripStart(key){
+  if (stripBusy || !(key in STRIPS)) return;
+  if (!art){ toast('Open a design first, then choose the test strip.'); return; }
+  if (key === 'lpi' && st.finish !== 'dots'){ toast('The dot size strip is for Halftone. Choose Halftone in Print style first.'); return; }
+  stripKey = key; startPick('strip');
+}
 async function stripMake(x, y){
   const key = stripKey, was = st[key]; if (!art || stripBusy || !(key in STRIPS)) return;
+  const isLpi = key === 'lpi', vals = isLpi ? STRIP_LPI : [0, 1, 2], names = isLpi ? STRIP_LPI.map(v => v + ' lpi') : ['Off', 'A little', 'More'];
+  const wasDens = {drop: st.drop, solid: st.solid}, level = isLpi ? densLevel() : null; // dot limits follow the lpi when they sit on a level, as with the slider
   stripBusy = true; let png = null, name = '';
   const settle = async () => { await new Promise(r => setTimeout(r, 200)); await idle(); await new Promise(r => setTimeout(r, 80)); await idle(); };
   try {
     $('busyTxt').textContent = 'Making the test strip…'; $('busy').hidden = false;
     const T = Math.round(60/25.4*DPI), fx = x/srcCanvas.width, fy = y/srcCanvas.height, tiles = [];
-    for (const L of [0, 1, 2]){
-      st[key] = L; buildSrc(); await settle(); $('busy').hidden = false;
+    for (const L of vals){
+      st[key] = L; if (level) Object.assign(st, densVals(level, L)); buildSrc(); await settle(); $('busy').hidden = false;
       const W = outCanvas.width, H = outCanvas.height, tw = Math.min(T, W), th = Math.min(T, H);
       const sx = Math.max(0, Math.min(W - tw, Math.round(fx*W - tw/2))), sy = Math.max(0, Math.min(H - th, Math.round(fy*H - th/2)));
       const c = document.createElement('canvas'); c.width = tw; c.height = th; c.getContext('2d').drawImage(outCanvas, sx, sy, tw, th, 0, 0, tw, th); tiles.push(c);
     }
     const gap = Math.round(4/25.4*DPI), band = Math.round(9/25.4*DPI), tw = tiles[0].width, th = tiles[0].height;
-    const o = document.createElement('canvas'); o.width = tw*3 + gap*2; o.height = th + band; const ox = o.getContext('2d');
+    const o = document.createElement('canvas'); o.width = tw*vals.length + gap*(vals.length - 1); o.height = th + band; const ox = o.getContext('2d');
     const under = isDtg() ? dtgColour() : st.shirt, u = hexRgb(under);
     if (isDtg()){ ox.fillStyle = under; ox.fillRect(0, 0, o.width, o.height); }
     ox.fillStyle = 0.299*u[0] + 0.587*u[1] + 0.114*u[2] < 128 ? '#ffffff' : '#111111';
     ox.font = `700 ${Math.round(4/25.4*DPI)}px Inter, Arial, sans-serif`; ox.textBaseline = 'middle';
-    ['Off', 'A little', 'More'].forEach((t, i) => { ox.drawImage(tiles[i], i*(tw + gap), 0); ox.fillText(`${STRIPS[key]}: ${t}`, i*(tw + gap), th + band/2 + 4, tw); });
+    names.forEach((t, i) => { ox.drawImage(tiles[i], i*(tw + gap), 0); ox.fillText(isLpi ? t : `${STRIPS[key]}: ${t}`, i*(tw + gap), th + band/2 + 4, tw); });
     const raw = await new Promise((res, rej) => o.toBlob(b => b ? res(b) : rej(new Error('The browser could not make the test strip.')), 'image/png'));
-    png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', `Test strip: ${STRIPS[key]} at Off, A little, More`]]);
-    name = fileName().replace(/\.png$/i, '') + `_test-strip-${key}.png`;
+    png = await withDpi(raw, DPI, [['Software', 'Tshirt Workshop Graphic Engine'], ['Comment', `Test strip: ${STRIPS[key]} at ${names.join(', ')}`]]);
+    name = fileName().replace(/\.png$/i, '').replace(isLpi ? /_\d+lpi/ : /$^/, '') + `_test-strip-${key}.png`;
   } catch(err){ toast(err && err.message ? err.message : 'The test strip didn’t work.'); }
-  finally { st[key] = was; buildSrc(); syncSliders(); await settle(); $('busy').hidden = true; $('busyTxt').textContent = 'Updating…'; stripBusy = false; }
-  if (png && await saveFile(png, name)) toast('Test strip saved. Print it, then choose Off, A little or More.');
+  finally { st[key] = was; Object.assign(st, wasDens); buildSrc(); syncSliders(); await settle(); $('busy').hidden = true; $('busyTxt').textContent = 'Updating…'; stripBusy = false; }
+  if (png && await saveFile(png, name)) toast(isLpi ? 'Test strip saved. Print it, then set Lines per inch to the one that looks best.' : 'Test strip saved. Print it, then choose Off, A little or More.');
 }
 document.addEventListener('click', e => { const b = e.target.closest ? e.target.closest('[data-strip]') : null; if (b) stripStart(b.dataset.strip); });
 
@@ -5546,11 +5575,12 @@ for (const id of ['wcm', 'hcm']){
   $(id).addEventListener('change', e => { const v = parseFloat(e.target.value); clearTimeout(wTimer); if (!art) return; if (v > 0) art.sizeFrom = 'user'; setWidth(v > 0 ? fromBox(id, v) : st.widthCm); buildSrcSoon(); updateChecks(); });
 }
 function nudgeWidth(mm){ // the - and + buttons and the slider type the new width into the box, so one path does the work
-  const el = $('wcm'); el.value = Math.max(5, Math.min(Math.round(mm), toMm(maxWidthCm())));
+  const el = $('wcm'); el.value = Math.max(5, Math.min(Math.round(mm), toMm(bigWidthCm())));
   el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true}));
 }
 $('wLess').addEventListener('click', () => { if (art) nudgeWidth((Math.ceil(toMm(st.widthCm)/10) - 1)*10); });
 $('wMore').addEventListener('click', () => { if (art) nudgeWidth((Math.floor(toMm(st.widthCm)/10) + 1)*10); });
+$('sizeFit').addEventListener('click', () => { if (!art) return; art.sizeFrom = 'user'; noteChange('Fit inside 400 × 500 mm'); setWidth(maxWidthCm(), true); buildSrcSoon(); updateChecks(); });
 $('wRange').addEventListener('input', e => { $('wcm').value = e.target.value; });
 $('wRange').addEventListener('change', e => { if (art) nudgeWidth(+e.target.value); });
 $('sizeChips').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (!b || !art) return; art.sizeFrom = 'user'; setWidth(b.dataset.w === 'max' ? maxWidthCm() : +b.dataset.w/10, b.dataset.w === 'max'); buildSrcSoon(); updateChecks(); });
@@ -5588,6 +5618,7 @@ function updateChecks(){
   if (!art) return;
   const rows = [];
   if (art.sizeFrom === 'guess') rows.push(['warn', '!', 'Print size not chosen', `No size is saved in this file, so it opened at ${toMm(st.widthCm)} mm wide. Choose the print width in step 1.`]);
+  if (overPrint()) rows.push(['warn', '!', 'Bigger than the largest print', `${toMm(st.widthCm).toLocaleString()} × ${toMm(st.widthCm*art.h/art.w).toLocaleString()} mm. Fine for editing or a sheet. For a garment print, use “Fit inside 400 × 500 mm” in Print size.`]);
   const s = srcStats;
   const softPct = s && s.vis ? Math.round(s.soft/s.vis*100) : null;
   const thruPc = thruPct();
@@ -5817,6 +5848,8 @@ function setArt(el, w, h, name, isSample, dpi, kind){
   Object.assign(lv, LV0); hist = null; syncLevels(); drawHisto(); // Levels belong to one piece of art
   syncLook(); syncFinish(); syncSliders(); syncInk(); updateNotes(); syncRules(); keepSettings(); // show the clean start
   setWidth(isSample ? 25 : w/(dpi || DPI)*2.54, true);
+  art.scale0 = isSample ? 0 : 2.54/(dpi || DPI); // the file's own scale, cm per pixel: a crop goes back to it until a size is chosen here
+  if (overPrint() && !restoringDocs){ const a0 = art; setTimeout(() => { if (art === a0 && overPrint() && !batchBusy) toast(`Opened at its own size, ${toMm(st.widthCm).toLocaleString()} × ${toMm(st.widthCm*a0.h/a0.w).toLocaleString()} mm. That is bigger than the largest print: Print size has a Fit button.`); }, 1700); }
   setZoom('fit');
   buildSrc(); render(); updateChecks();
   resetSteps(isSample ? 'Sample art' : `Opened ${name}`);
@@ -7392,7 +7425,7 @@ function resetToDefaults(){ // every setting back to the start, the crop and siz
 $('resetAll').addEventListener('click', resetToDefaults);
 /* Each step's Reset puts back just that step: to the Quick start's own values where it sets them, otherwise the defaults. */
 const lookVal = k => (LOOKS[st.look] && k in LOOKS[st.look] ? LOOKS[st.look] : DEFAULTS)[k];
-const openedWidth = () => Math.max(0.5, Math.min(art.isSample ? 25*art.w/art.fullW : art.w/(art.dpi || DPI)*2.54, maxWidthCm())); // as opened, for the current crop
+const openedWidth = () => Math.max(0.5, Math.min(art.isSample ? 25*art.w/art.fullW : art.w/(art.dpi || DPI)*2.54, bigWidthCm())); // as opened, for the current crop
 const sameRules = () => st.look === 'shadows' ? rules.length === 1 && JSON.stringify(rules[0]) === JSON.stringify(newRule('shadows', 'remove')) : !rules.length;
 const STEP_RESETS = {
   finishGroup: {get name(){ return isFlat() ? 'Flat colours' : st.finish === 'cut' ? 'Threshold' : 'Halftone dots'; }, // the print style itself stays
